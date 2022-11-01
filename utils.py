@@ -1,44 +1,34 @@
 import torch
-import torchvision
-import torchvision.transforms as T
 from torch.utils.data import DataLoader, Dataset
-import matplotlib
 import numpy as np
-import pickle as pkl
 from typing import Union, list, int
 import pandas as pd
-import os, sys
 from error import FuncInputError
 
-import torch.backends.cudnn as cudnn
-torch.manual_seed(0)    # Set seed for generating random numbers, returning torch.Generator object
-cudnn.deterministic = True
-cudnn.benchmark = False
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
-
 class vecDataset(Dataset):
-    def __init__(self, gen=False, **kwargs):
+    """Option to open dataset from existing CSV file or create from scratch."""
+    def __init__(self, gen=False, filename=None, **kwargs):
         if not gen:
             try:
-                if 'filename' in kwargs:
+                if filename != None:
                     filename = kwargs.pop('filename')
-                self.dataset = np.genfromtxt(filename, delimiter=',')
+                    self.dataset = np.genfromtxt(filename, delimiter=',')
+                else:
+                    raise FuncInputError
             except OSError:
                 print("Error opening files")
         else:
-            for key in ['simple', 'complex', 'noise', 'numpoints']:
+            for key in ['simple', 'complex', 'numpoints']:
                 if key not in kwargs:
                     raise FuncInputError
 
             num_points = kwargs.pop('num_points')
-            simple = kwargs.pop('simple')
+            self.simple = kwargs.pop('simple')
             complex = kwargs.pop('complex')
-            noise = kwargs.pop('noise')
 
-            self.generate(simple, complex, noise, num_points)
+            # Generate data
+            self.generate(self.simple, complex, num_points)
             
-
     def split_randomise(self, x):
         """Randomise n-fractions of the dataset.
         
@@ -51,6 +41,10 @@ class vecDataset(Dataset):
         for i in range(len(x)):
             idx = i*chunk_size
             np.random.shuffle(self.dataset[x[i],idx:idx+chunk_size])
+    
+    def simple_randomise(self):
+        for i in range(self.simple):
+            np.random.shuffle(self.dataset[i,:])
 
     def generate(self, simple, complex, noise, N):
         """"Generates dataset if it isn't read from file.
@@ -65,10 +59,13 @@ class vecDataset(Dataset):
             # Last row is y
             self.dataset[-1][i] = y
             for j in range(simple):
-                self.dataset[j][i] = np.random.choice([])
+                self.dataset[j][i] = np.random.choice([-1, 1])
             for j in range(len(complex)):
                 self.dataset[simple+j][i] = self.n_slabs(complex[j], y)
             # TODO: add noise stuff
+
+        name = input("Enter filename:")
+        np.savetxt('Dataset {}'.format(name), self.dataset, delimiter=',')
     
     def n_slabs(n, y):
         """"Generate single x datapoint from single y label.
@@ -78,12 +75,12 @@ class vecDataset(Dataset):
         :param n: number of slabs
         :param y: label
         """
-        xs = np.linspace(0, 2, n)
+        xs = np.linspace(-1, 1, n)
         if y == 1:
-            x_poss = xs[::2]-1
+            x_poss = xs[::2]
             return np.random.choice(x_poss)
         elif y == -1:
-            x_poss = xs[1::2]-1
+            x_poss = xs[1::2]
             return np.random.choice(x_poss)
     
     def __len__(self):
@@ -92,8 +89,38 @@ class vecDataset(Dataset):
     def __getitem__(self, idx):
         # Note that csv file is stored as rows = features, cols = datapoints
         # To preserve x as col vectors
-        input = self.dataset[:,idx][:-1]
-        label = self.dataset[:,idx][-1]
+        input = self.dataset[:-1,idx]
+        label = self.dataset[-1,idx]
         return input, label
 
-vecDataset(gen=True, simple=1, complex=[3,5], noise=0, numpoints=100)
+def my_train_dataloader(gen=False, filename=None, simple=0, complex=0, num_points=0, mode=0, x=[]):
+    """Used to load train and/or test splits.
+    
+    :param gen: Binary variable stating whether data should be generated or loading from an existing file. If so, filename should be given by filename parameter.
+    :param mode: Gives mode for data randomisation.
+        0: Generates without any randomisation.
+        1: Randomises feature indices/index listed in x using split randomise. Randomises simple feature.
+        2: Replaces simple component with uniform noise.
+        3: Replaces simple component with uniform noise and split randomises complex components.
+    :param x: Variable used for randomisation pass into split_randomise.
+
+    :returns: Dataset of 1D input features and one single label y which is the LAST ROW of the dataset.
+    """
+    # Base: to test that SB is observed as comparison
+    dset = vecDataset(gen, filename, simple, complex, num_points)
+    # Enforce variance towards all complex features only
+    if mode == 1:
+        dset.split_randomise(x)
+        dset.simple_randomise()
+    # Turn simple into noise
+    if mode == 2:
+        for i in range(len(simple)):
+            noise = np.random.uniform(-1, 1, num_points)
+            dset[i,:] = noise
+    if mode == 3:
+        for i in range(len(simple)):
+            noise = np.random.uniform(-1, 1, num_points)
+            dset[i,:] = noise
+        dset.split_randomise()
+
+    return dset.dataset
