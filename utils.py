@@ -14,15 +14,20 @@ class vecDataset(Dataset):
     Simple features always come first, followed by complex features.
     """
     def __init__(self, gen=False, filename=None, **kwargs):
+
         if not gen:
             try:
                 if filename != None:
-                    filename = kwargs.pop('filename')
                     self.dataset = np.genfromtxt(filename, delimiter=',')
                 else:
                     raise FuncInputError
             except OSError:
                 print("Error opening files")
+            self.num_points = self.dataset.shape[1]
+            self.features = self.dataset.shape[0]
+            self.simple = kwargs.pop('simple')
+            self.complex = kwargs.pop('complex')
+
         else:
             for key in ['simple', 'complex', 'num_points']:
                 if key not in kwargs:
@@ -70,12 +75,12 @@ class vecDataset(Dataset):
         for i in range(self.num_points):
             y = np.random.choice([0, 1], 1)
             # Last row is y
-            self.dataset[-1, i] = y
             for j in range(self.simple):
                 self.dataset[j, i] = np.random.choice([-1, 1])
             for j in range(self.complex):
                 self.dataset[self.simple+j, i] = self.n_slabs(self.complex_slabs[j], y)
-    
+            np.append(self.dataset[:, i], y)
+            
     def n_slabs(self, n, y):
         """"Generate single x datapoint from single y label.
         
@@ -129,9 +134,6 @@ def my_train_dataloader(gen=False, filename=None, simple=0, complex=[], num_poin
         np.savetxt('Train {}.csv'.format(name), dset.dataset, delimiter=',')
     # Return as tuple of data, labels
     return (dset.dataset[:-1,:], dset.dataset[-1,:])
-
-my_train_dataloader(gen=True, simple=1, complex=[5], num_points = 1000, mode=1, frac=0.2, x=[1])
-# Above works
 
 def my_test_dataloader(gen=False, filename=None, simple=0, complex=0, num_points=0,  sc=[]):
     """"Load test dataset.

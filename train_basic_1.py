@@ -18,6 +18,9 @@ print(f"Using {device} device")
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 
+GEN = True
+FILE_TEST = "Test 1.csv"
+FILE_TRAIN = "Train 1.csv"
 NUM_SIMPLE = 1
 COMPLEX = [3, 5]    # Array defining number of slabs for each complex
 num_features = NUM_SIMPLE + len(COMPLEX)
@@ -66,12 +69,12 @@ def evaluate(model, dataset, max_ex=0):
 
 #DATA STUFF======================================================
 # Train dataset
-X_train, y_train = my_train_dataloader(gen=True, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, x=X)
+X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, x=X)
 train_dataset = CustomDataset(X_train, y_train)
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 # Test dataset has 1/4 number of points
-X_test, y_test = my_test_dataloader(gen=True, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS//4, sc=SC)
+X_test, y_test = my_test_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS//4, sc=SC)
 test_dataset = CustomDataset(X_test, y_test)
 test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
@@ -80,6 +83,8 @@ output_dir = "teacher_linear_model/"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
+print("training data", X_train)
+print(y_train)
 # #TRAIN============================================================
 # loss_fn = nn.MSELoss()
 # models = {}
