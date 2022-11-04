@@ -70,7 +70,7 @@ class vecDataset(Dataset):
         """
         # Rows: features
         # Cols: datapoints
-        self.dataset = np.empty((self.features, self.num_points))
+        self.dataset = np.empty((self.features+1, self.num_points))
 
         for i in range(self.num_points):
             y = np.random.choice([0, 1], 1)
@@ -79,8 +79,8 @@ class vecDataset(Dataset):
                 self.dataset[j, i] = np.random.choice([-1, 1])
             for j in range(self.complex):
                 self.dataset[self.simple+j, i] = self.n_slabs(self.complex_slabs[j], y)
-            np.append(self.dataset[:, i], y)
-            
+            self.dataset[-1, i] = y
+
     def n_slabs(self, n, y):
         """"Generate single x datapoint from single y label.
         
