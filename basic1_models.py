@@ -18,7 +18,7 @@ class linear_net(nn.Module):
         scores = self.linear_2(scores)
         scores = self.relu(scores)
         scores = self.dropout(scores)
-        scores = self.linear_3(scores)
+        scores = nn.Sigmoid(self.linear_3(scores))
         return scores
 
 class small_linear_net(nn.Module):
@@ -31,23 +31,9 @@ class small_linear_net(nn.Module):
     def forward(self, input):
         scores = self.linear_1(input)
         scores = self.relu(scores)
-        scores = self.linear_2(scores)
+        scores = nn.Sigmoid(self.linear_2(scores))
         return scores
 
-#Convolution layers
-class convolutional_net(nn.Module):
-    def __init__(self):
-        super(convolutional_net, self).__init__()
-        self.convolution = nn.Conv2d(1, 10, 5)
-        self.relu = nn.ReLU()
-        self.maxpool = nn.MaxPool2d(5)
-        self.linear = nn.Linear(160, 10)
-
-    def forward(self, input):
-        in_reshaped = input.reshape(-1, 1, 28, 28)
-        x_conv = self.convolution(in_reshaped)
-        x_relu = self.relu(x_conv)
-        x_conv_out = self.maxpool(x_relu)
-        x_flat = x_conv_out.reshape(-1, 160)
-        scores = self.linear(x_flat)
-        return scores
+# test_model = small_linear_net(2)
+# # output model summary statistics
+# print(test_model)
