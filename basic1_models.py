@@ -11,6 +11,7 @@ class linear_net(nn.Module):
         self.linear_2 = nn.Linear(100, 100)
         self.dropout = nn.Dropout(p=dropout)
         self.linear_3 = nn.Linear(100, 1)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, input):
         scores = self.linear_1(input)
@@ -18,7 +19,7 @@ class linear_net(nn.Module):
         scores = self.linear_2(scores)
         scores = self.relu(scores)
         scores = self.dropout(scores)
-        scores = nn.Sigmoid(self.linear_3(scores))
+        scores = self.sigmoid(self.linear_3(scores))
         return scores
 
 class small_linear_net(nn.Module):
@@ -27,11 +28,12 @@ class small_linear_net(nn.Module):
         self.linear_1 = nn.Linear(num_features, 50)
         self.relu = nn.ReLU()
         self.linear_2 = nn.Linear(50, 1)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, input):
         scores = self.linear_1(input)
         scores = self.relu(scores)
-        scores = nn.Sigmoid(self.linear_2(scores))
+        scores = self.sigmoid(self.linear_2(scores))
         return scores
 
 # test_model = small_linear_net(2)

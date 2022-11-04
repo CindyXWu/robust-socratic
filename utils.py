@@ -18,7 +18,8 @@ class vecDataset(Dataset):
         if not gen:
             try:
                 if filename != None:
-                    self.dataset = np.genfromtxt(filename, delimiter=',')
+                    # Load datatype as float32 to avoid conflict with torch
+                    self.dataset = np.genfromtxt(filename, delimiter=',', dtype="float32")
                 else:
                     raise FuncInputError
             except OSError:
