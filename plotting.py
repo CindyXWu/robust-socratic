@@ -28,7 +28,7 @@ def plot_acc(train_acc, test_acc, it, base_name='', title=''):
     plt.title(title)
     plt.ylabel('Accuracy')
     plt.xlabel('Iteration')
-    plt.ylim([90, 100])
+    plt.ylim([40, 100])
     if base_name != '':
         fig.savefig(base_name + '.png')
     else:

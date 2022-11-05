@@ -134,8 +134,8 @@ def my_train_dataloader(gen=False, filename=None, simple=0, complex=[], num_poin
             dset.split_randomise(x)
         dset.simple_randomise(frac)
     if gen:
-        name = input("Enter filename for train dataset:")
-        np.savetxt(output_dir+'train {}.csv'.format(name), dset.dataset, delimiter=',')
+        name = filename
+        np.savetxt(output_dir+name, dset.dataset, delimiter=',')
     # Return as tuple of data, labels
     return (dset.dataset[:, :-1], dset.dataset[:, -1])
 
@@ -146,9 +146,11 @@ def my_test_dataloader(gen=False, filename=None, simple=0, complex=0, num_points
     """
     dset = vecDataset(gen=gen, filename=filename, simple=simple, complex=complex, num_points=num_points)
     for coord in sc:
-        np.random.shuffle(dset.dataset[coord,:])
+        np.random.shuffle(dset.dataset[:, coord])
+        np.random.shuffle(dset.dataset[:, coord])
+        # # Check if this column has been shuffled properly
+        # print(dset.dataset[:, coord])
     if gen:
-        name = input("Enter filename for test dataset:")
-        np.savetxt(output_dir+'test {}.csv'.format(name), dset.dataset, delimiter=',')
+        name = filename
+        np.savetxt(output_dir+name, dset.dataset, delimiter=',')
     return (dset.dataset[:, :-1], dset.dataset[:, -1])
-
