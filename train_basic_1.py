@@ -12,15 +12,14 @@ from utils import *
 from basic1_models import *
 from error import *
 from plotting import *
-from einops import rearrange, repeat, reduce
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device") 
-
+1
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 
 # Set GEN to True to generate files from scratch for training and testing
-GEN = False
+GEN = True
 # Train and test dataset names
 FILE_TEST = "Test 1.csv"
 FILE_TRAIN = "Train 1.csv"
@@ -30,10 +29,12 @@ NUM_SIMPLE = 1
 COMPLEX = [3, 5]
 # Total number of complex features
 num_features = NUM_SIMPLE + len(COMPLEX)
-NUM_POINTS = 100
-BATCH_SIZE = 10
+NUM_POINTS = 1000
+BATCH_SIZE = 100
 # For train
 MODE = 1
+# Fraction of simple datapoints to randomise
+FRAC = 0.5
 X = [1,2]
 # For test - start with randomising simple feature (first row)
 SC = [0]
@@ -51,7 +52,7 @@ class CustomDataset(Dataset):
         print('labels shape: ', self.labels.shape)
 
     def __getitem__(self, index):
-        f = torch.tensor(self.features[:,index])
+        f = torch.tensor(self.features[index, :])
         l = torch.tensor(self.labels[index])
         return (f.to(device), l.to(device))
 
@@ -75,7 +76,7 @@ def evaluate(model, dataset, max_ex=0):
 
 #DATA STUFF======================================================
 # Train dataset
-X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, x=X)
+X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=FRAC, x=X)
 # Reshape y tensor tp (datapoints*1)
 y_train = y_train.reshape(-1,1)
 train_dataset = CustomDataset(X_train, y_train)
@@ -93,6 +94,11 @@ output_dir = "teacher_linear_model/"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
+# iterable = iter(train_loader)
+# features, labels = next(iterable)
+# print(features.shape)
+# print(labels.shape)
+
 #TRAIN============================================================
 loss_fn = nn.MSELoss()
 models = {}
@@ -107,9 +113,8 @@ for lr in lrs:
         optimizer = Adam(net.parameters(), lr=lr)
         optimizer.zero_grad()
         # Start training
-        val_acc = []
         train_acc = []
-        train_loss = []  # loss at iteration 0
+        train_loss = [0]  # loss at iteration 0
 
         # print(len(train_data), len(train_loader))
         it_per_epoch = len(train_loader)
@@ -136,5 +141,4 @@ for lr in lrs:
                          'optimizer_state_dict': optimizer.state_dict(),
                          'loss_hist': train_loss,
                          'lr':lr,
-                         'p':dropout,
-                         'val_acc': val_acc[-1]}
+                         'p':dropout}

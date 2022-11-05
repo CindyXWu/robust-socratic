@@ -10,7 +10,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 class vecDataset(Dataset):
     """Option to open dataset from existing CSV file or create from scratch.
     
-    Rows are features, columns datapoints. Last row of every column is y label (0 or 1).
+    Rows are datapoints, columns are features. Last column of every row is y label (0 or 1).
     Simple features always come first, followed by complex features.
     """
     def __init__(self, gen=False, filename=None, **kwargs):
@@ -56,31 +56,31 @@ class vecDataset(Dataset):
         chunk_size = self.__len__()//n  # Size of each chunk
         for i in range(len(x)):
             idx = i*chunk_size
-            np.random.shuffle(self.dataset[x[i],idx:idx+chunk_size])
+            np.random.shuffle(self.dataset[idx:idx+chunk_size, x[i]])
     
     def simple_randomise(self, frac):
         """Shuffle first fraction of dataset for whatever specified fraction."""
         k = int(frac*self.num_points)
         for i in range(self.simple):
-            np.random.shuffle(self.dataset[i,:k])
+            np.random.shuffle(self.dataset[:k, i])
 
     def generate(self):
         """"Generates dataset if it isn't read from file.
         
         :param complex: list of number of slabs to use for each feature
         """
-        # Rows: features
-        # Cols: datapoints
-        self.dataset = np.empty((self.features+1, self.num_points))
+        # Rows: datapoints
+        # Cols: features
+        self.dataset = np.empty((self.num_points, self.features+1), dtype="float32")
 
         for i in range(self.num_points):
             y = np.random.choice([0, 1], 1)
-            # Last row is y
+            # Last column is y label
             for j in range(self.simple):
-                self.dataset[j, i] = np.random.choice([-1, 1])
+                self.dataset[i, j] = np.random.choice([-1, 1])
             for j in range(self.complex):
-                self.dataset[self.simple+j, i] = self.n_slabs(self.complex_slabs[j], y)
-            self.dataset[-1, i] = y
+                self.dataset[i, self.simple+j] = self.n_slabs(self.complex_slabs[j], y)
+            self.dataset[i, -1] = y
 
     def n_slabs(self, n, y):
         """"Generate single x datapoint from single y label.
@@ -104,8 +104,8 @@ class vecDataset(Dataset):
     def __getitem__(self, idx):
         # Note that csv file is stored as rows = features, cols = datapoints
         # To preserve x as col vectors
-        input = self.dataset[:-1,idx]
-        label = self.dataset[-1,idx]
+        input = self.dataset[idx, :-1]
+        label = self.dataset[idx, -1]
         return input, label
 
 # Train and test datasets formed slightly differently
@@ -134,7 +134,7 @@ def my_train_dataloader(gen=False, filename=None, simple=0, complex=[], num_poin
         name = input("Enter filename for train dataset:")
         np.savetxt('Train {}.csv'.format(name), dset.dataset, delimiter=',')
     # Return as tuple of data, labels
-    return (dset.dataset[:-1,:], dset.dataset[-1,:])
+    return (dset.dataset[:, :-1], dset.dataset[:, -1])
 
 def my_test_dataloader(gen=False, filename=None, simple=0, complex=0, num_points=0,  sc=[]):
     """"Load test dataset.
@@ -147,5 +147,5 @@ def my_test_dataloader(gen=False, filename=None, simple=0, complex=0, num_points
     if gen:
         name = input("Enter filename for test dataset:")
         np.savetxt('Test {}.csv'.format(name), dset.dataset, delimiter=',')
-    return (dset.dataset[:-1,:], dset.dataset[-1,:])
+    return (dset.dataset[:, :-1], dset.dataset[:, -1])
 
