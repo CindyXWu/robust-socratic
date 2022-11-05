@@ -80,7 +80,10 @@ class vecDataset(Dataset):
             y = np.random.choice([0, 1], 1)
             # Last column is y label
             for j in range(self.simple):
-                self.dataset[i, j] = np.random.choice([-1, 1])
+                if y == 1:
+                    self.dataset[i, j] = np.random.uniform(0, 1)
+                elif y == 0:
+                    self.dataset[i, j] = np.random.uniform(-1, 0)
             for j in range(self.complex):
                 self.dataset[i, self.simple+j] = self.n_slabs(self.complex_slabs[j], y)
             self.dataset[i, -1] = y

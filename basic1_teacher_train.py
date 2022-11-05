@@ -34,11 +34,11 @@ FILE_TRAIN = "train 1.csv"
 # Number of simple features
 NUM_SIMPLE = 1
 # Array defining number of slabs for each complex feature
-COMPLEX = [5, 8]
+COMPLEX = [3, 5]
 # Total number of complex features
 num_features = NUM_SIMPLE + len(COMPLEX)
 NUM_POINTS = 1000
-BATCH_SIZE = 100
+BATCH_SIZE = 50
 # For train
 MODE = 1
 # Fraction of simple datapoints to randomise
@@ -109,7 +109,7 @@ for frac in fracs:
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     # title = 'lr=' + str(lr)
-    title = 'simple randomised=' + str(frac)
+    title = 'Fraction training simple feature randomised=' + str(frac)
     print("\n", title, "\n")
     # Instantiate a new network
     net = linear_net(num_features, dropout=dropout).to(device)
