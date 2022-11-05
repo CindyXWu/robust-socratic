@@ -6,6 +6,9 @@ from error import *
 import sys, os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
+output_dir = "data/"
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
 
 class vecDataset(Dataset):
     """Option to open dataset from existing CSV file or create from scratch.
@@ -14,12 +17,12 @@ class vecDataset(Dataset):
     Simple features always come first, followed by complex features.
     """
     def __init__(self, gen=False, filename=None, **kwargs):
-
         if not gen:
             try:
                 if filename != None:
                     # Load datatype as float32 to avoid conflict with torch
-                    self.dataset = np.genfromtxt(filename, delimiter=',', dtype="float32")
+                    filepath = os.path.join('data', filename)
+                    self.dataset = np.genfromtxt(fname=filepath, delimiter=',', dtype="float32")
                 else:
                     raise FuncInputError
             except OSError:
@@ -132,7 +135,7 @@ def my_train_dataloader(gen=False, filename=None, simple=0, complex=[], num_poin
         dset.simple_randomise(frac)
     if gen:
         name = input("Enter filename for train dataset:")
-        np.savetxt('Train {}.csv'.format(name), dset.dataset, delimiter=',')
+        np.savetxt(output_dir+'train {}.csv'.format(name), dset.dataset, delimiter=',')
     # Return as tuple of data, labels
     return (dset.dataset[:, :-1], dset.dataset[:, -1])
 
@@ -146,6 +149,6 @@ def my_test_dataloader(gen=False, filename=None, simple=0, complex=0, num_points
         np.random.shuffle(dset.dataset[coord,:])
     if gen:
         name = input("Enter filename for test dataset:")
-        np.savetxt('Test {}.csv'.format(name), dset.dataset, delimiter=',')
+        np.savetxt(output_dir+'test {}.csv'.format(name), dset.dataset, delimiter=',')
     return (dset.dataset[:, :-1], dset.dataset[:, -1])
 

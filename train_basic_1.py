@@ -18,11 +18,14 @@ print(f"Using {device} device")
 1
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 
+# Edited a bunch ===============================================================
 # Set GEN to True to generate files from scratch for training and testing
-GEN = True
+GEN = False
 # Train and test dataset names
-FILE_TEST = "Test 1.csv"
-FILE_TRAIN = "Train 1.csv"
+FILE_TEST = "test 1.csv"
+FILE_TRAIN = "train 1.csv"
+
+# Edited sometimes ============================================
 # Number of simple features
 NUM_SIMPLE = 1
 # Array defining number of slabs for each complex feature
@@ -30,7 +33,7 @@ COMPLEX = [3, 5]
 # Total number of complex features
 num_features = NUM_SIMPLE + len(COMPLEX)
 NUM_POINTS = 1000
-BATCH_SIZE = 100
+BATCH_SIZE = 50
 # For train
 MODE = 1
 # Fraction of simple datapoints to randomise
@@ -42,7 +45,7 @@ SC = [0]
 # Hyperparameters
 lrs = [5e-4]
 dropouts = [0.4]
-epochs = 10
+epochs = 100
 
 class CustomDataset(Dataset):
     def __init__(self, features, labels):
@@ -52,6 +55,7 @@ class CustomDataset(Dataset):
         print('labels shape: ', self.labels.shape)
 
     def __getitem__(self, index):
+        # None adds extra dimension which hopefully forces dataloader to load correct size
         f = torch.tensor(self.features[index, :])
         l = torch.tensor(self.labels[index])
         return (f.to(device), l.to(device))
@@ -61,7 +65,6 @@ class CustomDataset(Dataset):
 
 def evaluate(model, dataset, max_ex=0):
     acc = 0
-    N = len(dataset) * BATCH_SIZE
     for i, (features, labels) in enumerate(dataset):
         # Batch size in length, varying from 0 to 1
         scores = model(features)
@@ -71,19 +74,20 @@ def evaluate(model, dataset, max_ex=0):
         acc += torch.sum(torch.eq(pred, labels)).item()
         if max_ex != 0 and i >= max_ex:
             break
-    # print(i)
+    # Return average accuracy as a percentage
+    # Fraction of data points correctly classified
     return (acc * 100 / ((i+1) * BATCH_SIZE) )
 
 #DATA STUFF======================================================
 # Train dataset
-X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=FRAC, x=X)
+X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=FRAC, x=X)
 # Reshape y tensor tp (datapoints*1)
 y_train = y_train.reshape(-1,1)
 train_dataset = CustomDataset(X_train, y_train)
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 # Test dataset has 1/4 number of points
-X_test, y_test = my_test_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS//4, sc=SC)
+X_test, y_test = my_test_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS//4, sc=SC)
 # Reshape y tensor
 y_test = y_test.reshape(-1,1)
 test_dataset = CustomDataset(X_test, y_test)
@@ -94,14 +98,10 @@ output_dir = "teacher_linear_model/"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
-# iterable = iter(train_loader)
-# features, labels = next(iterable)
-# print(features.shape)
-# print(labels.shape)
-
 #TRAIN============================================================
 loss_fn = nn.MSELoss()
 models = {}
+old_test_acc = 0
 for lr in lrs:
     for dropout in dropouts:
         # title = 'lr=' + str(lr)
@@ -114,31 +114,70 @@ for lr in lrs:
         optimizer.zero_grad()
         # Start training
         train_acc = []
+        test_acc = []
         train_loss = [0]  # loss at iteration 0
 
         # print(len(train_data), len(train_loader))
         it_per_epoch = len(train_loader)
         print("iterations per epoch: ", it_per_epoch)
+        # Count number of epochs
         it = 0
         for epoch in range(epochs):
             for features, labels in tqdm(train_loader):
+                # Forward pass
                 scores = net(features)
                 loss = loss_fn(scores, labels)
+                # Backward pass
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
                 train_loss.append(loss.item())
+                # Evaluate model at this iteration
                 if it % 100 == 0:
                     train_acc.append(evaluate(net, train_loader, max_ex=10))
-                    plot_acc(train_acc, it, it_per_epoch, base_name=output_dir + "acc_"+title, title=title)
+                    test_acc.append(evaluate(net, test_loader))
+                    plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
+                    plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
                 it += 1
-        #perform last book keeping
+        # Perform last book keeping
         train_acc.append(evaluate(net, train_loader, max_ex=100))
+        test_acc.append(evaluate(net, test_loader))
         plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
-        plot_acc(train_acc, it, it_per_epoch, base_name=output_dir + "acc_"+title, title=title)
+        plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
+
+        # Save model to dictionary, titled by dropout (can be changed)
         models[title] = {'model': net,
                          'model_state_dict': net.state_dict(),
                          'optimizer_state_dict': optimizer.state_dict(),
                          'loss_hist': train_loss,
                          'lr':lr,
-                         'p':dropout}
+                         'p':dropout,
+                         'test_acc': test_acc[-1]}
+
+for key in models.keys():
+    print("for lr: %s, test_acc: %s" % (models[key]['lr'], models[key]['test_acc']))
+    # print(key)
+
+test_accs = [models[key]['test_acc'] for key in models.keys()]
+xs = [models[key]['p'] for key in models.keys()]
+keys = [key for key in models.keys()]
+
+# Plot summary
+fig = plt.figure(figsize=(8, 4), dpi=100)
+plt.scatter(xs, test_accs)
+plt.title("{0} Epochs".format(epochs))
+plt.ylabel('Validation accuracy')
+# plt.xlabel('Learning rate')
+plt.xlabel('dropout')
+# plt.xscale('log')
+# plt.xlim([9e-5, 5e-1])
+
+best_key = keys[np.argmax(test_accs)]
+print(best_key)
+best_model = models[best_key]['model']
+
+torch.save({'epoch': epoch,
+            'model_state_dict': best_model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss_hist': train_loss},
+            output_dir + "main teacher model")
