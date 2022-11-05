@@ -37,19 +37,19 @@ NUM_SIMPLE = 1
 COMPLEX = [5, 8]
 # Total number of complex features
 num_features = NUM_SIMPLE + len(COMPLEX)
-NUM_POINTS = 100
-BATCH_SIZE = 10
+NUM_POINTS = 1000
+BATCH_SIZE = 100
 # For train
 MODE = 1
 # Fraction of simple datapoints to randomise
-fracs = [0, 0.2, 0.4, 0.6, 0.8, 1]
+fracs = [0, 1]
 X = [1,2]
 # For test - start with randomising simple feature (first row)
 SC = [0]
 
 # Hyperparameters
-lr = 5e-4
-dropout = 0.4
+lr = 0.1
+dropout = 0
 epochs = 500
 
 class CustomDataset(Dataset):
@@ -89,7 +89,7 @@ if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
 #TRAIN============================================================
-loss_fn = nn.MSELoss()
+loss_fn = nn.BCELoss()
 models = {}
 old_test_acc = 0
 for frac in fracs:
@@ -114,7 +114,7 @@ for frac in fracs:
     # Instantiate a new network
     net = linear_net(num_features, dropout=dropout).to(device)
     # Create optimizer
-    optimizer = Adam(net.parameters(), lr=lr)
+    optimizer = torch.optim.SGD(net.parameters(), lr=lr)
     optimizer.zero_grad()
     # Start training
     train_acc = []
@@ -160,7 +160,7 @@ for frac in fracs:
                         'test_acc': test_acc[-1]}
 
 for key in models.keys():
-    print("for simple frac randomised: %s', test_acc: %s" % (models[key]['simple frac random'], models[key]['test_acc']))
+    print("for simple frac randomised: %s, test_acc: %s" % (models[key]['simple frac random'], models[key]['test_acc']))
     # print(key)
 
 test_accs = [models[key]['test_acc'] for key in models.keys()]
