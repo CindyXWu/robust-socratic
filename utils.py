@@ -124,7 +124,7 @@ def my_train_dataloader(gen=False, filename=None, simple=0, complex=[], num_poin
     :param x: List of indices (rows) for randomisation using split_randomise.
     :param frac: Fraction of simple coordinate to randomise (acts as noise on simple dataset)
 
-    :returns: Dataset of 1D input features and one single label y which is the LAST ROW of the dataset.
+    :returns: Dataset of 1D input features and one single label y which is the LAST COLUMN of the dataset.
     """
     # Base: to test that SB is observed as comparison
     dset = vecDataset(gen=gen, filename=filename, simple=simple, complex=complex, num_points=num_points)

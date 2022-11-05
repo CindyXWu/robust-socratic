@@ -12,6 +12,10 @@ from utils import *
 from basic1_models import *
 from error import *
 from plotting import *
+import matplotlib
+
+# Trying to get rid of 'fail to allocate bitmap' error
+matplotlib.use("Agg")
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device") 
@@ -33,8 +37,8 @@ NUM_SIMPLE = 1
 COMPLEX = [5, 8]
 # Total number of complex features
 num_features = NUM_SIMPLE + len(COMPLEX)
-NUM_POINTS = 10000
-BATCH_SIZE = 100
+NUM_POINTS = 100
+BATCH_SIZE = 10
 # For train
 MODE = 1
 # Fraction of simple datapoints to randomise
@@ -46,7 +50,7 @@ SC = [0]
 # Hyperparameters
 lr = 5e-4
 dropout = 0.4
-epochs = 50
+epochs = 500
 
 class CustomDataset(Dataset):
     def __init__(self, features, labels):
@@ -150,12 +154,13 @@ for frac in fracs:
                         'model_state_dict': net.state_dict(),
                         'optimizer_state_dict': optimizer.state_dict(),
                         'loss_hist': train_loss,
+                        'simple frac random':frac,
                         'lr':lr,
                         'p':dropout,
                         'test_acc': test_acc[-1]}
 
 for key in models.keys():
-    print("for lr: %s, test_acc: %s" % (models[key]['lr'], models[key]['test_acc']))
+    print("for simple frac randomised: %s', test_acc: %s" % (models[key]['simple frac random'], models[key]['test_acc']))
     # print(key)
 
 test_accs = [models[key]['test_acc'] for key in models.keys()]
