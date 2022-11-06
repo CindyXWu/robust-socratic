@@ -10,6 +10,8 @@ output_dir = "data/"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 class vecDataset(Dataset):
     """Option to open dataset from existing CSV file or create from scratch.
     
@@ -57,7 +59,7 @@ class vecDataset(Dataset):
         """
         n = len(x)  # Num of chunks
         chunk_size = self.__len__()//n  # Size of each chunk
-        for i in range(len(x)):
+        for i in range(n):
             idx = i*chunk_size
             np.random.shuffle(self.dataset[idx:idx+chunk_size, x[i]])
     
@@ -105,6 +107,7 @@ class vecDataset(Dataset):
             return np.random.choice(x_poss)
     
     def __len__(self):
+        print(len(self.dataset))
         return len(self.dataset)
 
     def __getitem__(self, idx):
@@ -157,3 +160,43 @@ def my_test_dataloader(gen=False, filename=None, simple=0, complex=0, num_points
         name = filename
         np.savetxt(output_dir+name, dset.dataset, delimiter=',')
     return (dset.dataset[:, :-1], dset.dataset[:, -1])
+
+class CustomDataset(Dataset):
+    def __init__(self, features, labels):
+        self.features = features
+        self.labels = labels
+        print('data shape: ', self.features.shape)
+        print('labels shape: ', self.labels.shape)
+
+    def __getitem__(self, index):
+        # None adds extra dimension which hopefully forces dataloader to load correct size
+        f = torch.tensor(self.features[index, :])
+        l = torch.tensor(self.labels[index])
+        return (f.to(device), l.to(device))
+
+    def __len__(self):
+        return len(self.labels)
+
+
+GEN = True
+# Train and test dataset names
+FILE_TEST = "test 1.csv"
+FILE_TRAIN = "train 1.csv"
+
+# Number of simple features
+NUM_SIMPLE = 1
+# Array defining number of slabs for each complex feature
+COMPLEX = [5, 8]
+# Total number of complex features
+num_features = NUM_SIMPLE + len(COMPLEX)
+NUM_POINTS = 10000
+BATCH_SIZE = 500
+# For train
+MODE = 1
+# Fraction of simple datapoints to randomise
+fracs = [0.4, 1]
+X = [1,2]
+# For test - start with randomising simple feature (first row)
+SC = [0]
+
+X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=fracs[1], x=X)
