@@ -33,18 +33,19 @@ NUM_SIMPLE = 1
 COMPLEX = [5, 8]
 # Total number of complex features
 num_features = NUM_SIMPLE + len(COMPLEX)
-NUM_POINTS = 10000
-BATCH_SIZE = 500
+NUM_POINTS = 2000
+BATCH_SIZE = 50
 # For train
 MODE = 1
 # Fraction of simple datapoints to randomise
-fracs = [0.4, 1]
-X = [1,2]
-# For test - start with randomising simple feature (first row)
+fracs = [0, 0.2, 0.4, 0.6, 0.8, 1]
+# List of complex indices (cols) to do split randomise on (see utils.py)
+X = [1, 2]
+# Invariant set in test
 SC = [0]
 
 # Hyperparameters
-lr = 0.5
+lr = 1
 dropout = 0
 epochs = 200
 

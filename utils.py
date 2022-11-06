@@ -127,7 +127,9 @@ def my_train_dataloader(gen=False, filename=None, simple=0, complex=[], num_poin
     :param mode: Gives mode for data randomisation.
         0: Generates without any randomisation.
         1: Randomises feature indices/index listed in x using split randomise. Randomises simple feature entirely.
-    :param x: List of indices (rows) for randomisation using split_randomise.
+        Can use to randomise one specific complex feature at a time.
+        2: Only randomises simple feature.
+    :param x: List of indices (cols) for randomisation using split_randomise.
     :param frac: Fraction of simple coordinate to randomise (acts as noise on simple dataset)
 
     :returns: Dataset of 1D input features and one single label y which is the LAST COLUMN of the dataset.
@@ -138,6 +140,8 @@ def my_train_dataloader(gen=False, filename=None, simple=0, complex=[], num_poin
     if mode == 1:
         if len(x) != 1:
             dset.split_randomise(x)
+        dset.simple_randomise(frac)
+    if mode == 2:
         dset.simple_randomise(frac)
     if gen:
         name = filename
@@ -176,27 +180,3 @@ class CustomDataset(Dataset):
 
     def __len__(self):
         return len(self.labels)
-
-
-GEN = True
-# Train and test dataset names
-FILE_TEST = "test 1.csv"
-FILE_TRAIN = "train 1.csv"
-
-# Number of simple features
-NUM_SIMPLE = 1
-# Array defining number of slabs for each complex feature
-COMPLEX = [5, 8]
-# Total number of complex features
-num_features = NUM_SIMPLE + len(COMPLEX)
-NUM_POINTS = 10000
-BATCH_SIZE = 500
-# For train
-MODE = 1
-# Fraction of simple datapoints to randomise
-fracs = [0.4, 1]
-X = [1,2]
-# For test - start with randomising simple feature (first row)
-SC = [0]
-
-X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=fracs[1], x=X)
