@@ -23,24 +23,21 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 
 # Set GEN to True to generate files from scratch for training and testing
 GEN = True
-# Train and test dataset names
-FILE_TEST = "test 1.csv"
-FILE_TRAIN = "train 1.csv"
 
 # Number of simple features
 NUM_SIMPLE = 1
 # Array defining number of slabs for each complex feature
 COMPLEX = [5, 8]
-# Total number of complex features
+# Total number of features
 num_features = NUM_SIMPLE + len(COMPLEX)
-NUM_POINTS = 2000
+NUM_POINTS = 3000
 BATCH_SIZE = 50
 # For train
 MODE = 1
 # Fraction of simple datapoints to randomise
-fracs = [0, 0.2, 0.4, 0.6, 0.8, 1]
+fracs = [0, 0.1, 0.5, 1]
 # List of complex indices (cols) to do split randomise on (see utils.py)
-X = [1, 2]
+X = [2]
 # Invariant set in test
 SC = [0]
 
@@ -59,7 +56,7 @@ def evaluate(model, dataset, max_ex=0):
     acc = 0
     for i, (features, labels) in enumerate(dataset):
         # Batch size in length, varying from 0 to 1
-        scores = model(features)
+        scores = sigmoid(model(features))
         # Predictive class is closest from sigmoid output
         pred = torch.round(scores, decimals=0)
         # Save to pred 
@@ -72,9 +69,15 @@ def evaluate(model, dataset, max_ex=0):
 
 #TRAIN============================================================
 loss_fn = nn.BCELoss()
+sigmoid = nn.Sigmoid()
 models = {}
 old_test_acc = 0
+net = linear_net(num_features, dropout=dropout).to(device)
 for frac in fracs:
+
+    # Train and test dataset names
+    FILE_TEST = "test 1 " + str(frac) + ".csv"
+    FILE_TRAIN = "train 1 " + str(frac) + ".csv"
     # Train dataset
     X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
     # Reshape y tensor tp (datapoints*1)
@@ -88,28 +91,30 @@ for frac in fracs:
     y_test = y_test.reshape(-1,1)
     test_dataset = CustomDataset(X_test, y_test)
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    
+    # print("Length of dataloader: ", len(train_loader))
+    # print("Length of train dataset: ", len(train_dataset))
 
-    title = 'Fraction randomised=' + str(frac)
+    title = 'Fraction simple randomised ' + str(frac)
     print("\n", title, "\n")
-    # Instantiate a new network
-    net = linear_net(num_features, dropout=dropout).to(device)
+
     # Create optimizer
     optimizer = torch.optim.SGD(net.parameters(), lr=lr)
     optimizer.zero_grad()
+
     # Start training
     train_acc = []
     test_acc = []
     train_loss = [0]  # loss at iteration 0
-
-    # print(len(train_data), len(train_loader))
     it_per_epoch = len(train_loader)
-    print("iterations per epoch: ", it_per_epoch)
+    
     # Count number of epochs
     it = 0
     for epoch in range(epochs):
         for features, labels in tqdm(train_loader):
             # Forward pass
-            scores = net(features)
+            out = net(features)
+            scores = sigmoid(out)
             loss = loss_fn(scores, labels)
             # Backward pass
             optimizer.zero_grad()
@@ -135,12 +140,20 @@ for frac in fracs:
                         'model_state_dict': net.state_dict(),
                         'optimizer_state_dict': optimizer.state_dict(),
                         'loss_hist': train_loss,
-                        'simple frac random':frac,
+                        'simple frac random': frac,
                         'lr':lr,
                         'test_acc': test_acc[-1]}
 
 for key in models.keys():
     print("frac randomised: %s, test_acc: %s" % (models[key]['simple frac random'], models[key]['test_acc']))
+
+    # Save every model trained on different training data
+    # Means teacher models need to be retrained if fracs change for student model
+    torch.save({'epoch': epoch,
+            'model_state_dict': models[key]['model_state_dict'],
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss_hist': train_loss},
+            output_dir + "teacher"+ key)
 
 test_accs = [models[key]['test_acc'] for key in models.keys()]
 xs = [models[key]['simple frac random'] for key in models.keys()]
@@ -156,13 +169,3 @@ plt.xlabel('Randomised fraction of simple feature during training')
 # plt.xscale('log')
 # plt.xlim([9e-5, 5e-1])
 fig.savefig(output_dir + 'summary_{0}epochs.png'.format(epochs))
-
-# Save model that's been trained on 100% randomised simple features
-# This is bad code and might be broken if the input to frac changes
-last_model = models[keys[-1]]['model']
-
-torch.save({'epoch': epoch,
-            'model_state_dict': last_model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss_hist': train_loss},
-            output_dir + "teacher saved")

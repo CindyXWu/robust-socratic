@@ -20,15 +20,12 @@ class vecDataset(Dataset):
     """
     def __init__(self, gen=False, filename=None, **kwargs):
         if not gen:
-            try:
-                if filename != None:
-                    # Load datatype as float32 to avoid conflict with torch
-                    filepath = os.path.join('data', filename)
-                    self.dataset = np.genfromtxt(fname=filepath, delimiter=',', dtype="float32")
-                else:
-                    raise FuncInputError
-            except OSError:
-                print("Error opening files")
+            if filename != None:
+                # Load datatype as float32 to avoid conflict with torch
+                filepath = os.path.join('data', filename)
+                self.dataset = np.genfromtxt(fname=filepath, delimiter=',', dtype="float32")
+            else:
+                raise FuncInputError
             self.num_points = self.dataset.shape[1]
             self.features = self.dataset.shape[0]
             self.simple = kwargs.pop('simple')
@@ -136,17 +133,16 @@ def my_train_dataloader(gen=False, filename=None, simple=0, complex=[], num_poin
     """
     # Base: to test that SB is observed as comparison
     dset = vecDataset(gen=gen, filename=filename, simple=simple, complex=complex, num_points=num_points)
-    # Enforce variance towards all complex features only
-    if mode == 1:
-        if len(x) != 1:
-            dset.split_randomise(x)
-        dset.simple_randomise(frac)
-    if mode == 2:
-        dset.simple_randomise(frac)
     if gen:
+        # Enforce variance towards all complex features only
+        if mode == 1:
+            if len(x) != 1:
+                dset.split_randomise(x)
+            dset.simple_randomise(frac)
+        if mode == 2:
+            dset.simple_randomise(frac)
         name = filename
         np.savetxt(output_dir+name, dset.dataset, delimiter=',')
-    # Return as tuple of data, labels
     return (dset.dataset[:, :-1], dset.dataset[:, -1])
 
 def my_test_dataloader(gen=False, filename=None, simple=0, complex=0, num_points=0,  sc=[]):
@@ -155,12 +151,9 @@ def my_test_dataloader(gen=False, filename=None, simple=0, complex=0, num_points
     :param sc: subset of coordinates selected to randomise test distribution wrt to check if invariant
     """
     dset = vecDataset(gen=gen, filename=filename, simple=simple, complex=complex, num_points=num_points)
-    for coord in sc:
-        np.random.shuffle(dset.dataset[:, coord])
-        np.random.shuffle(dset.dataset[:, coord])
-        # # Check if this column has been shuffled properly
-        # print(dset.dataset[:, coord])
     if gen:
+        for coord in sc:
+            np.random.shuffle(dset.dataset[:, coord])
         name = filename
         np.savetxt(output_dir+name, dset.dataset, delimiter=',')
     return (dset.dataset[:, :-1], dset.dataset[:, -1])
