@@ -31,20 +31,20 @@ COMPLEX = [5, 8]
 # Total number of features
 num_features = NUM_SIMPLE + len(COMPLEX)
 NUM_POINTS = 3000
-BATCH_SIZE = 50
 # For train
 MODE = 1
 # Fraction of simple datapoints to randomise
-fracs = [0, 0.1, 0.5, 1]
+fracs = [0, 0.2, 0.4, 0.6, 0.8, 1]
 # List of complex indices (cols) to do split randomise on (see utils.py)
-X = [2]
+X = [1]
 # Invariant set in test
-SC = [0]
+SC = [0, 2]
 
-# Hyperparameters
+# Hyperparameters for training
 lr = 1
 dropout = 0
 epochs = 200
+BATCH_SIZE = 50
 
 # Set output directory and create if needed
 output_dir = "teacher_linear_model/"

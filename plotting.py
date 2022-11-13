@@ -34,3 +34,14 @@ def plot_acc(train_acc, test_acc, it, base_name='', title=''):
     else:
         plt.show()
     plt.close("all")
+
+def plot_data(data_arr, d1, d2):
+    """"Toy plot function that only plots two features against each other."""
+    fig = plt.figure(figsize=(8, 4), dpi=100)
+    # Plot scatter colour as red if y = 0 and blue if y = 1
+    plt.scatter(data_arr[:, d1], data_arr[:, d2], c=data_arr[:, -1], cmap='bwr')
+    plt.xlabel('Feature ' + str(d1))
+    plt.ylabel("Feature " + str(d2))
+    plt.show()
+    
+    

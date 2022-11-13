@@ -35,7 +35,7 @@ BATCH_SIZE = 50
 # For train
 MODE = 1
 # Fraction of simple datapoints to randomise
-fracs = [1]
+fracs = [0, 0.1, 0.5, 1]
 X = [1, 2]
 # For test - start with randomising simple feature (first row)
 SC = [0]
@@ -50,7 +50,6 @@ temperatures = [1]
 # For weighted average of scores
 alpha = 0.5
 
-
 # Instantiate networks
 load_path = "teacher_linear_model/"
 big_model = linear_net(NUM_FEATURES).to(device)
@@ -60,12 +59,11 @@ output_dir = "small_linear_model_distill1/"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
-
 # Custom distillation loss function to match sigmoid output from teacher to student with MSE loss
 def my_loss(scores, targets, T=5):
     soft_pred = sigmoid(scores/T)
     soft_targets = sigmoid(targets/T)
-    loss = bceloss_fn(soft_pred, soft_targets)
+    loss = T**2 * bceloss_fn(soft_pred, soft_targets)
     return loss
 
 # Function to evaluate model accuracy
@@ -105,7 +103,7 @@ for frac in fracs:
     big_model.eval()
 
     X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
-    # Reshape y tensor tp (datapoints*1)
+    # Reshape y tensor to (datapoints*1)
     y_train = y_train.reshape(-1,1)
     train_dataset = CustomDataset(X_train, y_train)
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
