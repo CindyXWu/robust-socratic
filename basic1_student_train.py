@@ -36,14 +36,14 @@ BATCH_SIZE = 50
 MODE = 1
 # Fraction of simple datapoints to randomise
 fracs = [0, 0.1, 0.5, 1]
-X = [1, 2]
+X = [1]
 # For test - start with randomising simple feature (first row)
 SC = [0]
 
 # Hyperparameters
-lr = 0.5
+lr = 0.8
 dropout = 0
-epochs = 100
+epochs = 150
 start_lr = 10
 end_lr = 0.001
 temperatures = [1]

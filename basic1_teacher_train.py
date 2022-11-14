@@ -34,16 +34,17 @@ NUM_POINTS = 3000
 # For train
 MODE = 1
 # Fraction of simple datapoints to randomise
-fracs = [0, 0.2, 0.4, 0.6, 0.8, 1]
+fracs = [0, 0.1, 0.5, 1]
 # List of complex indices (cols) to do split randomise on (see utils.py)
 X = [1]
 # Invariant set in test
-SC = [0, 2]
+SC = [0]
 
 # Hyperparameters for training
-lr = 1
+lr = 0.5
+
 dropout = 0
-epochs = 200
+epochs = 150
 BATCH_SIZE = 50
 
 # Set output directory and create if needed
@@ -67,14 +68,18 @@ def evaluate(model, dataset, max_ex=0):
     # Fraction of data points correctly classified
     return (acc * 100 / ((i+1) * BATCH_SIZE) )
 
+def weight_reset(m):
+    if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+        m.reset_parameters()
 #TRAIN============================================================
 loss_fn = nn.BCELoss()
 sigmoid = nn.Sigmoid()
 models = {}
 old_test_acc = 0
 net = linear_net(num_features, dropout=dropout).to(device)
-for frac in fracs:
 
+for frac in fracs:
+    net.apply(weight_reset)
     # Train and test dataset names
     FILE_TEST = "test 1 " + str(frac) + ".csv"
     FILE_TRAIN = "train 1 " + str(frac) + ".csv"
@@ -107,7 +112,8 @@ for frac in fracs:
     test_acc = []
     train_loss = [0]  # loss at iteration 0
     it_per_epoch = len(train_loader)
-    
+
+    print("Initial train accuracy: ", evaluate(net, train_loader))
     # Count number of epochs
     it = 0
     for epoch in range(epochs):
@@ -128,6 +134,7 @@ for frac in fracs:
                 test_acc.append(evaluate(net, test_loader, max_ex=10))
                 plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
                 plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
+                print("Iteration: ", it, "Train accuracy: ", train_acc[-1], "Test accuracy: ", test_acc[-1])
             it += 1
     # Perform last book keeping
     train_acc.append(evaluate(net, train_loader, max_ex=100))
