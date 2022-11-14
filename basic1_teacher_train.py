@@ -80,6 +80,7 @@ net = linear_net(num_features, dropout=dropout).to(device)
 
 for frac in fracs:
     net.apply(weight_reset)
+    net = linear_net(num_features, dropout=dropout).to(device)
     # Train and test dataset names
     FILE_TEST = "test 1 " + str(frac) + ".csv"
     FILE_TRAIN = "train 1 " + str(frac) + ".csv"

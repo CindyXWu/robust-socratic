@@ -41,14 +41,15 @@ X = [1]
 SC = [0]
 
 # Hyperparameters
-lr = 0.8
+lr = 0.5
 dropout = 0
-epochs = 150
+epochs = 200
 start_lr = 10
 end_lr = 0.001
-temperatures = [1]
+temperatures = [0.1, 0.25, 0.5, 0.75, 1, 3, 5, 7, 9]
 # For weighted average of scores
 alpha = 0.5
+sweep = "frac" #"lr", "temp"
 
 # Instantiate networks
 load_path = "teacher_linear_model/"
@@ -96,9 +97,9 @@ for frac in fracs:
     FILE_TRAIN = "train 1 " + str(frac) + ".csv"
 
     # Load teacher model (fn of frac randomised)
-    title = "Fraction simple randomised " + str(frac)
-    print("\n", title, "\n")
-    checkpoint = torch.load(load_path + "teacher" + title)
+    loadname = "Fraction simple randomised " + str(frac)
+    print("\n", loadname, "\n")
+    checkpoint = torch.load(load_path + "teacher" + loadname)
     big_model.load_state_dict(checkpoint['model_state_dict'])
     big_model.eval()
 
@@ -121,13 +122,14 @@ for frac in fracs:
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     for temp in temperatures:
+        title = "Fraction simple randomised " + str(frac) + " Temperature " + str(temp)
         # Start training
         train_acc = []
         test_acc = []
         train_loss = [0]  # loss at iteration 0
         it_per_epoch = len(train_loader)
 
-        small_model = small_linear_net(NUM_FEATURES).to(device)
+        small_model = linear_net(NUM_FEATURES).to(device)
         optimizer = torch.optim.SGD(small_model.parameters(), lr=lr)
         optimizer.zero_grad()
         it = 0
@@ -137,8 +139,8 @@ for frac in fracs:
                 scores = small_model(features)
                 targets = big_model(features)
 
-                loss = my_loss(scores, targets, T=temp)
-                # loss = bceloss_fn(sigmoid(scores), labels)
+                #loss = my_loss(scores, targets, T=temp)
+                loss = bceloss_fn(sigmoid(scores), labels)
                 # if it == 0:
                 #     print(scores.size())
                 #     print(scores[0])
@@ -178,3 +180,30 @@ for frac in fracs:
                             'train_acc': train_acc,
                             'test_acc': test_acc,
                             'iterations': it}
+
+for key in models.keys():
+    print("frac randomised: %s, test_acc: %s" % (models[key]['simple frac random'], models[key]['test_acc']))
+
+test_accs = [models[key]['test_acc'] for key in models.keys()]
+if sweep == "frac": xs = [models[key]['simple frac random'] for key in models.keys()]
+if sweep=="T":  xs = [models[key]['T'] for key in models.keys()]
+if sweep=="lr": xs = [models[key]['lr'] for key in models.keys()]
+keys = [key for key in models.keys()]
+print(keys)
+print(test_accs)
+
+best_key = keys[np.argmax(test_accs)]
+print(best_key)
+best_model = models[best_key]['model']
+best_model.eval()
+
+
+# Plot summary
+fig = plt.figure(figsize=(8, 4), dpi=100)
+plt.scatter(xs, test_accs)
+plt.title("{0} Epochs".format(epochs))
+plt.ylabel('Test accuracy')
+plt.xlabel('Randomised fraction of simple feature during training')
+# plt.xscale('log')
+# plt.xlim([9e-5, 5e-1])
+fig.savefig(output_dir + 'summary_{0}epochs.png'.format(epochs))
