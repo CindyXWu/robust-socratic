@@ -37,10 +37,10 @@ MODE = 1
 fracs = [0, 0.1, 0.5, 1]
 # List of complex indices (cols) to do split randomise on (see utils.py)
 # X_list = [[1,2], [1,2], [1,2], [1], [1], [1], [2], [2], [2]]
-X_list = [[2], [2], [2]]
+X_list = [[1,2], [1,2], [1,2], [1], [1], [1]]
 # For test - start with randomising simple feature (first row)
 # SC_list = [[0], [0,1], [0,2], [0], [0,1], [0,2], [0], [0,1], [0,2]]
-SC_list = [[0], [0,1], [0,2]]
+SC_list = [[0], [0,1], [0,2], [0], [0,1], [0,2]]
 # Hyperparameters for training
 lr = 0.1
 
@@ -76,7 +76,7 @@ old_test_acc = 0
 net = linear_net(num_features, dropout=dropout).to(device)
 
 # Outer loop to run all experiments
-exp =  7
+exp =  1
 for X, SC in zip(X_list, SC_list):
     X = np.array(X)
     SC = np.array(SC)
