@@ -36,21 +36,17 @@ MODE = 1
 # Fraction of simple datapoints to randomise
 fracs = [0, 0.1, 0.5, 1]
 # List of complex indices (cols) to do split randomise on (see utils.py)
-X = [1]
-# Invariant set in test
-SC = [0,2]
-
+# X_list = [[1,2], [1,2], [1,2], [1], [1], [1], [2], [2], [2]]
+X_list = [[2], [2], [2]]
+# For test - start with randomising simple feature (first row)
+# SC_list = [[0], [0,1], [0,2], [0], [0,1], [0,2], [0], [0,1], [0,2]]
+SC_list = [[0], [0,1], [0,2]]
 # Hyperparameters for training
 lr = 0.1
 
 dropout = 0
 epochs = 150
 BATCH_SIZE = 50
-
-# Set output directory and create if needed
-output_dir = "teacher_linear_model/"
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
 
 # Function to evaluate model accuracy
 def evaluate(model, dataset, max_ex=0):
@@ -71,6 +67,7 @@ def evaluate(model, dataset, max_ex=0):
 def weight_reset(m):
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
         m.reset_parameters()
+
 #TRAIN============================================================
 loss_fn = nn.BCELoss()
 sigmoid = nn.Sigmoid()
@@ -78,102 +75,116 @@ models = {}
 old_test_acc = 0
 net = linear_net(num_features, dropout=dropout).to(device)
 
-for frac in fracs:
-    net.apply(weight_reset)
-    net = linear_net(num_features, dropout=dropout).to(device)
-    # Train and test dataset names
-    FILE_TEST = "test 1 " + str(frac) + ".csv"
-    FILE_TRAIN = "train 1 " + str(frac) + ".csv"
-    # Train dataset
-    X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
-    # Reshape y tensor tp (datapoints*1)
-    y_train = y_train.reshape(-1,1)
-    train_dataset = CustomDataset(X_train, y_train)
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+# Outer loop to run all experiments
+exp =  7
+for X, SC in zip(X_list, SC_list):
+    X = np.array(X)
+    SC = np.array(SC)
 
-    # Test dataset has same number of points as train
-    X_test, y_test = my_test_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, sc=SC)
-    # Reshape y tensor
-    y_test = y_test.reshape(-1,1)
-    test_dataset = CustomDataset(X_test, y_test)
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    
-    # print("Length of dataloader: ", len(train_loader))
-    # print("Length of train dataset: ", len(train_dataset))
+    # Set output directory by experiment number
+    output_dir = "teacher_linear_"+str(exp)+"/"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    title = 'Fraction simple randomised ' + str(frac)
-    print("\n", title, "\n")
+    for frac in fracs:
+        net.apply(weight_reset)
+        net = linear_net(num_features, dropout=dropout).to(device)
+        # Train and test dataset names
+        # Add experiment number to start of file name
+        FILE_TEST = "exp" + str(exp) + "test 1 " + str(frac) + ".csv"
+        FILE_TRAIN = "exp" + str(exp) + "train 1 " + str(frac) + ".csv"
+        # Train dataset
+        X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
+        # Reshape y tensor tp (datapoints*1)
+        y_train = y_train.reshape(-1,1)
+        train_dataset = CustomDataset(X_train, y_train)
+        train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-    # Create optimizer
-    optimizer = torch.optim.SGD(net.parameters(), lr=lr)
-    optimizer.zero_grad()
+        # Test dataset has same number of points as train
+        X_test, y_test = my_test_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, sc=SC)
+        # Reshape y tensor
+        y_test = y_test.reshape(-1,1)
+        test_dataset = CustomDataset(X_test, y_test)
+        test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
+        
+        # print("Length of dataloader: ", len(train_loader))
+        # print("Length of train dataset: ", len(train_dataset))
 
-    # Start training
-    train_acc = []
-    test_acc = []
-    train_loss = [0]  # loss at iteration 0
-    it_per_epoch = len(train_loader)
+        title = 'Fraction simple randomised ' + str(frac)
+        print("\n", title, "\n")
 
-    print("Initial train accuracy: ", evaluate(net, train_loader))
-    # Count number of epochs
-    it = 0
-    for epoch in range(epochs):
-        for features, labels in tqdm(train_loader):
-            # Forward pass
-            out = net(features)
-            scores = sigmoid(out)
-            loss = loss_fn(scores, labels)
-            # Backward pass
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            train_loss.append(loss.item())
-            # Evaluate model at this iteration
-            if it % 100 == 0:
-                # max_ex is the number of batches to evaluate
-                train_acc.append(evaluate(net, train_loader, max_ex=10))
-                test_acc.append(evaluate(net, test_loader, max_ex=10))
-                plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
-                plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
-                print("Iteration: ", it, "Train accuracy: ", train_acc[-1], "Test accuracy: ", test_acc[-1])
-            it += 1
-    # Perform last book keeping
-    train_acc.append(evaluate(net, train_loader, max_ex=100))
-    test_acc.append(evaluate(net, test_loader))
-    plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
-    plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
+        # Create optimizer
+        optimizer = torch.optim.SGD(net.parameters(), lr=lr)
+        optimizer.zero_grad()
 
-    # Save model to dictionary, titled by dropout (can be changed)
-    models[title] = {'model': net,
-                        'model_state_dict': net.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict(),
-                        'loss_hist': train_loss,
-                        'simple frac random': frac,
-                        'lr':lr,
-                        'test_acc': test_acc[-1]}
+        # Start training
+        train_acc = []
+        test_acc = []
+        train_loss = [0]  # loss at iteration 0
+        it_per_epoch = len(train_loader)
 
-for key in models.keys():
-    print("frac randomised: %s, test_acc: %s" % (models[key]['simple frac random'], models[key]['test_acc']))
+        print("Initial train accuracy: ", evaluate(net, train_loader))
+        # Count number of epochs
+        it = 0
+        for epoch in range(epochs):
+            for features, labels in tqdm(train_loader):
+                # Forward pass
+                out = net(features)
+                scores = sigmoid(out)
+                loss = loss_fn(scores, labels)
+                # Backward pass
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                train_loss.append(loss.item())
+                # Evaluate model at this iteration
+                if it % 100 == 0:
+                    # max_ex is the number of batches to evaluate
+                    train_acc.append(evaluate(net, train_loader, max_ex=10))
+                    test_acc.append(evaluate(net, test_loader, max_ex=10))
+                    plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
+                    plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
+                    print("Iteration: ", it, "Train accuracy: ", train_acc[-1], "Test accuracy: ", test_acc[-1])
+                it += 1
+        # Perform last book keeping
+        train_acc.append(evaluate(net, train_loader, max_ex=100))
+        test_acc.append(evaluate(net, test_loader))
+        plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
+        plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
 
-    # Save every model trained on different training data
-    # Means teacher models need to be retrained if fracs change for student model
-    torch.save({'epoch': epoch,
-            'model_state_dict': models[key]['model_state_dict'],
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss_hist': train_loss},
-            output_dir + "teacher"+ key)
+        # Save model to dictionary, titled by dropout (can be changed)
+        models[title] = {'model': net,
+                            'model_state_dict': net.state_dict(),
+                            'optimizer_state_dict': optimizer.state_dict(),
+                            'loss_hist': train_loss,
+                            'simple frac random': frac,
+                            'lr':lr,
+                            'test_acc': test_acc[-1]}
 
-test_accs = [models[key]['test_acc'] for key in models.keys()]
-xs = [models[key]['simple frac random'] for key in models.keys()]
-keys = [key for key in models.keys()]
-print(keys)
+    for key in models.keys():
+        print("frac randomised: %s, test_acc: %s" % (models[key]['simple frac random'], models[key]['test_acc']))
 
-# Plot summary
-fig = plt.figure(figsize=(8, 4), dpi=100)
-plt.scatter(xs, test_accs)
-plt.title("{0} Epochs".format(epochs))
-plt.ylabel('Test accuracy')
-plt.xlabel('Randomised fraction of simple feature during training')
-# plt.xscale('log')
-# plt.xlim([9e-5, 5e-1])
-fig.savefig(output_dir + 'summary_{0}epochs.png'.format(epochs))
+        # Save every model trained on different training data
+        # Means teacher models need to be retrained if fracs change for student model
+        torch.save({'epoch': epoch,
+                'model_state_dict': models[key]['model_state_dict'],
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss_hist': train_loss},
+                output_dir + "teacher_"+ key)
+
+    test_accs = [models[key]['test_acc'] for key in models.keys()]
+    xs = [models[key]['simple frac random'] for key in models.keys()]
+    keys = [key for key in models.keys()]
+    print(keys)
+
+    # Plot summary
+    fig = plt.figure(figsize=(8, 4), dpi=100)
+    plt.scatter(xs, test_accs)
+    plt.title("{0} Epochs".format(epochs))
+    plt.ylabel('Test accuracy')
+    plt.xlabel('Randomised fraction of simple feature during training')
+    # plt.xscale('log')
+    # plt.xlim([9e-5, 5e-1])
+    fig.savefig(output_dir + 'summary_{0}epochs.png'.format(epochs))
+
+    exp += 1
