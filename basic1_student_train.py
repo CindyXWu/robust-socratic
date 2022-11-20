@@ -40,9 +40,9 @@ fracs = [1, 0.5, 0.1, 0]
 # X_list = [[1,2], [1,2], [1,2], [1], [1], [1], [2], [2], [2]]
 # # For test - start with randomising simple feature (first row)
 # SC_list = [[0], [0,1], [0,2], [0], [0,1], [0,2], [0], [0,1], [0,2]]
-X_list = [[2], [2], [2]]
+X_list = [[2]]
 # For test - start with randomising simple feature (first row)
-SC_list = [[0], [0,1], [0,2]]
+SC_list = [[0,2]]
 
 # Hyperparameters
 lr = 0.5
@@ -92,13 +92,9 @@ bceloss_fn = nn.BCELoss()
 
 models = {}
 
-# Will end up as list of lists
-train_avg = []
-test_avg = []
-
 repeats = 3
 # Outer loop to run all experiments
-exp =  7
+exp =  9
 for X, SC in zip(X_list, SC_list):
     X = np.array(X)
     SC = np.array(SC)
@@ -216,38 +212,20 @@ for X, SC in zip(X_list, SC_list):
                             'test_acc': test_acc,
                             'iterations': it}
     
-    # Append list for this experiment containing answers for all fracs
-    train_avg.append(exp_train_results)
-    test_avg.append(exp_test_results)
     # Convert to arrays and save
-    np.savetxt(output_dir + "train_avg.csv", np.array(train_avg), delimiter=",")
-    np.savetxt(output_dir + "test_avg.csv", np.array(test_avg), delimiter=",")
+    np.savetxt(output_dir + "train_avg.csv", np.array(exp_train_results), delimiter=",")
+    np.savetxt(output_dir + "test_avg.csv", np.array(exp_test_results), delimiter=",")
 
     for key in models.keys():
         print("frac randomised: %s, test_acc: %s" % (models[key]['simple frac random'], models[key]['test_acc']))
 
     test_accs = [models[key]['test_acc'] for key in models.keys()]
     if sweep == "frac": xs = [models[key]['simple frac random'] for key in models.keys()]
-    if sweep=="T":  xs = [models[key]['T'] for key in models.keys()]
-    if sweep=="lr": xs = [models[key]['lr'] for key in models.keys()]
-    keys = [key for key in models.keys()]
-    print(keys)
-    print(test_accs)
 
+    # keys = [key for key in models.keys()]
     # best_key = keys[np.argmax(test_accs)]
     # print(best_key)
     # best_model = models[best_key]['model']
     # best_model.eval()
-
-
-    # Plot summary
-    fig = plt.figure(figsize=(8, 4), dpi=100)
-    plt.scatter(xs, test_accs)
-    plt.title("{0} Epochs".format(epochs))
-    plt.ylabel('Test accuracy')
-    plt.xlabel('Randomised fraction of simple feature during training')
-    # plt.xscale('log')
-    # plt.xlim([9e-5, 5e-1])
-    fig.savefig(output_dir + 'summary_{0}epochs.png'.format(epochs))
 
     exp += 1
