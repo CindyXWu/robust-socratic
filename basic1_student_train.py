@@ -35,10 +35,10 @@ BATCH_SIZE = 50
 # For train
 MODE = 1
 # Fraction of simple datapoints to randomise
-fracs = [0, 0.1, 0.5, 1]
+fracs = [1, 0.5, 0.1, 0]
 X = [1]
 # For test - start with randomising simple feature (first row)
-SC = [0]
+SC = [0,1]
 
 # Hyperparameters
 lr = 0.5
@@ -46,7 +46,7 @@ dropout = 0
 epochs = 200
 start_lr = 10
 end_lr = 0.001
-temperatures = [0.1, 0.25, 0.5, 0.75, 1, 3, 5, 7, 9]
+temperatures = [1]
 # For weighted average of scores
 alpha = 0.5
 sweep = "frac" #"lr", "temp"
@@ -129,7 +129,7 @@ for frac in fracs:
         train_loss = [0]  # loss at iteration 0
         it_per_epoch = len(train_loader)
 
-        small_model = linear_net(NUM_FEATURES).to(device)
+        small_model = small_linear_net(NUM_FEATURES).to(device)
         optimizer = torch.optim.SGD(small_model.parameters(), lr=lr)
         optimizer.zero_grad()
         it = 0
@@ -192,10 +192,10 @@ keys = [key for key in models.keys()]
 print(keys)
 print(test_accs)
 
-best_key = keys[np.argmax(test_accs)]
-print(best_key)
-best_model = models[best_key]['model']
-best_model.eval()
+# best_key = keys[np.argmax(test_accs)]
+# print(best_key)
+# best_model = models[best_key]['model']
+# best_model.eval()
 
 
 # Plot summary

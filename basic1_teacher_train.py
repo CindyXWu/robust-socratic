@@ -38,10 +38,10 @@ fracs = [0, 0.1, 0.5, 1]
 # List of complex indices (cols) to do split randomise on (see utils.py)
 X = [1]
 # Invariant set in test
-SC = [0]
+SC = [0,2]
 
 # Hyperparameters for training
-lr = 0.5
+lr = 0.1
 
 dropout = 0
 epochs = 150
