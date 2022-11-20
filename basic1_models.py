@@ -32,3 +32,16 @@ class small_linear_net(nn.Module):
         scores = self.relu(scores)
         scores = self.linear_2(scores)
         return scores
+
+class medium_linear_net(nn.Module):
+    def __init__(self, num_features):
+        super(medium_linear_net, self).__init__()
+        self.linear_1 = nn.Linear(num_features, 50)
+        self.relu = nn.ReLU()
+        self.linear_2 = nn.Linear(50, 1)
+
+    def forward(self, input):
+        scores = self.linear_1(input)
+        scores = self.relu(scores)
+        scores = self.linear_2(scores)
+        return scores

@@ -76,7 +76,7 @@ old_test_acc = 0
 net = linear_net(num_features, dropout=dropout).to(device)
 
 # Outer loop to run all experiments
-exp =  7
+exp =  1
 for X, SC in zip(X_list, SC_list):
     X = np.array(X)
     SC = np.array(SC)
