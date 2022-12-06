@@ -97,12 +97,14 @@ class vecDataset(Dataset):
         :param y: label
         """
         xs = np.linspace(-1, 1, n)
+        bloc = 2/n
         if y == 1:
             x_poss = xs[::2]
-            return np.random.choice(x_poss)
         elif y == 0:
             x_poss = xs[1::2]
-            return np.random.choice(x_poss)
+        num = len(x_poss)
+        idx = int(np.random.choice(num, 1))
+        return np.random.uniform(x_poss[idx], x_poss[idx]+bloc)
     
     def __len__(self):
         print(len(self.dataset))
@@ -158,7 +160,7 @@ def my_test_dataloader(gen=False, filename=None, simple=0, complex=0, num_points
             np.random.shuffle(dset.dataset[:, coord])
         name = filename
         np.savetxt(output_dir+name, dset.dataset, delimiter=',')
-    #plot_data(dset.dataset, 1, 2)
+    plot_data(dset.dataset, 1, 2)
     return (dset.dataset[:, :-1], dset.dataset[:, -1])
 
 class CustomDataset(Dataset):
@@ -177,23 +179,24 @@ class CustomDataset(Dataset):
     def __len__(self):
         return len(self.labels)
 
-# TESTING CODE
-# GEN = True
-# # Number of simple features
-# NUM_SIMPLE = 1
-# # Array defining number of slabs for each complex feature
-# COMPLEX = [5, 8]
-# # Total number of features
-# NUM_FEATURES = NUM_SIMPLE + len(COMPLEX)
-# # For train
-# MODE = 1
-# # Fraction of simple datapoints to randomise
-# frac = 1
-# X = [1]
-# # For test - start with randomising simple feature (first row)
-# SC = [0]
-# FILE_TRAIN = 'train 1 1.csv'
-# FILE_TEST = 'test 1 1.csv'
-# NUM_POINTS = 3000
-# X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
-# X_test, y_test = my_test_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, sc=SC)
+if __name__ == "__main__":
+    #TESTING CODE
+    GEN = True
+    # Number of simple features
+    NUM_SIMPLE = 1
+    # Array defining number of slabs for each complex feature
+    COMPLEX = [5, 8]
+    # Total number of features
+    NUM_FEATURES = NUM_SIMPLE + len(COMPLEX)
+    # For train
+    MODE = 1
+    # Fraction of simple datapoints to randomise
+    frac = 1
+    X = []
+    # For test - start with randomising simple feature (first row)
+    SC = [0,1]
+    FILE_TRAIN = 'train 1 1.csv'
+    FILE_TEST = 'test 1 1.csv'
+    NUM_POINTS = 3000
+    X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
+    X_test, y_test = my_test_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, sc=SC)

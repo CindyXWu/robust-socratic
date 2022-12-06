@@ -1,9 +1,13 @@
 **/__pycache__
 
-**/teacher_linear_model
+teacher_linear_*/
 
 multiattr.py
 
-**/small_linear_model_distill1
+small_linear_*/
 
-**/data
+data/
+
+self_linear_*/
+
+medium_linear_*/

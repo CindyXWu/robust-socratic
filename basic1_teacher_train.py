@@ -34,18 +34,18 @@ NUM_POINTS = 3000
 # For train
 MODE = 1
 # Fraction of simple datapoints to randomise
-fracs = [0, 0.1, 0.5, 1]
+fracs = [0.5, 1]
 # List of complex indices (cols) to do split randomise on (see utils.py)
 # X_list = [[1,2], [1,2], [1,2], [1], [1], [1], [2], [2], [2]]
-X_list = [[1,2], [1,2], [1,2], [1], [1], [1]]
+X_list = [[1]]
 # For test - start with randomising simple feature (first row)
 # SC_list = [[0], [0,1], [0,2], [0], [0,1], [0,2], [0], [0,1], [0,2]]
-SC_list = [[0], [0,1], [0,2], [0], [0,1], [0,2]]
+SC_list = [[0,1]]
 # Hyperparameters for training
-lr = 0.1
+lr = 0.3
 
 dropout = 0
-epochs = 150
+epochs = 300
 BATCH_SIZE = 50
 
 # Function to evaluate model accuracy
@@ -76,7 +76,7 @@ old_test_acc = 0
 net = linear_net(num_features, dropout=dropout).to(device)
 
 # Outer loop to run all experiments
-exp =  1
+exp =  5
 for X, SC in zip(X_list, SC_list):
     X = np.array(X)
     SC = np.array(SC)

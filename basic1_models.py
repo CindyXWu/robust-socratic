@@ -8,8 +8,9 @@ class linear_net(nn.Module):
         self.linear_1 = nn.Linear(num_features, 100)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(p=dropout)
-        self.linear_2 = nn.Linear(100, 50)
-        self.linear_3 = nn.Linear(50, 1)
+        self.linear_2 = nn.Linear(100, 200)
+        self.linear_3 = nn.Linear(200, 100)
+        self.linear_4 = nn.Linear(100, 1)
 
     def forward(self, input):
         scores = self.linear_1(input)
@@ -18,6 +19,8 @@ class linear_net(nn.Module):
         scores = self.relu(scores)
         scores = self.dropout(scores)
         scores = self.linear_3(scores)
+        scores = self.relu(scores)
+        scores = self.linear_4(scores)
         return scores
 
 class small_linear_net(nn.Module):
