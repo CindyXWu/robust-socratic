@@ -35,21 +35,21 @@ BATCH_SIZE = 50
 # For train
 MODE = 1
 # Fraction of simple datapoints to randomise
-fracs = [1, 0.5]
+fracs = [0, 1, 0.5, 0.1]
 # List of complex indices (cols) to do split randomise on (see utils.py)
-X_list = [[1]]
+X_list = [[1,2], [1,2], [1,2], [1], [1], [1], [2], [2], [2]]
 # For test - start with randomising simple feature (first row)
-SC_list = [[0,1]]
+SC_list = [[0], [0,1], [0,2], [0], [0,1], [0,2], [0], [0,1], [0,2]]
 
 # Hyperparameters
-lr = 0.01
+lr = 0.3
 dropout = 0
-epochs = 100
-temps = [0.5, 0.75, 1, 2, 4]
+epochs = 150
+temps = [5]
 # For weighted average of scores
 alpha = 0.5
 sweep = "frac" #"lr", "temp"
-exp =  5
+exp =  1
 
 # Custom distillation loss function to match sigmoid output from teacher to student with MSE loss
 def my_loss(scores, targets, T=5):
@@ -88,7 +88,7 @@ bceloss_fn = nn.BCELoss()
 
 models = {}
 
-repeats = 3
+repeats = 5
 # Outer loop to run all experiments
 
 for X, SC in zip(X_list, SC_list):
@@ -97,7 +97,7 @@ for X, SC in zip(X_list, SC_list):
     # Instantiate networks
     load_path = "teacher_linear_" + str(exp) + "/"
     big_model = linear_net(NUM_FEATURES).to(device)
-    output_dir = "self_linear_"+str(exp)+"/"
+    output_dir = "small_linear_"+str(exp)+"/"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     
@@ -141,7 +141,7 @@ for X, SC in zip(X_list, SC_list):
             title = "Frac " + str(frac) + " Temp " + str(temp)
 
             for rep in range(repeats):
-                small_model = linear_net(NUM_FEATURES).to(device)
+                small_model = small_linear_net(NUM_FEATURES).to(device)
                 small_model.apply(weight_reset)
                 optimizer = torch.optim.SGD(small_model.parameters(), lr=lr)
                 optimizer.zero_grad()

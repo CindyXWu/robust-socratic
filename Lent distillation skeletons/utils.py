@@ -97,11 +97,11 @@ class vecDataset(Dataset):
         :param y: label
         """
         xs = np.linspace(-1, 1, n)
-        bloc = 2/n
+        bloc = 2/(n-1)
         if y == 1:
-            x_poss = xs[::2]
+            x_poss = xs[:-1:2]
         elif y == 0:
-            x_poss = xs[1::2]
+            x_poss = xs[1:-1:2]
         num = len(x_poss)
         idx = int(np.random.choice(num, 1))
         return np.random.uniform(x_poss[idx], x_poss[idx]+bloc)
@@ -194,9 +194,9 @@ if __name__ == "__main__":
     frac = 1
     X = []
     # For test - start with randomising simple feature (first row)
-    SC = [0,1]
-    FILE_TRAIN = 'train 1 1.csv'
-    FILE_TEST = 'test 1 1.csv'
+    SC = [0, 1]
+    FILE_TRAIN = 'file TEST train.csv'
+    FILE_TEST = 'file TEST test.csv'
     NUM_POINTS = 3000
     X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
     X_test, y_test = my_test_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, sc=SC)
