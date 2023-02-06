@@ -1,4 +1,5 @@
 import torch.nn as nn
+import numpy as np
 
 # Define loss functions
 bceloss_fn = nn.BCELoss()
@@ -16,7 +17,8 @@ def jacobian_loss(scores, targets, T, s_jac, t_jac, loss_fn):
     """
     soft_pred = sigmoid(scores/T)
     soft_targets = sigmoid(targets/T)
-    loss = T**2 * loss_fn(soft_pred, soft_targets) # TODO: add jacobian penalty
+    jacobian_term = s_jac @ t_jac/(np.linalg.norm(s_jac)*np.linalg.norm(t_jac))
+    loss = T**2 * loss_fn(soft_pred, soft_targets) + jacobian_term
     return loss
 
 def jacobian_loss_mix(scores, targets, labels, T, alpha, jacobian, loss_fn):
