@@ -1,4 +1,6 @@
-"""Implementation of contrastive loss from 'Contrastive Representation Distillation (Tiang et al 2022)'. Code adapted from https://github.com/HobbitLong/RepDistiller/blob/master/crd/criterion.py to be used without memory buffer."""
+""">>>'Contrastive Representation Distillation (Tiang et al 2022)'. 
+Code adapted from https://github.com/HobbitLong/RepDistiller/blob/master/crd/criterion.py to be used without memory buffer.
+"""
 import torch.nn as nn
 import numpy as np
 import torch
@@ -7,12 +9,10 @@ eps = 1e-7
 
 class ContrastiveRep(nn.Module):
     """CRD Loss function
-    Includes two symmetric parts:
-    (a) Using teacher as anchor, choose positive and negatives over the student side.
-    (b) Using student as anchor, choose positive and negatives over the teacher side.
-    
+    # Includes two symmetric parts:
+    # (a) Using teacher as anchor, choose positive and negatives over the student side.
+    # (b) Using student as anchor, choose positive and negatives over the teacher side.
     Note original implementation uses memory buffer to allow large N (hence tighter bounds on MI) but this is not implemented here.
-    
     Args:
         s_dim: dimension of student's feature
         t_dim: dimension of teacher's feature
@@ -82,10 +82,9 @@ class ContrastLoss(nn.Module):
         """x: some tensor that looks like the exponential of dot product of embedded vectors part of h(T,S)"""
         bsz = x.shape[0] # batch size
         m = x.size(1) - 1  # N, number of negative samples
-
         # noise distribution 1/M
         Pn = 1 / float(self.n_data)
-
+        
         # Loss for positive pair
         # First value: axis, second value: index
         P_pos = x.select(1, 0) # first column is positive sample
