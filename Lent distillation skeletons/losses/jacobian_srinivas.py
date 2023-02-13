@@ -58,8 +58,6 @@ def jacobian_attention(inputs, scores, targets, T, student, s_layer, teacher, t_
     loss = (1-alpha) * T**2 * loss_fn(soft_pred, soft_targets) + alpha * jacobian_loss
     return loss
 
-# Code to be used in trainig for obtaining the correct derivatives
-# Get gradient of activation wrt input
 def get_jacobian(model, x):
     """Get Jacobian matrix of the model output wrt input.
     
