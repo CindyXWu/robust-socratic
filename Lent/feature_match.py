@@ -1,5 +1,4 @@
 import torch.nn as nn
-import numpy as np
 import torch
 from basic1_models import *
 
@@ -29,7 +28,7 @@ def feature_map_diff(student, teacher, x, layer, aggregate_chan):
     # Aggregate the channels of the feature activation using root squared absolute value of channels to create activation map
     if aggregate_chan:
         student_output = torch.sqrt(torch.sum(torch.abs(student_output)**2, dim=1)).view(-1)
-        teacher_output = torch.sqrt(torch.sum(torch.abs(teacher_output)**2, dim=1))
+        teacher_output = torch.sqrt(torch.sum(torch.abs(teacher_output)**2, dim=1)).view(-1)
 
     # Compute the difference between the feature maps
     diff = torch.norm( (student_output/torch.norm(student_output, p=2) - teacher_output/torch.norm(teacher_output, p=2) ), p=2)

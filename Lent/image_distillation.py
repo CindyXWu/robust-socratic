@@ -1,5 +1,3 @@
-import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import torch
 from torchvision import datasets, transforms
@@ -8,12 +6,12 @@ import torchvision.models as models
 from torch import nn, optim
 import os
 from tqdm import tqdm
+
 from image_models import *
-from losses.jacobian_srinivas import *
 from plotting import *
-# import time
-# import torchvision
-# import copy
+from jacobian_srinivas import *
+from contrastive import *
+from feature_match import *
 
 # Setup ========================================================================
 # Suppress warnings "divide by zero" produced by NaN gradients
@@ -50,14 +48,6 @@ def load_cifar_10(dims):
     testloader = torch.utils.data.DataLoader(testset, batch_size=BATCH_SIZE, shuffle=True)
     return trainset, testset, trainloader, testloader
 
-# ResNet50 setup
-resnet = models.resnet50(pretrained=True)
-for param in resnet.parameters():
-    param.requires_grad = False
-num_ftrs = resnet.fc.in_features
-resnet.fc = nn.Linear(num_ftrs, 10)
-resnet = resnet.to(device)
-
 def evaluate(model, dataset, max_ex=0):
     """Evaluate model accuracy on dataset."""
     acc = 0
@@ -80,45 +70,40 @@ def weight_reset(m):
         m.reset_parameters()
 
 # Get data
-train_set, test_set, train_loader, test_loader = load_cifar_10((224, 224))
-small_train_set, small_test_set, small_train_loader, small_test_loader = load_cifar_10((32, 32))
+train_set, test_set, train_loader, test_loader = load_cifar_10((32, 32))
 
-# print(train_set[0][0].size())
-# print(small_train_set[0][0].size())
+# Define loss functions
+bceloss_fn = nn.BCELoss()
+sigmoid = nn.Sigmoid()
+kldivloss = nn.KLDivLoss(reduction='batchmean')
 
-def train_distill(loss, teacher, student, lr, epochs, trainloader, testloader, repeats, title, **kwargs):
+def train_distill(loss, teacher, student, lr, epochs, repeats, title):
     """Train student model with distillation loss."""
-    optimiser = optim.SGD(student.parameters(), lr=lr)
-    for rep in range(repeats):
-        student = student.to(device)
-        student.apply(weight_reset)
-        optimizer = torch.optim.SGD(student.parameters(), lr=lr)
+    optimizer = optim.SGD(student.parameters(), lr=lr)
+    for _ in range(repeats):
         it = 0
         train_acc = []
         test_acc = []
         train_loss = [0]  # loss at iteration 0
         it_per_epoch = len(train_loader)
-        for epoch in range(epochs):
-            dataloader_iterator = iter(train_loader)
-            for i, (inputs1, labels1) in tqdm(enumerate(small_train_loader), total=len(small_train_loader)):
-                try: 
-                    inputs2, labels2 = next(dataloader_iterator)
-                except StopIteration:
-                    dataloader_iterator = iter(train_loader)
-                    inputs2, labels2 = next(dataloader_iterator)
-
-                inputs1 = inputs1.to(device)
-                inputs1.requires_grad = True
-                inputs2 = inputs2.to(device)
-                inputs2.requires_grad = True
-
-                scores = student(inputs1)
-                targets = teacher(inputs2)
-
-                s_jac = torch.autograd.grad(scores, labels1, grad_outputs=torch.ones_like(scores), create_graph=True)[0]
-                print(s_jac.size())
-                loss = loss(scores, targets, **kwargs)
-
+        for _ in range(epochs):
+            student = student.to(device)
+            student.apply(weight_reset)
+            # Student
+            for inputs, labels in tqdm(train_loader):
+                inputs = inputs.to(device)
+                print(inputs.shape)
+                print(labels.shape)
+                inputs.requires_grad = True
+                labels = torch.tensor(labels).to(device)
+                # Student outputs
+                scores = student(inputs)
+                # Teacher outputs
+                targets = teacher(inputs)
+                ## Trying to figure out what sort of object scores is
+                # print(torch.is_tensor(scores[0]))
+                # print(scores)
+                loss = jacobian_loss(scores, targets, inputs, 1, student, teacher, 0.8, bceloss_fn)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -137,5 +122,26 @@ def train_distill(loss, teacher, student, lr, epochs, trainloader, testloader, r
         plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
         plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
 
-lenet = LeNet5(10)
-train_distill(jacobian_loss, resnet, lenet, lr, epochs, train_loader, test_loader, 1, "lenet_jac", temp=1)
+class ModifiedResNet50(nn.Module):
+    def __init__(self, num_classes):
+        super(ModifiedResNet50, self).__init__()
+        self.resnet50 = models.resnet50(pretrained=True)
+        self.resnet50.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.fc = nn.Linear(2048, num_classes)
+
+    def forward(self, x):
+        x = self.resnet50(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
+    
+if __name__ == "__main__":
+    lenet = LeNet5(10)
+    # ResNet50 setup
+    # Modified so it can be used with CIFAR-10
+    resnet = ResNet50_CIFAR10()
+    for param in resnet.parameters():
+        param.requires_grad = False
+    resnet = resnet.to(device)
+
+    train_distill(jacobian_loss, resnet, lenet, lr, epochs, 1, "lenet_jac")

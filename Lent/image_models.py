@@ -1,5 +1,7 @@
 import torch.nn as nn
 import torch
+import torchvision.models as models
+import torch.utils.model_zoo as model_zoo
 
 class LeNet5(nn.Module):
     def __init__(self, n_classes, greyscale=False):
@@ -33,4 +35,30 @@ class LeNet5(nn.Module):
         x = torch.flatten(x, 1)
         logits = self.classifier(x)
         probs = nn.functional.softmax(logits, dim=1)
-        return logits, probs
+        return logits
+
+class ResNet50_CIFAR10(models.ResNet):
+
+    def __init__(self):
+        super(ResNet50_CIFAR10, self).__init__(block=models.resnet.Bottleneck, layers=[3, 4, 6, 3], num_classes=10)
+
+        # Modify the first convolution layer to accept 3-channel input with 32 x 32 dimensions
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.maxpool = nn.Identity()
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+
+        return x

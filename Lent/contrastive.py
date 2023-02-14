@@ -2,7 +2,6 @@
 Code adapted from https://github.com/HobbitLong/RepDistiller/blob/master/crd/criterion.py to be used without memory buffer.
 """
 import torch.nn as nn
-import numpy as np
 import torch
 
 eps = 1e-7
