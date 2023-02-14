@@ -1,6 +1,7 @@
 import torch.nn as nn
 import numpy as np
 import torch
+from basic1_models import *
 
 # Define loss functions
 bceloss_fn = nn.BCELoss()
@@ -9,29 +10,32 @@ kldivloss = nn.KLDivLoss(reduction='batchmean')
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def activation_jac(my_model, x, layer):
-    """Get the channel-wise activations (Eq 8) of a specific layer, using forward hook.
-    Then compute the derivative wrt input and return as Jacobian matrix.
+def feature_map_diff(student, teacher, x, layer, aggregate_chan):
+    """Compute the difference between the feature maps of the student and teacher models.
     
     Args:
-        my_model: torch model
+        student: torch model
+        teacher: torch model
         x: torch tensor, input to the model
-        layer: pytorch module, layer of the model
+        layer: layer name of module
+        aggregate_chan: bool, whether to aggregate the channels of the feature activation
     """
-    model = my_model()
-    x.requires_grad = True
-    output = model(x)
-    activations = []
-    def get_hook(name):
-        def hook(model, input, output):
-            activations.append(output.detach())
-        return hook
-    
-    model.layer.register_forward_hook(get_hook(str(layer)))
-    
-    # Now compute derivatives of activation wrt input
-    gradients = torch.autograd.grad(outputs=activations, inputs=x,
-                          grad_outputs=torch.ones(activations.size()).to(device),
-                          create_graph=True, retain_graph=True, only_inputs=True)[0]
+    # Load and extract models
+    student = student()
+    teacher = teacher()
+    student_output = student._modules[layer](x)
+    teacher_output = teacher._modules[layer](x)
 
-    return
+    # Aggregate the channels of the feature activation using root squared absolute value of channels to create activation map
+    if aggregate_chan:
+        student_output = torch.sqrt(torch.sum(torch.abs(student_output)**2, dim=1)).view(-1)
+        teacher_output = torch.sqrt(torch.sum(torch.abs(teacher_output)**2, dim=1))
+
+    # Compute the difference between the feature maps
+    diff = torch.norm( (student_output/torch.norm(student_output, p=2) - teacher_output/torch.norm(teacher_output, p=2) ), p=2)
+
+    return diff
+
+if __name__ == "__main__":
+    model = small_linear_net()
+    model.eval()

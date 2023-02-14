@@ -9,7 +9,7 @@ from torch import nn, optim
 import os
 from tqdm import tqdm
 from image_models import *
-from losses import jacobian, contrastive
+from losses.jacobian_srinivas import *
 from plotting import *
 # import time
 # import torchvision

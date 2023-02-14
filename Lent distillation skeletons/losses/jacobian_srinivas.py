@@ -6,13 +6,14 @@ import torch.nn as nn
 import numpy as np
 import torch
 from feature_match import activation_jac
+from utils import *
 
 # Define loss functions
 bceloss_fn = nn.BCELoss()
 sigmoid = nn.Sigmoid()
 kldivloss = nn.KLDivLoss(reduction='batchmean')
 
-def jacobian(scores, targets, T, s_jac, t_jac, alpha, loss_fn):
+def jacobian_loss(scores, targets, inputs, T, student, teacher, t_jac, alpha, loss_fn):
     """Eq 10 adapted for input-output Jacobian matrix, not vector of output wrt largest pixel in attention map.
 
     See function below for adapation with attention maps.
@@ -28,12 +29,14 @@ def jacobian(scores, targets, T, s_jac, t_jac, alpha, loss_fn):
     """
     soft_pred = sigmoid(scores/T)
     soft_targets = sigmoid(targets/T)
+    s_jac = get_jacobian(student, inputs)
+    t_jac = get_jacobian(teacher, inputs)
     diff = s_jac/np.linalg.norm(s_jac, ord=2) - t_jac/np.linalg.norm(t_jac, ord=2)
     jacobian_loss = np.linalg.norm(diff, ord=2)**2
     loss = (1-alpha) * T**2 * loss_fn(soft_pred, soft_targets) + alpha * jacobian_loss
     return loss
 
-def jacobian_attention(inputs, scores, targets, T, student, s_layer, teacher, t_layer, alpha, loss_fn):
+def jacobian_attention_loss(inputs, scores, targets, T, student, s_layer, teacher, t_name, t_layer, alpha, loss_fn):
     """Eq 10, attention map Jacobian vector.
     
     J = dZ/dX where X is all inputs and Z is channel-wise square of attention maps.
@@ -46,11 +49,12 @@ def jacobian_attention(inputs, scores, targets, T, student, s_layer, teacher, t_
         student: torch model
         layer: pytorch module, layer of the model
         teacher: torch model
+        t_name: str, saved name of teacher model
         alpha: float, weight of the jacobian penalty
         loss_fn: base loss function - MSE, BCE, KLDiv
     """
-    s_jac = activation_jac(student, inputs, s_layer)
-    t_jac = activation_jac(teacher, inputs, t_layer)
+    s_jac = get_activation_jacobian(student, inputs, s_layer, True)
+    t_jac = get_activation_jacobian(student, inputs, s_layer, False, t_name)
     soft_pred = sigmoid(scores/T)
     soft_targets = sigmoid(targets/T)
     diff = s_jac/np.linalg.norm(s_jac, ord=2) - t_jac/np.linalg.norm(t_jac, ord=2)
