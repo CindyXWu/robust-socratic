@@ -1,13 +1,9 @@
 """Train and test student model in model distillation"""
-
 from tqdm import tqdm
 import os, sys
-import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-from torch.optim import Adam
-from torch.utils.data import Dataset, DataLoader
-from torch.autograd import Variable
+from torch.utils.data import DataLoader
 from utils import *
 from basic1_models import *
 from error import *
@@ -152,7 +148,6 @@ for X, SC in zip(X_list, SC_list):
                 it_per_epoch = len(train_loader)
                 for epoch in range(epochs):
                     for features, labels in tqdm(train_loader):
-                        # rnd_features = torch.rand(BATCH_SIZE, NUM_FEATURES).to(device)
                         scores = small_model(features)
                         targets = big_model(features)
 
@@ -218,11 +213,5 @@ for X, SC in zip(X_list, SC_list):
 
     test_accs = [models[key]['test_acc'] for key in models.keys()]
     if sweep == "frac": xs = [models[key]['simple frac random'] for key in models.keys()]
-
-    # keys = [key for key in models.keys()]
-    # best_key = keys[np.argmax(test_accs)]
-    # print(best_key)
-    # best_model = models[best_key]['model']
-    # best_model.eval()
 
     exp += 1

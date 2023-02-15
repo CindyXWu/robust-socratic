@@ -1,13 +1,10 @@
 """"Train and test teacher model in model distillation."""
-
 from tqdm import tqdm
 import os, sys
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-from torch.optim import Adam
-from torch.utils.data import Dataset, DataLoader
-from torch.autograd import Variable
+from torch.utils.data import DataLoader
 from utils import *
 from basic1_models import *
 from error import *
