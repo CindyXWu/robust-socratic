@@ -31,7 +31,7 @@ dropout = 0
 temps = [1, 5]
 alphas = [0.25, 0.5, 0.75]
 # Use a long distillation training schedule
-epochs = 1
+epochs = 3
 BATCH_SIZE = 64
 
 def load_cifar_10(dims):
@@ -98,14 +98,14 @@ def train_distill(loss, teacher, student, lr, epochs, repeats, title):
                 scores = student(inputs)
                 # Teacher outputs
                 targets = teacher(inputs)
-                ## Trying to figure out what sort of object scores is
-                # print(torch.is_tensor(scores[0]))
-                # print(scores)
-                loss = jacobian_loss(scores, targets, inputs, 1, student, teacher, 0.8, bceloss_fn)
+                input_dim = 32*32*3
+                
+                loss = jacobian_loss(scores, targets, inputs, 1, 0.8, BATCH_SIZE, input_dim, bceloss_fn)
                 loss.backward()
                 optimizer.zero_grad()
                 optimizer.step()
                 train_loss.append(loss.item())
+                
                 if it % 100 == 0:
                     train_acc.append(evaluate(student, train_loader, max_ex=100))
                     test_acc.append(evaluate(student, test_loader))
@@ -120,56 +120,6 @@ def train_distill(loss, teacher, student, lr, epochs, repeats, title):
         plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
         plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
 
-def jacobian_loss(scores, targets, inputs, T, student, teacher, alpha, loss_fn):
-    """Eq 10 adapted for input-output Jacobian matrix, not vector of output wrt largest pixel in attention map.
-
-    See function below for adapation with attention maps.
-    No hard targets used, purely distillation loss.
-    Args:
-        scores: torch tensor, output of the student model
-        targets: torch tensor, output of the teacher model
-        inputs: torch tensor, input to the model
-        T: float, temperature
-        s_jac: torch tensor, Jacobian matrix of the student model
-        t_jac: torch tensor, Jacobian matrix of the teacher model
-        alpha: float, weight of the jacobian penalty
-        loss_fn: base loss function to be used for the input-output distillation loss - MSE, BCE, KLDiv
-    """
-    soft_pred = nn.functional.softmax(scores/T, dim=1)
-    soft_targets = nn.functional.softmax(targets/T, dim=1)
-    # Change these two lines of code depending on which Jacobian you want to use
-    s_jac = get_approx_jacobian(student, inputs)
-    t_jac = get_approx_jacobian(teacher, inputs)
-    diff = s_jac/torch.norm(s_jac, 2) - t_jac/torch.norm(t_jac, 2)
-    jacobian_loss = torch.norm(diff, 2)**2
-    loss = (1-alpha) * T**2 * loss_fn(soft_pred, soft_targets) + alpha * jacobian_loss
-    return loss
-
-def get_approx_jacobian(model, x):
-    """Rather than computing Jacobian for all output classes, compute for most probable class.
-    
-    Required due to computational constraints for Jacobian computation.
-    Args:
-        model: torch model
-        x: torch tensor, input to the model
-    Returns:
-        jacobian: 1D torch tensor, vector of derivative of most probable class wrt input
-    """
-    batch_size = x.size(0)
-    # numel returns the number of elements in the tensor
-    input_dim = x.numel() // batch_size
-    x = x.requires_grad_()
-    y = model(x)
-    jacobian = torch.zeros(batch_size, input_dim, device=x.device)
-    output_dim = y.numel() // batch_size
-    grad_output = torch.zeros(batch_size, output_dim, device=x.device)
-    # Index of most likely class
-    i = torch.argmax(y, dim=1)
-    grad_output[:, i] = 1
-    grad_input, = torch.autograd.grad(y, x, grad_output, retain_graph=True)
-    jacobian = grad_input.view(batch_size, input_dim)
-    return jacobian
-    
 if __name__ == "__main__":
     lenet = LeNet5(10)
     # ResNet50 setup

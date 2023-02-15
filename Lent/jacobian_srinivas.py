@@ -12,26 +12,26 @@ bceloss_fn = nn.BCELoss()
 sigmoid = nn.Sigmoid()
 kldivloss = nn.KLDivLoss(reduction='batchmean')
 
-def jacobian_loss(scores, targets, inputs, T, student, teacher, alpha, loss_fn):
+def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, input_dim, loss_fn):
     """Eq 10 adapted for input-output Jacobian matrix, not vector of output wrt largest pixel in attention map.
 
     See function below for adapation with attention maps.
     No hard targets used, purely distillation loss.
     Args:
-        scores: torch tensor, output of the student model
-        targets: torch tensor, output of the teacher model
+        scores: torch tensor, logits of student model [batch_size, num_classes]
+        targets: torch tensor, logits of teacher model [batch_size, num_classes]
         inputs: torch tensor, input to the model
         T: float, temperature
-        s_jac: torch tensor, Jacobian matrix of the student model
-        t_jac: torch tensor, Jacobian matrix of the teacher model
         alpha: float, weight of the jacobian penalty
+        batch_size: int, batch size
+        input_dim: int, input dimension
         loss_fn: base loss function to be used for the input-output distillation loss - MSE, BCE, KLDiv
     """
     soft_pred = nn.functional.softmax(scores/T, dim=1)
     soft_targets = nn.functional.softmax(targets/T, dim=1)
     # Change these two lines of code depending on which Jacobian you want to use
-    s_jac = get_approx_jacobian(student, inputs)
-    t_jac = get_approx_jacobian(teacher, inputs)
+    s_jac = get_approx_jacobian(scores, inputs, batch_size, input_dim)
+    t_jac = get_approx_jacobian(targets, inputs, batch_size, input_dim)
     diff = s_jac/torch.norm(s_jac, 2) - t_jac/torch.norm(t_jac, 2)
     jacobian_loss = torch.norm(diff, 2)**2
     loss = (1-alpha) * T**2 * loss_fn(soft_pred, soft_targets) + alpha * jacobian_loss
@@ -65,25 +65,23 @@ def jacobian_attention_loss(scores, targets, inputs, T, student, s_layer, teache
     return loss
 
 # DEBUGGED
-def get_jacobian(model, x):
+def get_jacobian(output, x, batch_size, input_dim):
     """Get Jacobian matrix of the model output wrt input.
     
     Args:
-        model: torch model
-        x: torch tensor, input to the model
+        output: torch tensor, output of the model [batch_size, output_dim]
+        x: torch tensor, input to the model with requres_grad() True [batch_size, input_dim]
+        batch_size: int, batch size
+        input_dim: int, input dimension
     Returns:
         jacobian: torch tensor, Jacobian matrix of the model output wrt input
     """
-    batch_size = x.size(0)
-    input_dim = x.numel() // batch_size
-    x = x.requires_grad_()
-    y = model(x)
-    output_dim = y.numel() // batch_size
+    output_dim = output.numel() // batch_size
     jacobian = torch.zeros(batch_size, output_dim, input_dim, device=x.device)
     for i in range(output_dim):
         grad_output = torch.zeros(batch_size, output_dim, device=x.device)
         grad_output[:, i] = 1
-        grad_input, = torch.autograd.grad(y, x, grad_output, retain_graph=True)
+        grad_input, = torch.autograd.grad(output, x, grad_output, retain_graph=True)
         jacobian[:, i, :] = grad_input.view(batch_size, input_dim)
     return jacobian
 
@@ -125,27 +123,24 @@ def get_activation_jacobian(model, x, layer, dynamic, load_name=None, aggregate_
     return jacobian
 
 # DEBUGGED
-def get_approx_jacobian(model, x):
+def get_approx_jacobian(output, x, batch_size, input_dim):
     """Rather than computing Jacobian for all output classes, compute for most probable class.
     
-    Required due to computational constraints for Jacobian computation.
     Args:
-        model: torch model
-        x: torch tensor, input to the model
+        output: torch tensor, output of the model [batch_size, output_dim]
+        x: torch tensor, input to the model with requres_grad() True [batch_size, input_dim]
+        batch_size: int, batch size
+        input_dim: int, input dimension
     Returns:
         jacobian: 1D torch tensor, vector of derivative of most probable class wrt input
     """
-    batch_size = x.size(0)
-    # numel returns the number of elements in the tensor
-    input_dim = x.numel() // batch_size
-    x = x.requires_grad_()
-    y = model(x)
+    output_dim = output.numel() // batch_size
     jacobian = torch.zeros(batch_size, input_dim, device=x.device)
-    output_dim = y.numel() // batch_size
+    output_dim = output.numel() // batch_size
     grad_output = torch.zeros(batch_size, output_dim, device=x.device)
     # Index of most likely class
-    i = torch.argmax(y, dim=1)
-    grad_output[:, i] = 1
-    grad_input, = torch.autograd.grad(y, x, grad_output, retain_graph=True)
+    i = torch.argmax(output, dim=1)
+    grad_output.view(-1)[i] = 1
+    grad_input, = torch.autograd.grad(output, x, grad_output, retain_graph=True)
     jacobian = grad_input.view(batch_size, input_dim)
     return jacobian
