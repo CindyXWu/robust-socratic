@@ -29,13 +29,15 @@ def jacobian_loss(scores, targets, inputs, T, student, teacher, alpha, loss_fn):
     """
     soft_pred = nn.functional.softmax(scores/T, dim=1)
     soft_targets = nn.functional.softmax(targets/T, dim=1)
-    s_jac = get_jacobian(student, inputs)
-    t_jac = get_jacobian(teacher, inputs)
+    # Change these two lines of code depending on which Jacobian you want to use
+    s_jac = get_approx_jacobian(student, inputs)
+    t_jac = get_approx_jacobian(teacher, inputs)
     diff = s_jac/torch.norm(s_jac, 2) - t_jac/torch.norm(t_jac, 2)
     jacobian_loss = torch.norm(diff, 2)**2
     loss = (1-alpha) * T**2 * loss_fn(soft_pred, soft_targets) + alpha * jacobian_loss
     return loss
 
+# TODO: DEBUG
 def jacobian_attention_loss(scores, targets, inputs, T, student, s_layer, teacher, t_name, t_layer, alpha, loss_fn):
     """Eq 10, attention map Jacobian vector.
     
@@ -62,12 +64,15 @@ def jacobian_attention_loss(scores, targets, inputs, T, student, s_layer, teache
     loss = (1-alpha) * T**2 * loss_fn(soft_pred, soft_targets) + alpha * jacobian_loss
     return loss
 
+# DEBUGGED
 def get_jacobian(model, x):
     """Get Jacobian matrix of the model output wrt input.
     
     Args:
         model: torch model
         x: torch tensor, input to the model
+    Returns:
+        jacobian: torch tensor, Jacobian matrix of the model output wrt input
     """
     batch_size = x.size(0)
     input_dim = x.numel() // batch_size
@@ -82,6 +87,7 @@ def get_jacobian(model, x):
         jacobian[:, i, :] = grad_input.view(batch_size, input_dim)
     return jacobian
 
+# TODO: DEBUG
 def get_activation_jacobian(model, x, layer, dynamic, load_name=None, aggregate_chan=True):
     """Get Jacobian matrix of activation to input for a saved model or model during training.
     
@@ -90,8 +96,12 @@ def get_activation_jacobian(model, x, layer, dynamic, load_name=None, aggregate_
         layer: layer name of module
         x: torch tensor, input to the model
         dynamic: bool, whether to compute for saved model or model during training
-        load_name: file name of saved model which contains state dictaggregate_chan: bool, whether to aggregate the channels of the feature activation
+        load_name: file name of saved model which contains state dict
+        aggregate_chan: bool, whether to aggregate the channels of the feature activation
+    Returns:
+        jacobian: torch tensor, Jacobian matrix of activation to input
     """
+    batch_size = x.size(0)
     model = model()
     if not dynamic:
         # Load saved model
@@ -104,12 +114,38 @@ def get_activation_jacobian(model, x, layer, dynamic, load_name=None, aggregate_
         layer_output = torch.sqrt(torch.sum(torch.abs(layer_output)**2, dim=1))
 
     # Compute the Jacobian matrix
-    jacobian = torch.zeros(layer_output.numel(), x.numel())
+    jacobian = torch.zeros(batch_size, layer_output.numel(), x.numel())
     for i in tqdm(range(layer_output.numel())):
-        grad_output = torch.zeros(layer_output.size())
-        grad_output.view(-1)[i] = 1
+        grad_output = torch.zeros(batch_size, layer_output.size())
+        grad_output.view(-1)[:, i] = 1
         # Compute each row of Jacobian at a time
         # layer_output.view(-1) is function to differentiate - flattened to 1D tensor for compatibility with PyTorch's gradient computation
-        jacobian[i, :] = torch.autograd.grad(layer_output.view(-1), x, grad_outputs=grad_output.view(-1), retain_graph=True)[0].view(-1)
+        jacobian[:, i, :] = torch.autograd.grad(layer_output.view(-1), x, grad_outputs=grad_output.view(-1), retain_graph=True)[0].view(-1)
     
+    return jacobian
+
+# DEBUGGED
+def get_approx_jacobian(model, x):
+    """Rather than computing Jacobian for all output classes, compute for most probable class.
+    
+    Required due to computational constraints for Jacobian computation.
+    Args:
+        model: torch model
+        x: torch tensor, input to the model
+    Returns:
+        jacobian: 1D torch tensor, vector of derivative of most probable class wrt input
+    """
+    batch_size = x.size(0)
+    # numel returns the number of elements in the tensor
+    input_dim = x.numel() // batch_size
+    x = x.requires_grad_()
+    y = model(x)
+    jacobian = torch.zeros(batch_size, input_dim, device=x.device)
+    output_dim = y.numel() // batch_size
+    grad_output = torch.zeros(batch_size, output_dim, device=x.device)
+    # Index of most likely class
+    i = torch.argmax(y, dim=1)
+    grad_output[:, i] = 1
+    grad_input, = torch.autograd.grad(y, x, grad_output, retain_graph=True)
+    jacobian = grad_input.view(batch_size, input_dim)
     return jacobian
