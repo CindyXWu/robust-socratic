@@ -38,7 +38,6 @@ class LeNet5(nn.Module):
         return logits
 
 class ResNet50_CIFAR10(models.ResNet):
-
     def __init__(self):
         super(ResNet50_CIFAR10, self).__init__(block=models.resnet.Bottleneck, layers=[3, 4, 6, 3], num_classes=10)
 

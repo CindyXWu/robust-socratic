@@ -1,9 +1,7 @@
-import matplotlib.pyplot as plt
 import torch
 from torchvision import datasets, transforms
-from torch.optim import lr_scheduler
-import torchvision.models as models
 from torch import nn, optim
+import torch.nn.functional as F
 import os
 from tqdm import tqdm
 
@@ -35,10 +33,6 @@ epochs = 3
 t_epochs = 100
 BATCH_SIZE = 64
 
-# Define loss functions
-bceloss_fn = nn.BCELoss()
-kldivloss = nn.KLDivLoss(reduction='batchmean')
-
 def load_cifar_10(dims):
     """Load CIFAR-10 dataset and return dataloaders.
     :param dims: tuple, dimensions of the images
@@ -53,6 +47,7 @@ def load_cifar_10(dims):
     testloader = torch.utils.data.DataLoader(testset, batch_size=BATCH_SIZE, num_workers=0, shuffle=True, drop_last=True)
     return trainset, testset, trainloader, testloader
 
+@torch.no_grad()
 def evaluate(model, dataset, max_ex=0):
     """Evaluate model accuracy on dataset."""
     acc = 0
@@ -79,24 +74,32 @@ def weight_reset(model):
 def fine_tune(model, dataloader, title):
     """Fine tune a pre-trained teacher model for specific downstream task."""
     optimizer = optim.SGD(model.parameters(), lr=lr)
-    it - 0
+    it = 0
     it_per_epoch = len(dataloader)
     
-    for _ in range(t_epochs):
+    for epoch in range(t_epochs):
+        print("Epoch: ", epoch)
         train_acc = []
         test_acc = []
-        train_loss = [0]
+        train_loss = []
+        model.train()
         for inputs, labels in tqdm(dataloader):
             inputs = inputs.to(device)
             labels = labels.to(device)
-            loss = bceloss_fn(model(inputs), labels)
+            scores = model(inputs)
+            scores.requires_grad = True
+            # scores =  nn.functional.softmax(model(input
+            # s), dim=1)
+            # _, preds = torch.max(scores, 1)
+            optimizer.zero_grad()
+            loss = F.cross_entropy(scores, labels)
             loss.backward()
             optimizer.step()
             if it % 100 == 0:
                     train_acc.append(evaluate(model, train_loader, max_ex=100))
                     test_acc.append(evaluate(model, test_loader))
-                    plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
-                    plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
+                    # plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
+                    # plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
                     print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
             it += 1
     
@@ -110,6 +113,7 @@ def train_distill(loss, teacher, student, lr, epochs, repeats, title):
         test_acc = []
         train_loss = [0]  # loss at iteration 0
         it_per_epoch = len(train_loader)
+        
         for _ in range(epochs):
             weight_reset(student)
             # Student
@@ -121,9 +125,12 @@ def train_distill(loss, teacher, student, lr, epochs, repeats, title):
                 scores = student(inputs)
                 # Teacher outputs
                 targets = teacher(inputs)
+                
                 input_dim = 32*32*3
                 output_dim = scores.shape[1]
-                loss = jacobian_loss(scores, targets, inputs, 1, 0.8, BATCH_SIZE, input_dim, output_dim, bceloss_fn)
+                
+                # Can edit loss function input to be different e.g. MSE
+                loss = jacobian_loss(scores, targets, inputs, 1, 0.8, BATCH_SIZE, input_dim, output_dim, nn.KLDivLoss)
                 loss.backward()
                 optimizer.zero_grad()
                 optimizer.step()
@@ -136,7 +143,7 @@ def train_distill(loss, teacher, student, lr, epochs, repeats, title):
                     plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
                     print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
                 it += 1
-
+            
         # Perform last book keeping
         train_acc.append(evaluate(student, train_loader, max_ex=100))
         test_acc.append(evaluate(student, test_loader))
@@ -148,9 +155,12 @@ if __name__ == "__main__":
     train_set, test_set, train_loader, test_loader = load_cifar_10((32, 32))
     lenet = LeNet5(10)
     # ResNet50 early layers modified for CIFAR-10
-    resnet = ResNet50_CIFAR10()
+    resnet = ResNet50_CIFAR10().to(device)
     for param in resnet.parameters():
         param.requires_grad = False
-    resnet = resnet.to(device)
+    # print(resnet)
+    
+    # Fine-tune ResNet50
+    fine_tune(resnet, train_loader, "resnet finetune")
     # Train model
     train_distill(jacobian_loss, resnet, lenet, lr, epochs, 1, "lenet_jac")

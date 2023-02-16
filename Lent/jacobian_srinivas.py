@@ -12,7 +12,6 @@ kldivloss = nn.KLDivLoss(reduction='batchmean')
 
 def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, input_dim, output_dim, loss_fn):
     """Eq 10 adapted for input-output Jacobian matrix, not vector of output wrt largest pixel in attention map.
-
     See function below for adapation with attention maps.
     No hard targets used, purely distillation loss.
     Args:
@@ -35,7 +34,6 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, input_dim, outp
 
 def get_approx_jacobian(output, x, batch_size, input_dim, output_dim):
     """Rather than computing Jacobian for all output classes, compute for most probable class.
-    
     Args:
         output: [batch_size, output_dim=num_classes]
         x: input with requres_grad() True [batch_size, input_dim]
@@ -63,7 +61,6 @@ def get_jacobian(output, x, batch_size, input_dim, output_dim):
 # TODO: DEBUG
 def jacobian_attention_loss(scores, targets, inputs, T, student, teacher, t_name, s_layer, t_layer, alpha, loss_fn):
     """Eq 10, attention map Jacobian vector.
-    
     J = dZ/dX where X is all inputs and Z is channel-wise square of attention maps.
     No hard targets used, purely distillation loss.
     Args:
@@ -86,7 +83,6 @@ def jacobian_attention_loss(scores, targets, inputs, T, student, teacher, t_name
 # TODO: DEBUG
 def get_activation_jacobian(model, x, layer, dynamic, load_name=None, aggregate_chan=True):
     """Get Jacobian matrix of activation to input for a saved model or model during training.
-    
     Args:
         layer: layer name of module
         dynamic: bool, whether to compute for saved model or model during training

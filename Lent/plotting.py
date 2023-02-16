@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from torchvision.utils import make_grid
 
 def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
     fig = plt.figure(figsize=(8, 4), dpi=100)
@@ -43,4 +44,9 @@ def plot_data(data_arr, d1, d2):
     plt.ylabel("Feature " + str(d2))
     plt.show()
     
-    
+def show_batch(dl):
+    for images, labels in dl:
+        fig, ax = plt.subplots(figsize=(12, 12))
+        ax.set_xticks([]); ax.set_yticks([])
+        ax.imshow(make_grid(images[:64], nrow=8).permute(1, 2, 0))
+        break
