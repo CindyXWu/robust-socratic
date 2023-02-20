@@ -1,7 +1,6 @@
 import torch.nn as nn
 import torch
 import torchvision.models as models
-import torch.utils.model_zoo as model_zoo
 
 class LeNet5(nn.Module):
     def __init__(self, n_classes, greyscale=False):

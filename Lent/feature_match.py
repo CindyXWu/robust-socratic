@@ -1,40 +1,45 @@
-import torch.nn as nn
+"""Contains utility code for extracting feature maps from models."""
 import torch
 from basic1_models import *
 
-# Define loss functions
-bceloss_fn = nn.BCELoss()
-sigmoid = nn.Sigmoid()
-kldivloss = nn.KLDivLoss(reduction='batchmean')
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-def feature_map_diff(student, teacher, x, layer, aggregate_chan):
+def feature_map_diff(student_output, teacher_output, aggregate_chan):
     """Compute the difference between the feature maps of the student and teacher models.
     
     Args:
-        student: torch model
-        teacher: torch model
-        x: torch tensor, input to the model
-        layer: layer name of module
+        student_output: torch tensor, activation map of teacher model [batch_size, num_channels]
+        teacher_output: torch tensor, output of teacher model [batch_size, num_channels]
         aggregate_chan: bool, whether to aggregate the channels of the feature activation
     """
-    # Load and extract models
-    student = student()
-    teacher = teacher()
-    student_output = student._modules[layer](x)
-    teacher_output = teacher._modules[layer](x)
-
     # Aggregate the channels of the feature activation using root squared absolute value of channels to create activation map
     if aggregate_chan:
-        student_output = torch.sqrt(torch.sum(torch.abs(student_output)**2, dim=1)).view(-1)
-        teacher_output = torch.sqrt(torch.sum(torch.abs(teacher_output)**2, dim=1)).view(-1)
+        student_output = torch.sqrt(torch.sum(torch.abs(student_output)**2, dim=1))
+        teacher_output = torch.sqrt(torch.sum(torch.abs(teacher_output)**2, dim=1))
 
     # Compute the difference between the feature maps
     diff = torch.norm( (student_output/torch.norm(student_output, p=2) - teacher_output/torch.norm(teacher_output, p=2) ), p=2)
-
+    
     return diff
 
-if __name__ == "__main__":
-    model = small_linear_net()
-    model.eval()
+def feature_extractor(model, inputs, layer_num):
+    """Extract feature maps from model.
+    
+    Args:
+        model: torch model, model to extract feature maps from
+        inputs: torch tensor, input to model
+        layer_num: int, layer number to extract feature maps from
+    """
+    def get_activations():
+        def hook(model, input, output):
+            features.append(output)
+        return hook
+    features = []
+    layer = list(model.children())[0][layer_num] # Length 2 list so get 0th index to access layers
+    layer.register_forward_hook(get_activations())  # Register hook
+    model(inputs) # Foeward pass
+    return features[0]
+
+# if __name__ == "__main__":
+#     def feature_extractor(model, inputs, layer_num):
+#         layer = list(model.children())[0][layer_num] # Length 2 list so get 0th index to access layers
+#         activations = layer(inputs)
+#         grads = torch.autograd.grad(activations, x, )

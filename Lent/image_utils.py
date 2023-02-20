@@ -2,29 +2,15 @@
 AugMix implemented from Hendrycks et al. (2019) https://arxiv.org/abs/1912.02781"""
 import torchvision.datasets as datasets
 import torchvision.transforms.functional as TF
-from torch.utils.data import Dataset
-import sys, os
 import torch
 import random
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
-output_dir = "data/32/"
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
-
-class CIFAR10Aug(Dataset):
+class CIFAR10Aug(datasets.CIFAR10):
     """Custom augmented CIFAR10 implementation."""
-    def __init__(self, root, alpha, beta, mix_prob, crop_prob, flip_prob, rotate_prob, jitter_prob, erase_prob, *args, **kwargs):
-        """Set parameters for beta distribution. 
-        If alpha = beta = 1, distribution uniform.
-        If alpha > beta, distribution skewed towards 0.
-        If alpha < beta, distribution skewed towards 1.
-        When alpha > 1 and beta > 1, distribution is concentrated around 0 and 1 - more likely to interpolate samples with similar features.
-        When alpha < 1 and beta < 1, distribution is concentrated around 0.5, = more likely to interpolate samples with dissimilar features.
-        """
+    def __init__(self, alpha, beta, mix_prob, crop_prob, flip_prob, rotate_prob, jitter_prob, erase_prob, *args, **kwargs):
+        """Set parameters for transform probability."""
         super(CIFAR10Aug, self).__init__(*args, **kwargs)
         # Params for beta distribution
-        self.cifar10 = datasets.CIFAR10(root, train=True, transform=None, download=True)
         self.alpha = alpha
         self.beta = beta
         self.mix_prob = mix_prob
@@ -45,7 +31,13 @@ class CIFAR10Aug(Dataset):
         return x, y
         
 def mixup(x, y, alpha, beta, mix_prob):
-    """Mixup functon for CIFAR_10."""
+    """Mixup function using beta distribution for mixing.
+    If alpha = beta = 1, distribution uniform.
+    If alpha > beta, distribution skewed towards 0.
+    If alpha < beta, distribution skewed towards 1.
+    When alpha > 1 and beta > 1, distribution is concentrated around 0 and 1 - more likely to interpolate samples with similar features.
+    When alpha < 1 and beta < 1, distribution is concentrated around 0.5, = more likely to interpolate samples with dissimilar features.
+    """
     if random.uniform(0,1) > mix_prob:
         return x, y
     batch_size = x.size()[0]
@@ -100,6 +92,4 @@ def jitter(x, jitter_prob):
     return TF.colorjitter(x, brightness, contrast, saturation, hue)
 
 if __name__ == '__main__':
-    train_dataset = CIFAR10Aug(root='./data', train=True, download=True, alpha=1.0, beta=1.0, mix_prob=0.3, crop_prob=0.3, flip_prob=0.3, rotate_prob=0.3, jitter_prob=0.3, erase_prob=0.3)
-    
-# Random erasing: Randomly removing a rectangular portion of the input image and filling it with random pixel values can help the model learn to focus on the remaining parts of the image.
+    train_dataset = CIFAR10Aug(alpha=1.0, beta=1.0, mix_prob=0.3, crop_prob=0.3, flip_prob=0.3, rotate_prob=0.3, jitter_prob=0.3, erase_prob=0.3, root='./data/aug', download=True, train=True)
