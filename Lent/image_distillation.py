@@ -99,7 +99,12 @@ def fine_tune(model, dataloader):
                     test_acc.append(evaluate(model, test_loader))
                     print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
             it += 1
-    
+
+# Instantiate losses
+kl_loss = nn.KLDivLoss(reduction='batchmean')
+ce_loss = nn.CrossEntropyLoss(reduction='batchmean')
+mse_loss = nn.MSELoss(reduction='batchmean')
+
 def train_distill(loss, teacher, student, lr, epochs, repeats, title, **kwargs):
     """Train student model with distillation loss."""
     optimizer = optim.SGD(student.parameters(), lr=lr)
@@ -120,11 +125,10 @@ def train_distill(loss, teacher, student, lr, epochs, repeats, title, **kwargs):
                 labels = labels.to(device)
                 scores = student(inputs) # Student outputs
                 targets = teacher(inputs) # Teacher outputs
-                
                 input_dim = 32*32*3
                 output_dim = scores.shape[1]
                 
-                loss = jacobian_loss(scores, targets, inputs, 1, 0.8, batch_size, nn.KLDivLoss, input_dim, output_dim)
+                loss = jacobian_loss(scores, targets, inputs, 1, 0.8, batch_size, kl_loss, input_dim, output_dim)
                 
                 # Try feature matching loss for case of self-distillation only. Trial case where both are LeNet5.
                 # s_map = feature_extractor(student, inputs, 2)

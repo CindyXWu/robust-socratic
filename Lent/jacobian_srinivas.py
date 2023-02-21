@@ -24,34 +24,14 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
     t_norm = t_jac / torch.norm(t_jac, 2, dim=-1).unsqueeze(1)
     diff = s_norm - t_norm
     jacobian_loss = torch.norm(diff, 2, dim=1)**2
-    
-    # distill_loss = T**2 * loss_fn(soft_pred, soft_targets)
-    # loss = (1-alpha) * distill_loss + alpha * jacobian_loss
-    
-    # Calculate batchwise average loss
     jacobian_loss = torch.mean(jacobian_loss)
     jacobian_loss.requires_grad = True
+    distill_loss = T**2 * loss_fn(soft_pred, soft_targets)
     
-    return  jacobian_loss
+    loss = (1-alpha) * distill_loss + alpha * jacobian_loss
+    return  loss
 
-# def get_approx_jacobian(output, x, batch_size):
-#     """Rather than computing Jacobian for all output classes, compute for most probable class.
-#     Args:
-#         output: [batch_size, output_dim=num_classes]
-#         x: input with requres_grad() True - [batch_size, input_dim, input_dim, channels]
-#     Returns:
-#         jacobian: 1D torch tensor, vector of derivative of most probable class wrt input
-#     """
-#     output_dim = output.shape[1] # num of classes
-#     input_dim = x.view(batch_size, -1).shape[1]
-#     grad_output = torch.zeros(batch_size, output_dim, device=x.device)
-#     # Index of most likely class, tensor of batch size shape
-#     i = torch.argmax(output, dim=1) 
-#     jacobian = torch.zeros(batch_size, input_dim, device=x.device)
-#     grad_output.view(-1)[i] = 1
-#     jacobian = torch.autograd.grad(output, x, grad_output)[0]
-#     return jacobian.view(batch_size, -1)
-
+# DEBUGGED
 def get_approx_jacobian(output, x, batch_size, input_dim, output_dim):
     """Rather than computing Jacobian for all output classes, compute for most probable class.
     Args:
@@ -60,15 +40,14 @@ def get_approx_jacobian(output, x, batch_size, input_dim, output_dim):
     Returns:
         jacobian: 1D torch tensor, vector of derivative of most probable class wrt input
     """
-    jacobian = torch.zeros(batch_size, input_dim, device=x.device)
     grad_output = torch.zeros(batch_size, output_dim, device=x.device)
     # Index of most likely class
     i = torch.argmax(output, dim=1)
     grad_output.view(-1)[i] = 1
-    grad_input = torch.autograd.grad(output, x, grad_output)[0]
-    jacobian = grad_input.view(batch_size, input_dim)
-    return jacobian
+    jacobian = torch.autograd.grad(output, x, grad_output, retain_graph=True)[0]
+    return jacobian.view(batch_size, input_dim)
 
+# TODO: LAST DEBUG
 def get_jacobian(output, x, batch_size):
     input_dim = x.shape(1)
     output_dim = output.shape(1)
@@ -118,13 +97,6 @@ def get_activation_jacobian(x, feature_map, batch_size):
     # layer_output.view(-1) is function to differentiate - flattened for autograd
     jacobian = torch.autograd.grad(feature_map.view(batch_size, -1), x, grad_output, retain_graph=True)[0]
     return jacobian
-
-# def get_features(x, batch_size):
-#     features = []
-#     def get_activations():
-#         def hook(model, input, output):
-#             features.append(output)
-#         return hook
     
 # TODO: implement
 def projection(s_map, t_map):
