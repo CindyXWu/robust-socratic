@@ -116,22 +116,22 @@ def train_distill(loss, teacher, student, lr, epochs, repeats, title, **kwargs):
             # Student
             for inputs, labels in tqdm(train_loader):
                 inputs = inputs.to(device)
-
-                s_map = feature_extractor(student, inputs, 2)
-                t_map = feature_extractor(teacher, inputs, 2)
-                print(s_map.shape)
-                
                 inputs.requires_grad = True
                 labels = labels.to(device)
-                # Student outputs
-                scores = student(inputs)
-                # Teacher outputs
-                targets = teacher(inputs)
+                scores = student(inputs) # Student outputs
+                targets = teacher(inputs) # Teacher outputs
                 
-                # Can edit loss function input to be different e.g. MS
-                # loss = jacobian_loss(scores, targets, inputs, 1, 0.8, batch_size, nn.KLDivLoss)
+                input_dim = 32*32*3
+                output_dim = scores.shape[1]
+                
+                loss = jacobian_loss(scores, targets, inputs, 1, 0.8, batch_size, nn.KLDivLoss, input_dim, output_dim)
+                
                 # Try feature matching loss for case of self-distillation only. Trial case where both are LeNet5.
-                loss = jacobian_attention_loss(scores, targets, s_map, t_map, batch_size, T=1, alpha=0.5, loss_fn = nn.KLDivLoss)
+                # s_map = feature_extractor(student, inputs, 2)
+                # t_map = feature_extractor(teacher, inputs, 2)
+                # print(s_map.shape)
+                # loss = jacobian_attention_loss(scores, targets, s_map, t_map, batch_size, T=1, alpha=0.5, loss_fn = nn.KLDivLoss)
+                
                 loss.backward()
                 optimizer.zero_grad()
                 optimizer.step()
@@ -157,16 +157,10 @@ if __name__ == "__main__":
     
     # ResNet50 early layers modified for CIFAR-10
     resnet = ResNet50_CIFAR10().to(device)
-    for param in resnet.parameters():
-        param.requires_grad = False
     
     # Instantiate student model
     lenet = LeNet5(10).to(device)
     lenet_to_train = LeNet5(10).to(device)
-    
-    ## Test ============================================
-    # inputs, labels = next(iter(train_loader))
-    # inputs = inputs.to(device)
     
     ## Fine-tune ============================================
     # fine_tune(lenet_to_train, train_loader)
