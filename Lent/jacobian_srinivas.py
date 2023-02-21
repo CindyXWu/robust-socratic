@@ -16,7 +16,6 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
     """
     soft_pred = F.softmax(scores/T, dim=1)
     soft_targets = F.softmax(targets/T, dim=1)
-    # Change these two lines of code depending on which Jacobian you want to use
     s_jac = get_approx_jacobian(scores, inputs, batch_size, input_dim, output_dim)
     t_jac = get_approx_jacobian(targets, inputs, batch_size, input_dim, output_dim)
 
@@ -24,12 +23,16 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
     s_norm = s_jac / torch.norm(s_jac, 2, dim=-1).unsqueeze(1)
     t_norm = t_jac / torch.norm(t_jac, 2, dim=-1).unsqueeze(1)
     diff = s_norm - t_norm
-    
     jacobian_loss = torch.norm(diff, 2, dim=1)**2
+    
     # distill_loss = T**2 * loss_fn(soft_pred, soft_targets)
     # loss = (1-alpha) * distill_loss + alpha * jacobian_loss
+    
+    # Calculate batchwise average loss
+    jacobian_loss = torch.mean(jacobian_loss)
     jacobian_loss.requires_grad = True
-    return jacobian_loss
+    
+    return  jacobian_loss
 
 # def get_approx_jacobian(output, x, batch_size):
 #     """Rather than computing Jacobian for all output classes, compute for most probable class.
@@ -62,7 +65,7 @@ def get_approx_jacobian(output, x, batch_size, input_dim, output_dim):
     # Index of most likely class
     i = torch.argmax(output, dim=1)
     grad_output.view(-1)[i] = 1
-    grad_input, = torch.autograd.grad(output, x, grad_output, retain_graph=True)
+    grad_input = torch.autograd.grad(output, x, grad_output)[0]
     jacobian = grad_input.view(batch_size, input_dim)
     return jacobian
 
