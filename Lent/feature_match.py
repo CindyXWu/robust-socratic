@@ -29,17 +29,29 @@ def feature_extractor(model, inputs, layer_num):
         layer_num: int, layer number to extract feature maps from
     """
     def get_activations():
-        def hook(model, input, output):
+        def forward_hook(model, input, output):
             features.append(output)
-        return hook
+        return forward_hook
+    
+    def retain_grads(x, batch_size):
+        def backward_hook(module, grad_input, grad_output):
+            grad_input.retain_grads()
+            features = module(x)
+            output_dim = features.shape[-1]
+            i = torch.argmax(features.view(batch_size, -1).detach(), dim=1)
+            grad_output = torch.zeros(batch_size, output_dim, device=x.device)
+            grad_output[:, i] = 1
+            jac = torch.autograd.grad(outputs=features, inputs=x, grad_outputs=grad_output, retain_graph=True, create_graph=True, only_inputs=True)
+            print(jac)
+            grads.append(jac)
+        return backward_hook
+    
+    batch_size = inputs.shape[0]
+    grads = []
     features = []
     layer = list(model.children())[0][layer_num] # Length 2 list so get 0th index to access layers
     layer.register_forward_hook(get_activations())  # Register hook
-    model(inputs) # Foeward pass
-    return features[0]
-
-# if __name__ == "__main__":
-#     def feature_extractor(model, inputs, layer_num):
-#         layer = list(model.children())[0][layer_num] # Length 2 list so get 0th index to access layers
-#         activations = layer(inputs)
-#         grads = torch.autograd.grad(activations, x, )
+    layer.register_backward_hook(retain_grads(batch_size, inputs))
+    model(inputs) # Forward pass
+    loss.backward()
+    return features[0], grads[0]
