@@ -3,6 +3,7 @@
 """
 import torch.nn.functional as F
 import torch
+from image_models import *
 
 def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_dim, output_dim):
     """Eq 10, no hard targets used.
@@ -79,20 +80,51 @@ def jacobian_attention_loss(scores, targets, s_map, t_map, batch_size, T, alpha,
     loss = (1 - alpha) * distill_loss + alpha * jacobian_loss
     return loss
 
+# Deprecated function until I figure out how to fix a bug
 def get_activation_jacobian(x, feature_map, batch_size):
     """Rather than computing Jacobian for entire activation map, compute for largest activation.
     Args:
-        output: [batch_size, output_dim=num_classes]
+        output: [batch_size, output_dim=channels*width*height]
         x: input with requres_grad() True - [batch_size, input_dim, input_dim, channels]
     """
-    input_dim = x.view(batch_size, -1)[-1]
-    output_dim = feature_map.numel() // batch_size
-    # Largest pixel in feature map
-    i = torch.argmax(feature_map.view(batch_size, -1).detach(), dim=1)
+    input_dim = x.view(batch_size, -1).shape[-1]
+    output_dim = feature_map.shape[-1]
+     # Largest pixel in feature map
+    i = torch.argmax(feature_map, dim=1)
     grad_output = torch.zeros(batch_size, output_dim, device=x.device)
     grad_output[:, i] = 1
-    jacobian = torch.autograd.grad(feature_map.view(batch_size, -1), x, grad_output, retain_graph=True)[0]
+    feature_map.retain_grad()
+    x.requires_grad = True
+    jacobian = torch.autograd.grad(feature_map, x, grad_output, retain_graph=True, allow_unused=True)[0]
     return jacobian.view(batch_size, input_dim)
+
+def get_grads(model, inputs, batch_size, layer_num):
+    """Extract feature maps from model.
+    
+    Args:
+        model: torch model, model to extract feature maps from
+        inputs: torch tensor, input to model
+        layer_num: int, layer number to extract feature maps from
+    """
+    def get_activations(batch_size):
+        def forward_hook(model, input, output):
+            output = output.view(batch_size, -1)
+            output = torch.autograd.Variable(output.data, requires_grad=True)
+            output.retain_grad()
+            features.append(output)
+        return forward_hook
+    features = []
+    layer = list(model.children())[0][layer_num] # Length 2 list so get 0th index to access layers
+    layer.register_forward_hook(get_activations(batch_size))  # Register hook
+    model(inputs) # Forward pass
+    
+    map = features[0].view(batch_size, -1)
+    i = torch.argmax(map, dim=1)
+    model.zero_grad()
+    gradient = torch.ones_like(map[:,i])
+    map[:,i].backward(gradient)
+    grads = inputs.grad
+    return grads
     
 # TODO: implement
 def projection(s_map, t_map):

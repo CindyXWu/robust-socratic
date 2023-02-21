@@ -122,18 +122,20 @@ def train_distill(loss, teacher, student, lr, epochs, repeats, title, **kwargs):
             for inputs, labels in tqdm(train_loader):
                 inputs = inputs.to(device)
                 inputs.requires_grad = True
+                inputs.retain_grad = True
                 labels = labels.to(device)
-                scores = student(inputs) # Student outputs
-                targets = teacher(inputs) # Teacher outputs
+                scores = student(inputs)
+                targets = teacher(inputs)
                 input_dim = 32*32*3
                 output_dim = scores.shape[1]
                 
                 # loss = jacobian_loss(scores, targets, inputs, 1, 0.8, batch_size, kl_loss, input_dim, output_dim)
                 
-                # Try feature matching loss for case of self-distillation only. Trial case where both are LeNet5.
-                s_map = feature_extractor(student, inputs, 2)
-                t_map = feature_extractor(teacher, inputs, 2)
-                loss = jacobian_attention_loss(scores, targets, s_map, t_map, batch_size, T=1, alpha=0.5, loss_fn=kl_loss)
+                s_map = feature_extractor(student, inputs, batch_size, 2)
+                t_map = feature_extractor(teacher, inputs, batch_size, 2)
+                
+                # loss = jacobian_attention_loss(scores, targets, s_map, t_map, batch_size, T=1, alpha=0.5, loss_fn=kl_loss)
+                loss = jacobian_loss(s_map, t_map, inputs, 1, 0.8, batch_size, kl_loss, input_dim, s_map.shape[-1])
                 
                 loss.backward()
                 optimizer.zero_grad()
