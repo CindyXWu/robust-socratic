@@ -10,6 +10,7 @@ from plotting import *
 from jacobian_srinivas import *
 from contrastive import *
 from feature_match import *
+from utils_ekdeep import *
 
 # Setup ========================================================================
 # Suppress warnings "divide by zero" produced by NaN gradients
@@ -86,12 +87,8 @@ def fine_tune(model, dataloader):
             inputs = inputs.to(device)
             labels = labels.to(device)
             scores = model(inputs)
-            # scores.requires_grad = True
-            # scores =  nn.functional.softmax(model(input
-            # s), dim=1)
-            # _, preds = torch.max(scores, 1)
             optimizer.zero_grad()
-            loss = F.cross_entropy(scores, labels)
+            loss = ce_loss(scores, labels)
             loss.backward()
             optimizer.step()
             if it % 100 == 0:
@@ -122,20 +119,20 @@ def train_distill(loss, teacher, student, lr, epochs, repeats, title, **kwargs):
             for inputs, labels in tqdm(train_loader):
                 inputs = inputs.to(device)
                 inputs.requires_grad = True
-                inputs.retain_grad = True
                 labels = labels.to(device)
                 scores = student(inputs)
                 targets = teacher(inputs)
                 input_dim = 32*32*3
                 output_dim = scores.shape[1]
                 
-                # loss = jacobian_loss(scores, targets, inputs, 1, 0.8, batch_size, kl_loss, input_dim, output_dim)
-                
                 s_map = feature_extractor(student, inputs, batch_size, 2)
                 t_map = feature_extractor(teacher, inputs, batch_size, 2)
                 
                 # loss = jacobian_attention_loss(scores, targets, s_map, t_map, batch_size, T=1, alpha=0.5, loss_fn=kl_loss)
-                loss = jacobian_loss(s_map, t_map, inputs, 1, 0.8, batch_size, kl_loss, input_dim, s_map.shape[-1])
+                # loss = jacobian_loss(s_map, t_map, inputs, 1, 0.8, batch_size, kl_loss, input_dim, s_map.shape[-1])
+                # loss = jacobian_loss(scores, targets, inputs, 1, 0.8, batch_size, kl_loss, input_dim, output_dim)
+                # loss = feature_map_diff(s_map, t_map, False)
+                loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, 1, 0.8, kl_loss)
                 
                 loss.backward()
                 optimizer.zero_grad()

@@ -39,7 +39,6 @@ class LeNet5(nn.Module):
 class ResNet50_CIFAR10(models.ResNet):
     def __init__(self):
         super(ResNet50_CIFAR10, self).__init__(block=models.resnet.Bottleneck, layers=[3, 4, 6, 3], num_classes=10)
-
         # Modify the first convolution layer to accept 3-channel input with 32 x 32 dimensions
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
         self.maxpool = nn.Identity()

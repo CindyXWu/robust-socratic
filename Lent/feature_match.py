@@ -2,27 +2,23 @@
 import torch
 from basic1_models import *
 
-def feature_map_diff(student_output, teacher_output, aggregate_chan):
+def feature_map_diff(s_map, t_map, aggregate_chan):
     """Compute the difference between the feature maps of the student and teacher models.
-    
     Args:
-        student_output: torch tensor, activation map of teacher model [batch_size, num_channels]
-        teacher_output: torch tensor, output of teacher model [batch_size, num_channels]
+        s_map: torch tensor, activation map of teacher model [batch_size, num_channels]
+        t_map: torch tensor, output of teacher model [batch_size, num_channels]
         aggregate_chan: bool, whether to aggregate the channels of the feature activation
     """
     # Aggregate the channels of the feature activation using root squared absolute value of channels to create activation map
     if aggregate_chan:
-        student_output = torch.sqrt(torch.sum(torch.abs(student_output)**2, dim=1))
-        teacher_output = torch.sqrt(torch.sum(torch.abs(teacher_output)**2, dim=1))
-
+        s_map = torch.sqrt(torch.sum(torch.abs(s_map)**2, dim=1))
+        t_map = torch.sqrt(torch.sum(torch.abs(t_map)**2, dim=1))
     # Compute the difference between the feature maps
-    diff = torch.norm( (student_output/torch.norm(student_output, p=2) - teacher_output/torch.norm(teacher_output, p=2) ), p=2)
-    
+    diff = torch.mean(s_map/torch.norm(s_map, p=2, dim=-1).unsqueeze(-1) - t_map/torch.norm(t_map, p=2, dim=-1).unsqueeze(-1) )
     return diff
 
 def feature_extractor(model, inputs, batch_size, layer_num):
     """Extract feature maps from model.
-    
     Args:
         model: torch model, model to extract feature maps from
         inputs: torch tensor, input to model
@@ -41,11 +37,5 @@ def feature_extractor(model, inputs, batch_size, layer_num):
     layer = list(model.children())[0][layer_num] # Length 2 list so get 0th index to access layers
     layer.register_forward_hook(get_activations(batch_size))  # Register hook
     model(inputs) # Forward pass
-    # map = features[0].view(batch_size, -1)
-    # i = torch.argmax(map, dim=1)
-    # model.zero_grad()
-    # gradient = torch.ones_like(map[:,i])
-    # map[:,i].backward(gradient)
-    # grads = inputs.grad
     return features[0]
     
