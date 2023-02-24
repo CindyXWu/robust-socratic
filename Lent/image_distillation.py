@@ -25,12 +25,13 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 # print(f"Using {device} device")
 
 # Hyperparams ========================================================================
-lr = 0.05
+lr = 0.3
+ft_lr = 0.05
 dropout = 0
 temps = [1, 5]
 alphas = [0.25, 0.5, 0.75]
 # Use a long distillation training schedule
-epochs = 70
+epochs = 10
 t_epochs = 10
 batch_size = 64
 dims = [32, 32]
@@ -73,28 +74,36 @@ def weight_reset(model):
         if hasattr(layer, 'reset_parameters'):
             layer.reset_parameters()
 
-def fine_tune(model, dataloader):
-    """Fine tune a pre-trained teacher model for specific downstream task. N.B may want to adjust learning rate to be smaller."""
+def train_teacher(model, dataloader, title):
+    """Fine tune a pre-trained teacher model for specific downstream task, or train from scratch."""
     optimizer = optim.SGD(model.parameters(), lr=lr)
     it = 0
-    
+    it_per_epoch = len(dataloader)-1 # drop_last = True
+
     for epoch in range(t_epochs):
         print("Epoch: ", epoch)
         train_acc = []
         test_acc = []
+        train_loss = []
+        
         model.train()
         for inputs, labels in tqdm(dataloader):
             inputs = inputs.to(device)
             labels = labels.to(device)
             scores = model(inputs)
+
             optimizer.zero_grad()
             loss = ce_loss(scores, labels)
             loss.backward()
             optimizer.step()
+            train_loss.append(loss.detach().numpy())
+
             if it % 100 == 0:
                     train_acc.append(evaluate(model, train_loader, max_ex=100))
                     test_acc.append(evaluate(model, test_loader))
                     print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
+                    plot_loss(train_loss, it, it_per_epoch, base_name=output_dir+"loss_"+title, title=title)
+                    plot_acc(train_acc, test_acc, it, base_name=output_dir+"acc_"+title, title=title)
             it += 1
 
 # Instantiate losses
@@ -124,14 +133,13 @@ def train_distill(loss, teacher, student, lr, epochs, repeats, title, **kwargs):
                 targets = teacher(inputs)
                 input_dim = 32*32*3
                 output_dim = scores.shape[1]
-                print("Input dim: ", inputs.shape)
-                print("Output dim: ", scores.shape)
                 
                 # s_map = feature_extractor(student, inputs, batch_size, 2)
                 # t_map = feature_extractor(teacher, inputs, batch_size, 2)
                 
                 # Jacobian loss
-                loss = jacobian_loss(scores, targets, inputs, 1, 0.5, batch_size, kl_loss, input_dim, output_dim)
+                # loss = jacobian_loss(scores, targets, inputs, 1, 0, batch_size, kl_loss, input_dim, output_dim)
+                loss = ce_loss(scores, labels)
                 ## Feature map loss
                 # loss = feature_map_diff(s_map, t_map, False)
                 ## Attention jacobian loss
@@ -140,13 +148,13 @@ def train_distill(loss, teacher, student, lr, epochs, repeats, title, **kwargs):
                 loss.backward()
                 optimizer.zero_grad()
                 optimizer.step()
-                train_loss.append(loss.item())
+                train_loss.append(loss)
                 
                 if it % 100 == 0:
                     train_acc.append(evaluate(student, train_loader, max_ex=100))
                     test_acc.append(evaluate(student, test_loader))
-                    plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
-                    plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
+                    plot_loss(train_loss, it, it_per_epoch, base_name=output_dir+"loss_"+title, title=title)
+                    plot_acc(train_acc, test_acc, it, base_name=output_dir+"acc_"+title, title=title)
                     print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
                 it += 1
             
@@ -162,7 +170,7 @@ if __name__ == "__main__":
     
     # ResNet50 early layers modified for CIFAR-10
     resnet = ResNet50_CIFAR10().to(device)
-    randomize_loc = False
+    randomize_loc = True
     spurious_type = 'box'
     train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, randomize_loc=randomize_loc)
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, randomize_loc=randomize_loc)
@@ -172,7 +180,7 @@ if __name__ == "__main__":
     lenet_to_train = LeNet5(10).to(device)
     
     # Fine-tune ============================================
-    fine_tune(lenet_to_train, train_loader)
+    train_teacher(lenet_to_train, train_loader, "lenet_teacher")
     
     # Train ============================================
-    train_distill(jacobian_loss, lenet_to_train, lenet, lr, epochs, 1, "lenet_jac_box")
+    train_distill(jacobian_loss, lenet_to_train, lenet, lr, epochs, 1, "lenet_jac_box_")

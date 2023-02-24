@@ -325,7 +325,7 @@ def get_dataloader(load_type='train', base_dataset='CIFAR10', spurious_type='pla
         dset = torch.utils.data.Subset(dset, subset_ids)
 
     # define dataloader
-    dataloader = DataLoader(dset, batch_size=batch_size, shuffle=(load_type=='train'), num_workers=4)
+    dataloader = DataLoader(dset, batch_size=batch_size, shuffle=(load_type=='train'), num_workers=2, drop_last=True)
     return dataloader
 
 
