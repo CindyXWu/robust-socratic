@@ -22,7 +22,7 @@ if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using {device} device")
+# print(f"Using {device} device")
 
 # Hyperparams ========================================================================
 lr = 0.05
@@ -30,8 +30,8 @@ dropout = 0
 temps = [1, 5]
 alphas = [0.25, 0.5, 0.75]
 # Use a long distillation training schedule
-epochs = 3
-t_epochs = 50
+epochs = 70
+t_epochs = 10
 batch_size = 64
 dims = [32, 32]
 
@@ -99,7 +99,7 @@ def fine_tune(model, dataloader):
 
 # Instantiate losses
 kl_loss = nn.KLDivLoss(reduction='batchmean')
-ce_loss = nn.CrossEntropyLoss(reduction='batchmean')
+ce_loss = nn.CrossEntropyLoss(reduction='mean')
 mse_loss = nn.MSELoss(reduction='batchmean')
 
 def train_distill(loss, teacher, student, lr, epochs, repeats, title, **kwargs):
@@ -124,16 +124,19 @@ def train_distill(loss, teacher, student, lr, epochs, repeats, title, **kwargs):
                 targets = teacher(inputs)
                 input_dim = 32*32*3
                 output_dim = scores.shape[1]
+                print("Input dim: ", inputs.shape)
+                print("Output dim: ", scores.shape)
                 
-                s_map = feature_extractor(student, inputs, batch_size, 2)
-                t_map = feature_extractor(teacher, inputs, batch_size, 2)
+                # s_map = feature_extractor(student, inputs, batch_size, 2)
+                # t_map = feature_extractor(teacher, inputs, batch_size, 2)
                 
-                # loss = jacobian_attention_loss(scores, targets, s_map, t_map, batch_size, T=1, alpha=0.5, loss_fn=kl_loss)
-                # loss = jacobian_loss(s_map, t_map, inputs, 1, 0.8, batch_size, kl_loss, input_dim, s_map.shape[-1])
-                # loss = jacobian_loss(scores, targets, inputs, 1, 0.8, batch_size, kl_loss, input_dim, output_dim)
+                # Jacobian loss
+                loss = jacobian_loss(scores, targets, inputs, 1, 0.5, batch_size, kl_loss, input_dim, output_dim)
+                ## Feature map loss
                 # loss = feature_map_diff(s_map, t_map, False)
-                loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, 1, 0.8, kl_loss)
-                
+                ## Attention jacobian loss
+                # loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, 1, 0.8, kl_loss)
+
                 loss.backward()
                 optimizer.zero_grad()
                 optimizer.step()
@@ -155,17 +158,21 @@ def train_distill(loss, teacher, student, lr, epochs, repeats, title, **kwargs):
 
 if __name__ == "__main__":
     # Get data
-    train_set, test_set, train_loader, test_loader = load_cifar_10((dims[0], dims[1]))
+    # train_set, test_set, train_loader, test_loader = load_cifar_10((dims[0], dims[1]))
     
     # ResNet50 early layers modified for CIFAR-10
     resnet = ResNet50_CIFAR10().to(device)
+    randomize_loc = False
+    spurious_type = 'box'
+    train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, randomize_loc=randomize_loc)
+    test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, randomize_loc=randomize_loc)
     
     # Instantiate student model
     lenet = LeNet5(10).to(device)
     lenet_to_train = LeNet5(10).to(device)
     
-    ## Fine-tune ============================================
-    # fine_tune(lenet_to_train, train_loader)
+    # Fine-tune ============================================
+    fine_tune(lenet_to_train, train_loader)
     
     # Train ============================================
-    train_distill(jacobian_loss, lenet_to_train, lenet, lr, epochs, 1, "lenet_jac")
+    train_distill(jacobian_loss, lenet_to_train, lenet, lr, epochs, 1, "lenet_jac_box")

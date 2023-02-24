@@ -16,6 +16,10 @@ cudnn.benchmark = False
 # Color perturbations dataset
 class coloredDataset(Dataset):
     def __init__(self, dataset, spurious_corr=1., randomize_color=False, use_spurious_by_ids=False, reverse_color=False, randomize_img=False):
+        """Args:
+            dataset: 
+            use_spurious_by_ids: 'rand' or 'norand' or False (for now set to False) 
+        """
         self.dataset = dataset
         self.classes = dataset.classes
         self.n_classes = len(dataset.classes)
@@ -88,7 +92,9 @@ class coloredDataset(Dataset):
 class boxDataset(Dataset):
     def __init__(self, dataset, spurious_corr=1., spurious_intensity=1., spurious_boxsize=3, randomize_intensity=False, 
                 randomize_size=False, randomize_loc=False, randomize_color=False, randomize_bgd=False, use_spurious_by_ids=False):
-
+        """Args:
+            spurious_corr: probability of box spurious feature
+        """
         # setup dataset
         self.dataset = dataset
         self.classes = dataset.classes
@@ -118,6 +124,7 @@ class boxDataset(Dataset):
     # retrieve next sample
     def __getitem__(self, item):
         image, label = self.dataset[item]
+        # If randomise background then pick random image
         image = self.dataset[np.random.randint(0, len(self.dataset))][0] if self.randomize_bgd else image
 
         put_spurious_feature = (np.random.uniform() < self.spurious_corr) if self.spurious_ids is None else self.spurious_ids[label][item]
@@ -132,6 +139,7 @@ class boxDataset(Dataset):
         
     # box creation function
     def get_box(self, mask, label):
+        # If randomise location else location predictive of label
         loc = np.random.randint(0, 10) if self.randomize_loc else (label % 10)
 
         l = (label // 10) if self.n_classes == 100 else 10   # only use color for CIFAR-100
@@ -239,7 +247,8 @@ class mnist3d(object):
         return img
 
 def get_transform(tform_type='plain'):
-
+    """Args:
+        tform_type: 'plain' or 'MNIST' or 'dominoes' depending on dataset used."""
     if(tform_type == 'plain'):
         train_transform = T.Compose([
             T.ToTensor(),
@@ -265,9 +274,22 @@ def get_transform(tform_type='plain'):
 ### Dataloaders
 def get_dataloader(load_type='train', base_dataset='CIFAR10', spurious_type='plain', spurious_corr=1.0, spurious_intensity=1., 
                     spurious_boxsize=3, tform_type='plain', randomize_intensity=False, randomize_size=False, randomize_loc=False, 
-                    randomize_bgd=False, randomize_color=False, batch_size=128, use_spurious_by_ids=False, randomize_img=False,
-                    data_dir='../early_pruning/datasets', finding_connectivity=False, subset_ids=None):
-
+                    randomize_bgd=False, randomize_color=False, batch_size=64, use_spurious_by_ids=False, randomize_img=False,
+                    data_dir='data', finding_connectivity=False, subset_ids=None):
+    """Returns dataloader for specified dataset.
+    Args:
+        load_type: 'train' or 'test'
+        base_dataset: e.g. 'CIFAR10', 'CIFAR100', 'MNIST'
+        spurious_type: 'plain', 'color', 'reverse_color', 'box', 'dominoes'
+        spurious_corr: probability of spurious feature
+        spurious_intensity: can set or randomise intensity of each pixel in box
+        spurious_boxsize: as on box, size of box...
+        tform_type: transform type for get_transform()
+        randomise_loc: whether to randomise box location (if set False, then box location is label % 10; 10 possibilities represent nothing/9 locations in grid for CIFAR-10)
+        randomize_bgd: if True then pick random image not predictive of label
+        randomize_color: if True then pick random color for box
+        use_spurious_by_ids: 
+    """
     # define transforms
     is_train = (load_type == 'train')
     transform = get_transform(tform_type if base_dataset != 'MNIST' else 'MNIST')
@@ -280,7 +302,7 @@ def get_dataloader(load_type='train', base_dataset='CIFAR10', spurious_type='pla
     # define base dataset (pick train or test)
     dset_type = getattr(torchvision.datasets, base_dataset)
     dset = dset_type(root=f'{data_dir}/{base_dataset.lower()}/', 
-                     train=is_train, download=False, transform=transform)
+                     train=is_train, download=True, transform=transform)
 
     # pick normal vs. spurious
     if (spurious_type == 'plain'):
@@ -319,13 +341,18 @@ def change_setup(base_setup, attr_change=[], attr_val=[]):
 def get_spurious_ids(targets=None, n_classes=10, use_rand=False, prob=1.):
     spurious_ids = {}
     for class_num in range(n_classes):
+        # Indexes where label is of target class
         idx = np.where(targets == class_num)[0]
+        # Masked True array
         make_these_spurious = np.array([True]*idx.shape[0])
         if(use_rand):
+            # Bernoulli coin toss to set some of these True values False with probability (1-p)
             make_these_spurious *= (np.random.binomial(n=1, p=prob, size=make_these_spurious.shape) > 0)
         else:
+            # First p fraction are False
             make_these_spurious[int(idx.shape[0] * prob):] = False
 
+        # Dictionary of dictionaries
         spurious_ids.update({class_num: {idx[sample_id]: make_these_spurious[sample_id] for sample_id in range(idx.shape[0])}})
 
     return spurious_ids
