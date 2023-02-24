@@ -5,8 +5,13 @@ def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
     fig = plt.figure(figsize=(8, 4), dpi=100)
     plt.plot(loss)
     plt.plot(smooth_loss)
+    # The iteration marking the start of each epoch
     epochs = [i * int(it_per_epoch) for i in range(int(it / it_per_epoch) + 1)]
-    plt.plot(epochs, [loss[i] for i in epochs], linestyle='', marker='o')
+    try:
+        loss_for_epochs = [loss[i] for i in epochs]
+        plt.plot(epochs, loss_for_epochs, linestyle='', marker='o')
+    except IndexError:
+        pass
     plt.title(title)
     plt.ylabel('Loss')
     plt.xlabel('Iteration')

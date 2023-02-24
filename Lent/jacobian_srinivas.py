@@ -3,6 +3,7 @@
 """
 import torch.nn.functional as F
 import torch
+import wandb
 from image_models import *
 
 def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_dim, output_dim):

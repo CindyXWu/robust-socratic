@@ -3,6 +3,7 @@ from torchvision import datasets, transforms
 from torch import nn, optim
 import torch.nn.functional as F
 import os
+import wandb
 from tqdm import tqdm
 
 from image_models import *
@@ -17,7 +18,7 @@ from utils_ekdeep import *
 import warnings
 warnings.filterwarnings("ignore")
 
-output_dir = "Image Experiments/"
+output_dir = "Image_Experiments/"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
@@ -35,6 +36,22 @@ epochs = 10
 t_epochs = 10
 batch_size = 64
 dims = [32, 32]
+
+# Logging=========================================================================
+wandb.init(
+    # set the wandb project where this run will be logged
+    project="lent_mechanistic_distillation",
+    
+    # track hyperparameters and run metadata
+    config={
+    "learning_rate": lr,
+    "architecture": "CNN",
+    "dataset": "CIFAR-100",
+    "epochs": epochs,
+    "temps": temps,
+    "batch_size": batch_size,
+    }
+)
 
 def load_cifar_10(dims):
     """Load CIFAR-10 dataset and return dataloaders.
@@ -84,7 +101,7 @@ def train_teacher(model, dataloader, title):
         print("Epoch: ", epoch)
         train_acc = []
         test_acc = []
-        train_loss = []
+        train_loss = [0]
         
         model.train()
         for inputs, labels in tqdm(dataloader):
@@ -97,14 +114,18 @@ def train_teacher(model, dataloader, title):
             loss.backward()
             optimizer.step()
             train_loss.append(loss.detach().numpy())
-
+            
             if it % 100 == 0:
-                    train_acc.append(evaluate(model, train_loader, max_ex=100))
-                    test_acc.append(evaluate(model, test_loader))
-                    print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
-                    plot_loss(train_loss, it, it_per_epoch, base_name=output_dir+"loss_"+title, title=title)
-                    plot_acc(train_acc, test_acc, it, base_name=output_dir+"acc_"+title, title=title)
+                train_acc.append(evaluate(model, train_loader, max_ex=100))
+                test_acc.append(evaluate(model, test_loader))
+                print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
+                plot_loss(train_loss, it, it_per_epoch, base_name=output_dir+"loss_"+title, title=title)
+                plot_acc(train_acc, test_acc, it, base_name=output_dir+"acc_"+title, title=title)
+
+                wandb.log({"teacher_acc": test_acc[-1], "teacher_loss": train_loss[-1]})
+
             it += 1
+        
 
 # Instantiate losses
 kl_loss = nn.KLDivLoss(reduction='batchmean')
@@ -156,6 +177,7 @@ def train_distill(loss, teacher, student, lr, epochs, repeats, title, **kwargs):
                     plot_loss(train_loss, it, it_per_epoch, base_name=output_dir+"loss_"+title, title=title)
                     plot_acc(train_acc, test_acc, it, base_name=output_dir+"acc_"+title, title=title)
                     print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
+                    wandb.log({"student_acc": test_acc[-1], "student_loss": train_loss[-1]})
                 it += 1
             
         # Perform last book keeping
