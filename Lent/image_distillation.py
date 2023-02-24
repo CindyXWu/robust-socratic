@@ -37,24 +37,24 @@ t_epochs = 10
 batch_size = 64
 dims = [32, 32]
 
-# Logging=========================================================================
-wandb.init(
-    # set the wandb project where this run will be logged
-    project="lenet-lenet",
+# # Logging=========================================================================
+# wandb.init(
+#     # set the wandb project where this run will be logged
+#     project="lenet-lenet",
     
-    # track hyperparameters and run metadata
-    config={
-    "learning_rate": lr,
-    "architecture": "CNN",
-    "dataset": "CIFAR-100",
-    "epochs": epochs,
-    "temps": temps,
-    "batch_size": batch_size,
-    "teacher": "LeNet5",
-    "student": "LeNet5",
-    "spurious type": "box",
-    }
-)
+#     # track hyperparameters and run metadata
+#     config={
+#     "learning_rate": lr,
+#     "architecture": "CNN",
+#     "dataset": "CIFAR-100",
+#     "epochs": epochs,
+#     "temps": temps,
+#     "batch_size": batch_size,
+#     "teacher": "LeNet5",
+#     "student": "LeNet5",
+#     "spurious type": "box",
+#     }
+# )
 
 def load_cifar_10(dims):
     """Load CIFAR-10 dataset and return dataloaders.
@@ -102,8 +102,8 @@ def train_teacher(model, dataloader, title):
 
     for epoch in range(t_epochs):
         print("Epoch: ", epoch)
-        train_acc = []
-        test_acc = []
+        train_acc = [1/10]
+        test_acc = [1/10]
         train_loss = [0]
         
         model.train()
@@ -116,14 +116,12 @@ def train_teacher(model, dataloader, title):
             loss = ce_loss(scores, labels)
             loss.backward()
             optimizer.step()
-            train_loss.append(loss.detach().numpy())
+            train_loss.append(loss.detach().cpu().numpy())
             
             if it % 100 == 0:
                 train_acc.append(evaluate(model, train_loader, max_ex=100))
                 test_acc.append(evaluate(model, test_loader))
                 print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
-                plot_loss(train_loss, it, it_per_epoch, base_name=output_dir+"loss_"+title, title=title)
-                plot_acc(train_acc, test_acc, it, base_name=output_dir+"acc_"+title, title=title)
 
                 wandb.log({"teacher_acc": test_acc[-1], "teacher_loss": train_loss[-1]})
 
