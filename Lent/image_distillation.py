@@ -40,7 +40,7 @@ dims = [32, 32]
 # Logging=========================================================================
 wandb.init(
     # set the wandb project where this run will be logged
-    project="lent_mechanistic_distillation",
+    project="lenet-lenet",
     
     # track hyperparameters and run metadata
     config={
@@ -50,6 +50,9 @@ wandb.init(
     "epochs": epochs,
     "temps": temps,
     "batch_size": batch_size,
+    "teacher": "LeNet5",
+    "student": "LeNet5",
+    "spurious type": "box",
     }
 )
 
@@ -192,7 +195,7 @@ if __name__ == "__main__":
     
     # ResNet50 early layers modified for CIFAR-10
     resnet = ResNet50_CIFAR10().to(device)
-    randomize_loc = True
+    randomize_loc = False
     spurious_type = 'box'
     train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, randomize_loc=randomize_loc)
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, randomize_loc=randomize_loc)
