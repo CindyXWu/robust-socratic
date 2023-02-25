@@ -162,13 +162,13 @@ if __name__ == '__main__':
     dropout = 0
     temps = [1, 5]
     alphas = [0.25, 0.5, 0.75]
-    epochs = 10
-    t_epochs = 10
+    epochs = 30
+    t_epochs = 20
     batch_size = 64
     dims = [32, 32]
 
     # Wandb stuff
-    project = "lenet-lenet"
+    project = "resnet-lenet-box"
     wandb.init(
         # set the wandb project where this run will be logged
         project=project,
@@ -193,7 +193,7 @@ if __name__ == '__main__':
     resnet = ResNet50_CIFAR10().to(device)
     randomize_loc =  False
     spurious_type = 'box'
-    name = 'plain'
+    name = 'box'
     spurious_corr = 0.5
 
     train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
@@ -201,10 +201,9 @@ if __name__ == '__main__':
 
     # Instantiate student model
     lenet = LeNet5(10).to(device)
-    lenet_to_train = LeNet5(10).to(device)
 
     # Fine-tune ============================================
-    train_teacher(lenet_to_train, train_loader)
+    train_teacher(resnet, train_loader)
 
     # Train ============================================
-    train_distill(jacobian_loss, lenet_to_train, lenet, lr, epochs, 5, 1)
+    train_distill(jacobian_loss, resnet, lenet, lr, epochs, 5, 1)
