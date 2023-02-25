@@ -25,6 +25,33 @@ if not os.path.exists(output_dir):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # print(f"Using {device} device")
 
+# Hyperparams ========================================================================
+lr = 0.3
+ft_lr = 0.05
+dropout = 0
+temps = [1, 5]
+alphas = [0.25, 0.5, 0.75]
+# Use a long distillation training schedule
+epochs = 5
+t_epochs = 5
+batch_size = 64
+dims = [32, 32]
+
+# Wandb stuff
+project = "lenet lenet spurious"
+sweep_configuration = {
+    'method': 'grid',
+    'name': 'spurious correlation sweep',
+    'metric': {'goal': 'maximize', 'name': 'student test acc',
+    },
+    'parameters': {
+        'spurious_corr': {'values': [0.25, 1]}, 
+        'lr': {'values': [0.3, 0.1]}
+    }
+}
+
+sweep_id = wandb.sweep(sweep=sweep_configuration, project=project)
+
 def load_cifar_10(dims):
     """Load CIFAR-10 dataset and return dataloaders.
     :param dims: tuple, dimensions of the images
@@ -154,21 +181,7 @@ def train_distill(loss, teacher, student, lr, epochs, repeats):
         # train_acc.append(evaluate(student, train_loader, max_ex=100))
         # test_acc.append(evaluate(student, test_loader))
 
-if __name__ == '__main__':
-
-    # Hyperparams ========================================================================
-    lr = 0.3
-    ft_lr = 0.05
-    dropout = 0
-    temps = [1, 5]
-    alphas = [0.25, 0.5, 0.75]
-    epochs = 5
-    t_epochs = 5
-    batch_size = 64
-    dims = [32, 32]
-
-    # Wandb stuff
-    project = "lenet lenet spurious"
+def main():
     wandb.init(
         # set the wandb project where this run will be logged
         project=project,
@@ -183,28 +196,31 @@ if __name__ == '__main__':
             "teacher": "LeNet5",
             "student": "LeNet5",
             "spurious type": "box",
-        }   
+            }
     )
 
     # Get data
     # train_set, test_set, train_loader, test_loader = load_cifar_10((dims[0], dims[1]))
-
+    
     # ResNet50 early layers modified for CIFAR-10
     resnet = ResNet50_CIFAR10().to(device)
-    randomize_loc =  False
-    spurious_type = 'plain'
+    randomize_loc = False
+    spurious_type = 'box'
     name = 'box_random'
-    spurious_corr = 0.5
+    spurious_corr = wandb.config.spurious_corr
+    # lr = wandb.config.lr
 
     train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
-
+    
     # Instantiate student model
     lenet = LeNet5(10).to(device)
     lenet_to_train = LeNet5(10).to(device)
-
+    
     # Fine-tune ============================================
     train_teacher(lenet_to_train, train_loader)
-
+    
     # Train ============================================
     train_distill(jacobian_loss, lenet_to_train, lenet, lr, epochs, 1)
+
+wandb.agent(sweep_id, function=main, count=4)

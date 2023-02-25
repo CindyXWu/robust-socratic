@@ -21,6 +21,21 @@ def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
         plt.show()
     plt.close("all")
 
+def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
+    fig = plt.figure(figsize=(8, 4), dpi=100)
+    plt.plot(loss)
+    plt.plot(smooth_loss)
+    epochs = [i * int(it_per_epoch) for i in range(int(it / it_per_epoch) + 1)]
+    plt.plot(epochs, [loss[i] for i in epochs], linestyle='', marker='o')
+    plt.title(title)
+    plt.ylabel('Loss')
+    plt.xlabel('Iteration')
+    if base_name != '':
+        fig.savefig(base_name + '.png')
+    else:
+        plt.show()
+    plt.close("all")
+
 def plot_acc(train_acc, test_acc, it, base_name='', title=''):
     fig = plt.figure(figsize=(8, 4), dpi=100)
     if it !=0:

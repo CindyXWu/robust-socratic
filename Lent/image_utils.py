@@ -5,31 +5,33 @@ import torchvision.transforms.functional as TF
 import torch
 import random
 
-class CIFAR10Aug(datasets.CIFAR10):
-    """Custom augmented CIFAR10 implementation."""
-    def __init__(self, alpha, beta, mix_prob, crop_prob, flip_prob, rotate_prob, jitter_prob, erase_prob, *args, **kwargs):
-        """Set parameters for transform probability."""
-        super(CIFAR10Aug, self).__init__(*args, **kwargs)
-        # Params for beta distribution
-        self.alpha = alpha
-        self.beta = beta
-        self.mix_prob = mix_prob
-        self.crop_prob = crop_prob
-        self.flip_prob = flip_prob
-        self.rotate_prob = rotate_prob
-        self.jitter_prob = jitter_prob
-        self.erase_prob = erase_prob
-        
-    def __getitem__(self, index):
-        x, y = super().__getitem__(index)
-        x, y = mixup(x, y, self.alpha, self.beta, self.mix_prob)
-        x = crop(x, self.crop_prob, x.size()[1])
-        x = flip(x, self.flip_prob)
-        x = rotate(x, self.rotate_prob)
-        x = jitter(x, self.jitter_prob)
-        x = TF.randomerasing(x, p=self.erase_prob, scale=(0.02, 0.1), ratio=(0.5, 2), value=0)
-        return x, y
-        
+def get_aug_dataloader(dataset, alpha, beta, mix_prob, crop_prob, flip_prob, rotate_prob, jitter_prob, erase_prob, *args, **kwargs):
+    """Example dataset: datasets.CIFAR10"""
+    class CIFAR10Aug(dataset):
+        """Custom augmented CIFAR10 implementation."""
+        def __init__(self, alpha, beta, mix_prob, crop_prob, flip_prob, rotate_prob, jitter_prob, erase_prob, *args, **kwargs):
+            """Set parameters for transform probability."""
+            super(CIFAR10Aug, self).__init__(*args, **kwargs)
+            # Params for beta distribution
+            self.alpha = alpha
+            self.beta = beta
+            self.mix_prob = mix_prob
+            self.crop_prob = crop_prob
+            self.flip_prob = flip_prob
+            self.rotate_prob = rotate_prob
+            self.jitter_prob = jitter_prob
+            self.erase_prob = erase_prob
+            
+        def __getitem__(self, index):
+            x, y = super().__getitem__(index)
+            x, y = mixup(x, y, self.alpha, self.beta, self.mix_prob)
+            x = crop(x, self.crop_prob, x.size()[1])
+            x = flip(x, self.flip_prob)
+            x = rotate(x, self.rotate_prob)
+            x = jitter(x, self.jitter_prob)
+            x = TF.randomerasing(x, p=self.erase_prob, scale=(0.02, 0.1), ratio=(0.5, 2), value=0)
+            return x, y
+            
 def mixup(x, y, alpha, beta, mix_prob):
     """Mixup function using beta distribution for mixing.
     If alpha = beta = 1, distribution uniform.
@@ -92,4 +94,4 @@ def jitter(x, jitter_prob):
     return TF.colorjitter(x, brightness, contrast, saturation, hue)
 
 if __name__ == '__main__':
-    train_dataset = CIFAR10Aug(alpha=1.0, beta=1.0, mix_prob=0.3, crop_prob=0.3, flip_prob=0.3, rotate_prob=0.3, jitter_prob=0.3, erase_prob=0.3, root='./data/aug', download=True, train=True)
+    train_dataset = get_aug_dataloader(datasets.CIFAR10, alpha=1.0, beta=1.0, mix_prob=0.3, crop_prob=0.3, flip_prob=0.3, rotate_prob=0.3, jitter_prob=0.3, erase_prob=0.3, root='./data/aug', download=True, train=True)
