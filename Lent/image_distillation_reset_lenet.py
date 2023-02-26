@@ -63,7 +63,7 @@ def weight_reset(model):
         if hasattr(layer, 'reset_parameters'):
             layer.reset_parameters()
 
-def train_teacher(model, dataloader):
+def train_teacher(model, dataloader, lr):
     """Fine tune a pre-trained teacher model for specific downstream task, or train from scratch."""
     optimizer = optim.SGD(model.parameters(), lr=lr)
     it = 0
@@ -102,7 +102,7 @@ kl_loss = nn.KLDivLoss(reduction='batchmean')
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
 mse_loss = nn.MSELoss(reduction='batchmean')
 
-def train_distill(loss, teacher, student, lr, epochs, temp, repeats):
+def train_distill(loss, teacher, student, lr, temp, epochs, repeats):
     """Train student model with distillation loss."""
     optimizer = optim.SGD(student.parameters(), lr=lr)
     student = student.to(device)
@@ -129,7 +129,7 @@ def train_distill(loss, teacher, student, lr, epochs, temp, repeats):
                 
                 # Jacobian loss
                 # loss = jacobian_loss(scores, targets, inputs, 1, 0, batch_size, kl_loss, input_dim, output_dim)
-                loss = ce_loss(scores/temp, labels/temp)
+                loss = ce_loss(scores/temp, targets/temp)
                 ## Feature map loss
                 # loss = feature_map_diff(s_map, t_map, False)
                 ## Attention jacobian loss
@@ -159,9 +159,7 @@ if __name__ == '__main__':
     # Hyperparams ========================================================================
     lr = 0.3
     ft_lr = 0.05
-    dropout = 0
-    temps = [1, 5]
-    alphas = [0.25, 0.5, 0.75]
+    temp = 5
     epochs = 30
     t_epochs = 20
     batch_size = 64
@@ -178,7 +176,7 @@ if __name__ == '__main__':
             "architecture": "CNN",
             "dataset": "CIFAR-100",
             "epochs": epochs,
-            "temps": temps,
+            "temp": temp,
             "batch_size": batch_size,
             "teacher": "LeNet5",
             "student": "LeNet5",
@@ -203,7 +201,7 @@ if __name__ == '__main__':
     lenet = LeNet5(10).to(device)
 
     # Fine-tune ============================================
-    train_teacher(resnet, train_loader)
+    train_teacher(resnet, train_loader, ft_lr)
 
     # Train ============================================
-    train_distill(jacobian_loss, resnet, lenet, lr, epochs, 5, 1)
+    train_distill(jacobian_loss, resnet, lenet, lr, temp, epochs, 5, 1)

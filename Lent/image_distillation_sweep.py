@@ -25,18 +25,6 @@ if not os.path.exists(output_dir):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # print(f"Using {device} device")
 
-# Hyperparams ========================================================================
-lr = 0.3
-ft_lr = 0.05
-dropout = 0
-temps = [1, 5]
-alphas = [0.25, 0.5, 0.75]
-# Use a long distillation training schedule
-epochs = 5
-t_epochs = 5
-batch_size = 64
-dims = [32, 32]
-
 # Wandb stuff
 project = "lenet lenet spurious"
 sweep_configuration = {
@@ -129,7 +117,7 @@ kl_loss = nn.KLDivLoss(reduction='batchmean')
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
 mse_loss = nn.MSELoss(reduction='batchmean')
 
-def train_distill(loss, teacher, student, lr, epochs, repeats):
+def train_distill(loss, teacher, student, train_loader, test_loader, lr, temp, epochs, repeats):
     """Train student model with distillation loss."""
     optimizer = optim.SGD(student.parameters(), lr=lr)
     student = student.to(device)
@@ -156,7 +144,7 @@ def train_distill(loss, teacher, student, lr, epochs, repeats):
                 
                 # Jacobian loss
                 # loss = jacobian_loss(scores, targets, inputs, 1, 0, batch_size, kl_loss, input_dim, output_dim)
-                loss = ce_loss(scores, labels)
+                loss = ce_loss(scores/temp, targets/temp)
                 ## Feature map loss
                 # loss = feature_map_diff(s_map, t_map, False)
                 ## Attention jacobian loss
@@ -182,6 +170,15 @@ def train_distill(loss, teacher, student, lr, epochs, repeats):
         # test_acc.append(evaluate(student, test_loader))
 
 def main():
+
+    # Hyperparams ========================================================================
+    lr = 0.3
+    ft_lr = 0.05
+    temp = 5
+    epochs = 20
+    t_epochs = 20
+    batch_size = 64
+    dims = [32, 32]
     wandb.init(
         # set the wandb project where this run will be logged
         project=project,
@@ -191,7 +188,7 @@ def main():
             "architecture": "CNN",
             "dataset": "CIFAR-100",
             "epochs": epochs,
-            "temps": temps,
+            "temp": temp,
             "batch_size": batch_size,
             "teacher": "LeNet5",
             "student": "LeNet5",
@@ -221,6 +218,6 @@ def main():
     train_teacher(lenet_to_train, train_loader)
     
     # Train ============================================
-    train_distill(jacobian_loss, lenet_to_train, lenet, lr, epochs, 1)
+    train_distill(jacobian_loss, lenet_to_train, lenet, train_loader, test_loader, lr, temp, epochs, 1)
 
 wandb.agent(sweep_id, function=main, count=4)
