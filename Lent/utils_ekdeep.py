@@ -374,6 +374,7 @@ def get_dominoes_associations(targets_mnist, targets_c10):
 class LR_Scheduler(object):
     def __init__(self, optimizer, num_epochs, base_lr, final_lr, iter_per_epoch):
         self.base_lr = base_lr
+        # Iterations per epoch
         decay_iter = iter_per_epoch * num_epochs
         self.lr_schedule = final_lr+0.5*(base_lr-final_lr)*(1+np.cos(np.pi*np.arange(decay_iter)/decay_iter))        
         self.optimizer = optimizer

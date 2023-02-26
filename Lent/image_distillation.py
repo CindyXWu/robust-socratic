@@ -102,10 +102,12 @@ kl_loss = nn.KLDivLoss(reduction='batchmean')
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
 mse_loss = nn.MSELoss(reduction='batchmean')
 
-def train_distill(loss, teacher, student, lr, temp, epochs, repeats):
+def train_distill(loss, teacher, student, train_loader, test_loader, lr, temp, epochs, repeats):
     """Train student model with distillation loss."""
     optimizer = optim.SGD(student.parameters(), lr=lr)
+    scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=0.001, iter_per_epoch=len(train_loader))
     student = student.to(device)
+
     for _ in range(repeats):
         it = 0
         train_acc = []
@@ -154,10 +156,83 @@ def train_distill(loss, teacher, student, lr, temp, epochs, repeats):
         # train_acc.append(evaluate(student, train_loader, max_ex=100))
         # test_acc.append(evaluate(student, test_loader))
 
-if __name__ == '__main__':
+# Wandb stuff
+project = "lenet lenet spurious"
+sweep_configuration = {
+    'method': 'grid',
+    'name': 'spurious correlation sweep',
+    'metric': {'goal': 'maximize', 'name': 'student test acc',
+    },
+    'parameters': {
+        'temp': {'values': [3, 8, 13]}, 
+        'lr': {'values': [0.3, 0.1, 0.05]}
+    }
+}
+sweep_id = wandb.sweep(sweep=sweep_configuration, project=project) 
+
+def sweep():
+    """Main function for sweep."""
 
     # Hyperparams ========================================================================
-    lr = 0.1
+    lr = 0.3
+    ft_lr = 0.3
+    epochs = 20
+    t_epochs = 20
+    batch_size = 64
+    dims = [32, 32]
+
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project=project,
+        # track hyperparameters and run metadata
+        config={
+            "learning_rate": lr,
+            "architecture": "CNN",
+            "dataset": "CIFAR-100",
+            "epochs": epochs,
+            "temp": temp,
+            "batch_size": batch_size,
+            "teacher": "LeNet5",
+            "student": "LeNet5",
+            "spurious type": "box",
+            }
+    )
+
+    # Hyperparams ========================================================================
+    ft_lr = 0.05
+    epochs = 20
+    t_epochs = 20
+    batch_size = 64
+    dims = [32, 32]
+    resnet = ResNet50_CIFAR10().to(device)
+    randomize_loc = False
+    spurious_type = 'box'
+    name = 'box_random'
+    spurious_corr = 1.0
+    lr = wandb.config.lr
+    temp = wandb.config.temp
+
+    train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
+    test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
+    
+    # Instantiate student model
+    lenet = LeNet5(10).to(device)
+    lenet_to_train = LeNet5(10).to(device)
+    
+    # Fine-tune ============================================
+    train_teacher(lenet_to_train, train_loader, ft_lr)
+    
+    # Train ============================================
+    train_distill(jacobian_loss, lenet_to_train, lenet, train_loader, test_loader, lr, temp, epochs, 1)
+
+sweep = False
+
+if sweep: 
+    wandb.agent(sweep_id, function=sweep, count=20)
+
+else:
+    # Hyperparams ========================================================================
+    lr = 0.3
     ft_lr = 0.05
     temp = 10
     epochs = 15
@@ -201,8 +276,8 @@ if __name__ == '__main__':
     lenet = LeNet5(10).to(device)
     lenet_to_train = LeNet5(10).to(device)
 
-    # Fine-tune ============================================
+    # Fine-tune or train teacher from scratch ============================================
     train_teacher(lenet_to_train, train_loader, ft_lr)
 
     # Train ============================================
-    train_distill(jacobian_loss, lenet_to_train, lenet, lr, temp, epochs, 1)
+    train_distill(jacobian_loss, resnet, lenet, train_loader, test_loader, lr, temp, epochs, 1)
