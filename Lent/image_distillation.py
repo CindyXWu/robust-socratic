@@ -107,7 +107,7 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, temp, e
     N.B. I need to refator this at some point.
     """
     optimizer = optim.SGD(student.parameters(), lr=lr)
-    scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=0.001, iter_per_epoch=len(train_loader))
+    scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=0.01, iter_per_epoch=len(train_loader))
     student = student.to(device)
 
     for _ in range(repeats):
@@ -274,11 +274,11 @@ if __name__ == "__main__":
         lenet = LeNet5(10).to(device)
         lenet_to_train = LeNet5(10).to(device)
 
+        # Training-specific variables
         teacher = lenet
         student = lenet
-        randomise_loc = False
+        randomize_loc = False
         spurious_corr = 1.0
-
         match EXP_NUM:
             case 0:
                 spurious_type = 'plain'
@@ -288,17 +288,17 @@ if __name__ == "__main__":
                 name = 'box'
             case 2:
                 spurious_type = 'box'
-                name = 'box'
-                randomise_loc = True
+                name = 'box_random'
+                randomize_loc = True
             case 3:
                 spurious_type = 'box'
-                name = 'box'
+                name = 'box_half'
                 spurious_corr = 0.5
             case 4:
                 spurious_type = 'box'
-                name = 'box'
+                name = 'box_random_half'
                 spurious_corr = 0.5
-                randomise_loc = True
+                randomize_loc = True
             case 5:
                 teacher = resnet
                 spurious_type = 'plain'
