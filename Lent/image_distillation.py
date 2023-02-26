@@ -95,6 +95,12 @@ def train_teacher(model, train_loader, test_loader, lr, t_epochs):
 
             it += 1
 
+def base_distill_loss(scores, targets, T=1):
+    soft_pred = F.softmax(scores/T, dim=1)
+    soft_targets = F.softmax(targets/T, dim=1)
+    distill_loss = T**2 * ce_loss(soft_pred, soft_targets)
+    return distill_loss
+
 # Instantiate losses
 kl_loss = nn.KLDivLoss(reduction='batchmean')
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
@@ -119,7 +125,7 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
         for epoch in range(epochs):
             weight_reset(student)
             # Student
-            for inputs, labels in tqdm(train_loader):
+            for inputs, labels in train_loader:
                 inputs = inputs.to(device)
                 inputs.requires_grad = True
                 labels = labels.to(device)
@@ -133,7 +139,7 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
                 # input_dim = 32*32*3
                 # output_dim = scores.shape[1]
                 # loss = jacobian_loss(scores, targets, inputs, 1, 0, batch_size, kl_loss, input_dim, output_dim)
-                loss = ce_loss(scores/temp, targets/temp)
+                loss = base_distill_loss(scores, targets, temp)
                 ## Feature map loss
                 # loss = feature_map_diff(s_map, t_map, False)
                 ## Attention jacobian loss
