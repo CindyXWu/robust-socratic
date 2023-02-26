@@ -189,8 +189,8 @@ def sweep():
 
     resnet = ResNet50_CIFAR10().to(device)
     randomize_loc = False
-    spurious_type = 'box'
-    name = 'box_random'
+    spurious_type = 'plain'
+    name = 'plain'
     spurious_corr = 1.0
     # lr = wandb.config.lr
     # temp = wandb.config.temp
@@ -210,17 +210,28 @@ def sweep():
     # Train ============================================
     train_distill(jacobian_loss, lenet_to_train, lenet, train_loader, test_loader, lr, temp, epochs, 1)
 
-is_sweep = True
+# CHANGE THESE
+is_sweep = False
+experiment_dict = {0: 'lenet-lenet', 
+                1: 'lenet-lenet-spurious',
+                2: 'lenet-lenet-spurious-randomised',
+                3: 'lenet-lenet-spurious-0.5',
+                4: 'lenet-lenet-spurious-randomised-0.5',
+                5: 'resnet-lenet',
+                6: 'resnet-lenet-spurious',
+                }
+EXP_NUM = 0
+project = experiment_dict[EXP_NUM]
 
 if __name__ == "__main__":
 
-    if is_sweep: 
-        project = "lenet lenet spurious"
+    if is_sweep:
         sweep_configuration = {
             'method': 'grid',
             'name': 'spurious correlation sweep',
             'metric': {'goal': 'maximize', 'name': 'student test acc',
             },
+            # CHANGE THESE
             'parameters': {
                 'temp': {'values': [3, 8, 13]}, 
                 'lr': {'values': [0.3, 0.1, 0.05]}
@@ -230,18 +241,17 @@ if __name__ == "__main__":
         wandb.agent(sweep_id, function=sweep, count=20)
 
     else:
-        # Hyperparams
+        # Hyperparams - CHANGE THESE
         lr = 0.3
-        ft_lr = 0.3
+        ft_lr = 0.03
         temp = 10
-        epochs = 50
-        t_epochs = 50
+        epochs = 20
+        t_epochs = 20
         # Shouldn't need to change these
         batch_size = 64
         dims = [32, 32]
 
         # Wandb stuff
-        project = "lenet-lenet"
         wandb.init(
             # set the wandb project where this run will be logged
             project=project,
@@ -259,25 +269,51 @@ if __name__ == "__main__":
             }   
         )
 
-        # Get data
-        # train_set, test_set, train_loader, test_loader = load_cifar_10((dims[0], dims[1]))
-
-        # ResNet50 early layers modified for CIFAR-10
+        # Models
         resnet = ResNet50_CIFAR10().to(device)
-        randomize_loc =  False
-        spurious_type = 'box'
-        name = 'plain'
-        spurious_corr = 0.5
-
-        train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
-        test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
-
-        # Instantiate student model
         lenet = LeNet5(10).to(device)
         lenet_to_train = LeNet5(10).to(device)
 
+        teacher = lenet
+        student = lenet
+        randomise_loc = False
+        spurious_corr = 1.0
+
+        match EXP_NUM:
+            case 0:
+                spurious_type = 'plain'
+                name = 'plain'
+            case 1:
+                spurious_type = 'box'
+                name = 'box'
+            case 2:
+                spurious_type = 'box'
+                name = 'box'
+                randomise_loc = True
+            case 3:
+                spurious_type = 'box'
+                name = 'box'
+                spurious_corr = 0.5
+            case 4:
+                spurious_type = 'box'
+                name = 'box'
+                spurious_corr = 0.5
+                randomise_loc = True
+            case 5:
+                teacher = resnet
+                spurious_type = 'plain'
+                name = 'plain'
+            case 6:
+                teacher = resnet
+                spurious_type = 'box'
+                name = 'box'
+
+        # Dataloaders
+        train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
+        test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
+
         # Fine-tune or train teacher from scratch ============================================
-        train_teacher(lenet_to_train, train_loader, test_loader, ft_lr, t_epochs)
+        train_teacher(teacher, train_loader, test_loader, ft_lr, t_epochs)
 
         # Train ============================================
-        train_distill(jacobian_loss, lenet_to_train, lenet, train_loader, test_loader, lr, temp, epochs, 1)
+        train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, temp, epochs, 1)
