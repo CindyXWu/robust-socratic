@@ -7,8 +7,8 @@ import numpy as np
 import pickle as pkl
 
 import torch.backends.cudnn as cudnn
-torch.manual_seed(0)
-cudnn.deterministic = True
+# torch.manual_seed(0)
+# cudnn.deterministic = True
 cudnn.benchmark = False
 
 

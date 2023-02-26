@@ -100,14 +100,14 @@ kl_loss = nn.KLDivLoss(reduction='batchmean')
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
 mse_loss = nn.MSELoss(reduction='batchmean')
 
-def train_distill(loss, teacher, student, train_loader, test_loader, lr, temp, epochs, repeats):
+def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, repeats):
     """Train student model with distillation loss.
     
     Includes LR scheduling. Change loss function as required. 
     N.B. I need to refator this at some point.
     """
     optimizer = optim.SGD(student.parameters(), lr=lr)
-    scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=0.1, iter_per_epoch=len(train_loader))
+    scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
     student = student.to(device)
 
     for _ in range(repeats):
@@ -169,14 +169,10 @@ def sweep():
         project=project,
         # track hyperparameters and run metadata
         config={
-            "architecture": "CNN",
             "dataset": "CIFAR-100",
             "epochs": epochs,
             "teacher epochs": t_epochs,
             "batch_size": batch_size,
-            "teacher": "LeNet5",
-            "student": "LeNet5",
-            "spurious type": "box",
             }
     )
 
@@ -217,23 +213,26 @@ def sweep():
             teacher = resnet
             spurious_type = 'plain'
             name = 'plain'
+            ft_lr = 0.01
         case 6:
             teacher = resnet
             spurious_type = 'box'
             name = 'box'
+            ft_lr = 0.01
 
     # Dataloaders
     train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
 
-    # Fine-tune or train teacher from scratch ============================================
+    # Fine-tune or train teacher from scratch
     train_teacher(teacher, train_loader, test_loader, ft_lr, t_epochs)
 
-    # Train ============================================
+    # Train
     train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, temp, epochs, 1)
 
-# CHANGE THESE
-is_sweep = False
+# CHANGE THESE ==================================================
+# Edit this to set wandb to sweep or not
+is_sweep = True
 exp_dict = {0: 'lenet-lenet', 
                 1: 'lenet-lenet-spurious',
                 2: 'lenet-lenet-spurious-randomised',
@@ -242,12 +241,14 @@ exp_dict = {0: 'lenet-lenet',
                 5: 'resnet-lenet',
                 6: 'resnet-lenet-spurious',
                 }
-EXP_NUM = 0
+# Edit this to change the project type and associated hyperparams
+EXP_NUM = 1
 project = exp_dict[EXP_NUM]
 
 # Hyperparams - CHANGE THESE
 lr = 0.5
-ft_lr = 0.03
+ft_lr = 0.3
+final_lr = 0.05
 temp = 10
 epochs = 20
 t_epochs = 20
@@ -264,8 +265,8 @@ if __name__ == "__main__":
             },
             # CHANGE THESE
             'parameters': {
-                'temp': {'values': [3, 8, 13]}, 
-                'lr': {'values': [0.3, 0.1, 0.05]}
+                'temp': {'values': [1, 3, 8, 13]}, 
+                'lr': {'values': [1, 0.5, 0.3, 0.1, 0.05]}
             }
         }
         sweep_id = wandb.sweep(sweep=sweep_configuration, project=project) 
@@ -325,17 +326,19 @@ if __name__ == "__main__":
             teacher = resnet
             spurious_type = 'plain'
             name = 'plain'
+            ft_lr = 0.01  
         case 6:
             teacher = resnet
             spurious_type = 'box'
             name = 'box'
+            ft_lr = 0.01
 
     # Dataloaders
     train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
 
-    # Fine-tune or train teacher from scratch ============================================
+    # Fine-tune or train teacher from scratch
     train_teacher(teacher, train_loader, test_loader, ft_lr, t_epochs)
 
-    # Train ============================================
-    train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, temp, epochs, 1)
+    # Train
+    train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, 1)
