@@ -187,29 +187,6 @@ def sweep():
             }
     )
 
-    resnet = ResNet50_CIFAR10().to(device)
-    randomize_loc = False
-    spurious_type = 'plain'
-    name = 'plain'
-    spurious_corr = 1.0
-    # lr = wandb.config.lr
-    # temp = wandb.config.temp
-    lr = 0.3
-    temp = 5
-
-    train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
-    test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
-    
-    # Instantiate student model
-    lenet = LeNet5(10).to(device)
-    lenet_to_train = LeNet5(10).to(device)
-    
-    # Fine-tune ============================================
-    train_teacher(lenet_to_train, train_loader, test_loader, ft_lr, t_epochs)
-    
-    # Train ============================================
-    train_distill(jacobian_loss, lenet_to_train, lenet, train_loader, test_loader, lr, temp, epochs, 1)
-
 # CHANGE THESE
 is_sweep = False
 experiment_dict = {0: 'lenet-lenet', 
@@ -269,51 +246,51 @@ if __name__ == "__main__":
             }   
         )
 
-        # Models
-        resnet = ResNet50_CIFAR10().to(device)
-        lenet = LeNet5(10).to(device)
-        lenet_to_train = LeNet5(10).to(device)
+    # Models
+    resnet = ResNet50_CIFAR10().to(device)
+    lenet = LeNet5(10).to(device)
+    lenet_to_train = LeNet5(10).to(device)
 
-        # Training-specific variables
-        teacher = lenet
-        student = lenet
-        randomize_loc = False
-        spurious_corr = 1.0
-        match EXP_NUM:
-            case 0:
-                spurious_type = 'plain'
-                name = 'plain'
-            case 1:
-                spurious_type = 'box'
-                name = 'box'
-            case 2:
-                spurious_type = 'box'
-                name = 'box_random'
-                randomize_loc = True
-            case 3:
-                spurious_type = 'box'
-                name = 'box_half'
-                spurious_corr = 0.5
-            case 4:
-                spurious_type = 'box'
-                name = 'box_random_half'
-                spurious_corr = 0.5
-                randomize_loc = True
-            case 5:
-                teacher = resnet
-                spurious_type = 'plain'
-                name = 'plain'
-            case 6:
-                teacher = resnet
-                spurious_type = 'box'
-                name = 'box'
+    # Training-specific variables
+    teacher = lenet
+    student = lenet
+    randomize_loc = False
+    spurious_corr = 1.0
+    match EXP_NUM:
+        case 0:
+            spurious_type = 'plain'
+            name = 'plain'
+        case 1:
+            spurious_type = 'box'
+            name = 'box'
+        case 2:
+            spurious_type = 'box'
+            name = 'box_random'
+            randomize_loc = True
+        case 3:
+            spurious_type = 'box'
+            name = 'box_half'
+            spurious_corr = 0.5
+        case 4:
+            spurious_type = 'box'
+            name = 'box_random_half'
+            spurious_corr = 0.5
+            randomize_loc = True
+        case 5:
+            teacher = resnet
+            spurious_type = 'plain'
+            name = 'plain'
+        case 6:
+            teacher = resnet
+            spurious_type = 'box'
+            name = 'box'
 
-        # Dataloaders
-        train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
-        test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
+    # Dataloaders
+    train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
+    test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
 
-        # Fine-tune or train teacher from scratch ============================================
-        train_teacher(teacher, train_loader, test_loader, ft_lr, t_epochs)
+    # Fine-tune or train teacher from scratch ============================================
+    train_teacher(teacher, train_loader, test_loader, ft_lr, t_epochs)
 
-        # Train ============================================
-        train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, temp, epochs, 1)
+    # Train ============================================
+    train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, temp, epochs, 1)
