@@ -96,8 +96,8 @@ def train_teacher(model, train_loader, test_loader, lr, t_epochs):
             it += 1
 
 def base_distill_loss(scores, targets, T=1):
-    soft_pred = F.softmax(scores/T, dim=1)
-    soft_targets = F.softmax(targets/T, dim=1)
+    soft_pred = scores/T
+    soft_targets = targets/T
     distill_loss = T**2 * ce_loss(soft_pred, soft_targets)
     return distill_loss
 

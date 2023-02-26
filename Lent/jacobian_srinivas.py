@@ -16,8 +16,14 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
         alpha: float, weight of jacobian penalty
         loss_fn: for classical distill loss - MSE, BCE, KLDiv
     """
-    soft_pred = F.softmax(scores/T, dim=1)
-    soft_targets = F.softmax(targets/T, dim=1)
+    # Only compute softmax for KL divergence loss
+    if loss_fn == nn.KLDivLoss:
+        soft_pred = F.softmax(scores/T, dim=1)
+        soft_targets = F.softmax(targets/T, dim=1)
+    else:
+        soft_pred = scores/T
+        soft_targets = targets/T
+        
     s_jac = get_approx_jacobian(scores, inputs, batch_size, input_dim, output_dim)
     t_jac = get_approx_jacobian(targets, inputs, batch_size, input_dim, output_dim)
 
@@ -68,8 +74,13 @@ def jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_siz
     """
     s_jac = get_grads(student, inputs, batch_size, 3)
     t_jac = get_grads(teacher, inputs, batch_size, 3)
-    soft_pred = F.softmax(scores/T, dim=1)
-    soft_targets = F.softmax(targets/T, dim=1)
+
+    if loss_fn == nn.KLDivLoss:
+        soft_pred = F.softmax(scores/T, dim=1)
+        soft_targets = F.softmax(targets/T, dim=1)
+    else:
+        soft_pred = scores/T
+        soft_targets = targets/T
 
     s_norm = s_jac / torch.norm(s_jac, 2, dim=-1).unsqueeze(1) 
     t_norm = t_jac / torch.norm(t_jac, 2, dim=-1).unsqueeze(1)
