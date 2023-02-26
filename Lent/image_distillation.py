@@ -243,7 +243,7 @@ exp_dict = {0: 'lenet-lenet',
                 6: 'resnet-lenet-spurious',
                 }
 # Edit this to change the project type and associated hyperparams
-EXP_NUM = 1
+EXP_NUM = 0
 project = exp_dict[EXP_NUM]
 
 # Hyperparams - CHANGE THESE
@@ -267,7 +267,7 @@ if __name__ == "__main__":
             # CHANGE THESE
             'parameters': {
                 'temp': {'values': [1, 3, 8, 13]}, 
-                'lr': {'values': [1, 0.5, 0.3, 0.1, 0.05]}
+                'lr': {'values': [3, 1, 0.6, 0.3, 0.1]}
             }
         }
         sweep_id = wandb.sweep(sweep=sweep_configuration, project=project) 
