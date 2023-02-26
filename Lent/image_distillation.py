@@ -189,6 +189,7 @@ def sweep():
     student = lenet
     randomize_loc = False
     spurious_corr = 1.0
+    ft_lr = 0.3
     match EXP_NUM:
         case 0:
             spurious_type = 'plain'
@@ -273,7 +274,6 @@ if __name__ == "__main__":
         wandb.agent(sweep_id, function=sweep, count=20)
 
     else:
-
         # Wandb stuff
         wandb.init(
             # set the wandb project where this run will be logged
