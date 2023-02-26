@@ -107,7 +107,7 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, temp, e
     N.B. I need to refator this at some point.
     """
     optimizer = optim.SGD(student.parameters(), lr=lr)
-    scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=0.01, iter_per_epoch=len(train_loader))
+    scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=0.1, iter_per_epoch=len(train_loader))
     student = student.to(device)
 
     for _ in range(repeats):
@@ -164,13 +164,6 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, temp, e
 
 def sweep():
     """Main function for sweep."""
-    # Hyperparams
-    ft_lr = 0.3
-    epochs = 50
-    t_epochs = 50
-    batch_size = 64
-    dims = [32, 32]
-
     wandb.init(
         # set the wandb project where this run will be logged
         project=project,
@@ -187,9 +180,61 @@ def sweep():
             }
     )
 
+    lr = wandb.config.lr
+    temp = wandb.config.temp
+
+        # Models
+    resnet = ResNet50_CIFAR10().to(device)
+    lenet = LeNet5(10).to(device)
+    lenet_to_train = LeNet5(10).to(device)
+
+    # Training-specific variables
+    teacher = lenet
+    student = lenet
+    randomize_loc = False
+    spurious_corr = 1.0
+    match EXP_NUM:
+        case 0:
+            spurious_type = 'plain'
+            name = 'plain'
+        case 1:
+            spurious_type = 'box'
+            name = 'box'
+        case 2:
+            spurious_type = 'box'
+            name = 'box_random'
+            randomize_loc = True
+        case 3:
+            spurious_type = 'box'
+            name = 'box_half'
+            spurious_corr = 0.5
+        case 4:
+            spurious_type = 'box'
+            name = 'box_random_half'
+            spurious_corr = 0.5
+            randomize_loc = True
+        case 5:
+            teacher = resnet
+            spurious_type = 'plain'
+            name = 'plain'
+        case 6:
+            teacher = resnet
+            spurious_type = 'box'
+            name = 'box'
+
+    # Dataloaders
+    train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
+    test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
+
+    # Fine-tune or train teacher from scratch ============================================
+    train_teacher(teacher, train_loader, test_loader, ft_lr, t_epochs)
+
+    # Train ============================================
+    train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, temp, epochs, 1)
+
 # CHANGE THESE
 is_sweep = False
-experiment_dict = {0: 'lenet-lenet', 
+exp_dict = {0: 'lenet-lenet', 
                 1: 'lenet-lenet-spurious',
                 2: 'lenet-lenet-spurious-randomised',
                 3: 'lenet-lenet-spurious-0.5',
@@ -198,7 +243,16 @@ experiment_dict = {0: 'lenet-lenet',
                 6: 'resnet-lenet-spurious',
                 }
 EXP_NUM = 0
-project = experiment_dict[EXP_NUM]
+project = exp_dict[EXP_NUM]
+
+# Hyperparams - CHANGE THESE
+lr = 0.5
+ft_lr = 0.03
+temp = 10
+epochs = 20
+t_epochs = 20
+batch_size = 64
+dims = [32, 32]
 
 if __name__ == "__main__":
 
@@ -218,15 +272,6 @@ if __name__ == "__main__":
         wandb.agent(sweep_id, function=sweep, count=20)
 
     else:
-        # Hyperparams - CHANGE THESE
-        lr = 0.3
-        ft_lr = 0.03
-        temp = 10
-        epochs = 20
-        t_epochs = 20
-        # Shouldn't need to change these
-        batch_size = 64
-        dims = [32, 32]
 
         # Wandb stuff
         wandb.init(
