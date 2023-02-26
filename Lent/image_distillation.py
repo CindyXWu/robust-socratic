@@ -91,7 +91,7 @@ def train_teacher(model, train_loader, test_loader, lr, t_epochs):
                 train_acc.append(evaluate(model, train_loader, batch_size, max_ex=100))
                 test_acc.append(evaluate(model, test_loader, batch_size))
                 print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
-                # wandb.log({"teacher test acc": test_acc[-1], "teacher loss": train_loss[-1]})
+                wandb.log({"teacher test acc": test_acc[-1], "teacher loss": train_loss[-1]})
 
             it += 1
 
