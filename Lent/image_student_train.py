@@ -228,9 +228,9 @@ if __name__ == "__main__":
             },
             # CHANGE THESE
             'parameters': {
-                'epochs': {'values': [20, 50]},
-                'temp': {'values': [1, 5, 10]}, 
-                'lr': {'values': [0.5, 0.3, 0.1]},
+                'epochs': {'values': [20]},
+                'temp': {'values': [1, 5]}, 
+                'lr': {'values': [0.5, 0.3]},
             }
         }
         sweep_id = wandb.sweep(sweep=sweep_configuration, project=project) 

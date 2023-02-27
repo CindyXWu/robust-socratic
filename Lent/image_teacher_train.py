@@ -105,9 +105,6 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, save=F
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss_hist': train_loss},
                 output_dir + "teacher_"+ teacher_dict[TEACH_NUM])
-        
-    # Log final test accuracy for sweep metrics
-    wandb.log({"teacher final test acc": test_acc[-1]})
 
 def base_distill_loss(scores, targets, T=1):
     soft_pred = scores/T
@@ -192,15 +189,16 @@ if __name__ == "__main__":
         sweep_configuration = {
             'method': 'bayes',
             'name': teacher_name,
-            'metric': {'goal': 'maximize', 'name': 'teacher final test acc',
+            'metric': {'goal': 'maximize', 'name': 'teacher test acc',
             },
             # CHANGE THESE ==============================================================
             'parameters': {
-                'epochs': {'values': [15, 25, 35]},
-                'lr': {'values': [0.3, 0.1, 0.05]},
-                'final_lr': {'values': [0.05, 0.01, 0.005]}
+                'epochs': {'values': [25, 35, 50]},
+                'lr': {'values': [0.3, 0.1, 0.05, 0.01]},
+                'final_lr': {'values': [0.01, 0.005]}
             },
-            'early_terminate': {'type': 'hyperband', 'min_iter': 500}
+            # Iter refers to number of times in code the metric is logged
+            'early_terminate': {'type': 'hyperband', 'min_iter': 5}
         }
         sweep_id = wandb.sweep(sweep=sweep_configuration, project=teacher_name) 
         wandb.agent(sweep_id, function=sweep_teacher, count=sweep_count)
