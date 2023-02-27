@@ -128,10 +128,8 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
                     test_acc.append(evaluate(student, test_loader, batch_size))
                     print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch)
                     print("Project {}, LR {}, temp {}".format(project, lr, temp))
-                    wandb.log({"student train acc": train_acc[-1], "student test acc": test_acc[-1], "student loss": train_loss[-1]})
+                    wandb.log({"student train acc": train_acc[-1], "student test acc": test_acc[-1], "student loss": train_loss[-1], 'student lr': lr})
                 it += 1
-        # Logging for sweeps
-        wandb.log("student final test acc", test_acc[-1])
 
 def sweep():
     """Main function for sweep."""
@@ -225,14 +223,15 @@ if __name__ == "__main__":
         sweep_configuration = {
             'method': sweep_method,
             'name': sweep_name,
-            'metric': {'goal': 'maximize', 'name': 'student final test acc',
+            'metric': {'goal': 'maximize', 'name': 'student test acc',
             },
             # CHANGE THESE
             'parameters': {
                 'epochs': {'values': [20]},
                 'temp': {'values': [1, 5]}, 
                 'lr': {'values': [0.5, 0.3]},
-            }
+            },
+            'early_terminate': {'type': 'hyperband', 'min_iter': 5},
         }
         sweep_id = wandb.sweep(sweep=sweep_configuration, project=project) 
         wandb.agent(sweep_id, function=sweep, count=sweep_count)
