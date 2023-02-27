@@ -181,7 +181,7 @@ final_lr = 0.3
 epochs = 10
 batch_size = 64
 dims = [32, 32]
-sweep_count = 4
+sweep_count = 10
 
 is_sweep = True
 if __name__ == "__main__":

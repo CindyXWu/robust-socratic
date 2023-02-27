@@ -216,6 +216,7 @@ alpha = 0.5 # Fraction of other distillation losses (1-alpha for distillation lo
 batch_size = 64
 dims = [32, 32]
 sweep_method = 'bayes'
+sweep_count = 10
 sweep_name = 'epochs_lr_temp_' + strftime("%H:%M:%S", gmtime())
 
 if __name__ == "__main__":
@@ -234,7 +235,7 @@ if __name__ == "__main__":
             }
         }
         sweep_id = wandb.sweep(sweep=sweep_configuration, project=project) 
-        wandb.agent(sweep_id, function=sweep, count=20)
+        wandb.agent(sweep_id, function=sweep, count=sweep_count)
         sweep()
 
     else:
