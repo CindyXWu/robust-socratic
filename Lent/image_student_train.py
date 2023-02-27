@@ -126,17 +126,12 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
                     batch_size = inputs.shape[0]
                     train_acc.append(evaluate(student, train_loader, batch_size, max_ex=100))
                     test_acc.append(evaluate(student, test_loader, batch_size))
-                    # plot_loss(train_loss, it, it_per_epoch, base_name=output_dir+"loss_"+title, title=title)
-                    # plot_acc(train_acc, test_acc, it, base_name=output_dir+"acc_"+title, title=title)
                     print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch)
                     print("Project {}, LR {}, temp {}".format(project, lr, temp))
                     wandb.log({"student train acc": train_acc[-1], "student test acc": test_acc[-1], "student loss": train_loss[-1]})
                 it += 1
         # Logging for sweeps
         wandb.log("student final test acc", test_acc[-1])
-        # # Perform last book keeping - only needed for manual plotting
-        # train_acc.append(evaluate(student, train_loader, max_ex=100))
-        # test_acc.append(evaluate(student, test_loader))
 
 def sweep():
     """Main function for sweep."""
@@ -147,58 +142,38 @@ def sweep():
         config={
             "dataset": "CIFAR-100",
             "epochs": epochs,
-            "teacher epochs": t_epochs,
             "batch_size": batch_size,
             }
     )
     lr = wandb.config.lr
     temp = wandb.config.temp
+    final_lr = wandb.config.final_lr
 
-    # Models
-    resnet = ResNet50_CIFAR10().to(device)
-    lenet = LeNet5(10).to(device)
-    lenet_to_train = LeNet5(10).to(device)
-
-    # Training-specific variables
-    teacher = lenet
-    student = lenet
     randomize_loc = False
     spurious_corr = 1.0
+    name = exp_dict[EXP_NUM]    # Dataset saved name - see dict above
     match EXP_NUM:
         case 0:
             spurious_type = 'plain'
-            name = 'plain'
         case 1:
             spurious_type = 'box'
-            name = 'box'
-        case 2:
+        case 2: 
             spurious_type = 'box'
-            name = 'box_random'
             randomize_loc = True
         case 3:
             spurious_type = 'box'
-            name = 'box_half'
             spurious_corr = 0.5
         case 4:
             spurious_type = 'box'
-            name = 'box_random_half'
-            spurious_corr = 0.5
             randomize_loc = True
-        case 5:
-            teacher = resnet
-            spurious_type = 'plain'
-            name = 'plain'
-        case 6:
-            teacher = resnet
-            spurious_type = 'box'
-            name = 'box'
+            spurious_corr = 0.5
 
     # Dataloaders
     train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
 
     # Train
-    train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, temp, epochs, 1)
+    train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, 1)
 
 # SETUP PARAMS - CHANGE THESE ==================================================
 is_sweep = True

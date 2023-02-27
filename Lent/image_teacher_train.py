@@ -67,7 +67,7 @@ def weight_reset(model):
 
 def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, save=False):
     """Fine tune a pre-trained teacher model for specific downstream task, or train from scratch."""
-    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=5e-4)
+    optimizer = optim.SGD(model.parameters(), lr=lr)
     it = 0
     scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
 
@@ -96,8 +96,7 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, save=F
                 train_acc.append(evaluate(model, train_loader, batch_size, max_ex=100))
                 test_acc.append(evaluate(model, test_loader, batch_size))
                 print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
-                print('lr: ', lr)
-                wandb.log({"teacher test acc": test_acc[-1], "teacher loss": train_loss[-1]})
+                wandb.log({"teacher test acc": test_acc[-1], "teacher loss": train_loss[-1], "teacher lr": lr})
             it += 1
 
     if save:
@@ -190,29 +189,16 @@ sweep_count = 4
 is_sweep = True
 if __name__ == "__main__":
     if is_sweep == True:
-        # sweep_configuration = {
-        #     'method': 'Bayes',
-        #     'name': teacher_name + ' sweep',
-        #     'metric': {'goal': 'maximize', 'name': 'teacher test acc',
-        #     },
-        #     # CHANGE THESE
-        #     'parameters': {
-        #         'epochs': {'values': [10, 25, 40]},
-        #         'lr': {'values': [1, 0.6, 0.3, 0.1, 0.05]},
-        #         'final_lr': {'values': [0.05, 0.01, 0.005, 0.001]}
-        #     },
-        #     'early_terminate': {'type': 'hyperband', 'min_iter': 500}
-        # }
         sweep_configuration = {
             'method': 'bayes',
-            'name': teacher_name + ' sweep',
+            'name': teacher_name,
             'metric': {'goal': 'maximize', 'name': 'teacher final test acc',
             },
             # CHANGE THESE ==============================================================
             'parameters': {
-                'epochs': {'values': [20, 35]},
-                'lr': {'values': [0.5, 0.3]},
-                'final_lr': {'values': [0.3, 0.1, 0.05]}
+                'epochs': {'values': [25, 35]},
+                'lr': {'values': [1, 0.5, 0.1]},
+                'final_lr': {'values': [0.1, 0.05]}
             },
             'early_terminate': {'type': 'hyperband', 'min_iter': 500}
         }
