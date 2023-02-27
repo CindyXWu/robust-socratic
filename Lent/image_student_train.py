@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import os
 import wandb
 from tqdm import tqdm
-from datetime import datetime
+from time import gmtime, strftime
 
 from image_models import *
 from plotting import *
@@ -136,18 +136,16 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
 def sweep():
     """Main function for sweep."""
     wandb.init(
-        # set the wandb project where this run will be logged
+        # Set wandb project where this run will be logged
         project=project,
-        # track hyperparameters and run metadata
         config={
-            "dataset": "CIFAR-100",
-            "epochs": epochs,
+            "dataset": "CIFAR-10",
             "batch_size": batch_size,
             }
     )
     lr = wandb.config.lr
     temp = wandb.config.temp
-    final_lr = wandb.config.final_lr
+    epochs = wandb.config.epochs
 
     randomize_loc = False
     spurious_corr = 1.0
@@ -207,19 +205,18 @@ checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
 teacher.eval()
 
-print("Teacher: ", teacher_dict[TEACH_NUM])
 project = exp_dict[EXP_NUM]+"_"+teacher_name+"_"+student_dict[STUDENT_NUM]
 
 # Hyperparams - CHANGE THESE ====================================================
-lr = 0.3
+lr = 0.5
 final_lr = 0.05
 temp = 10
-epochs = 20
+epochs = 15
 alpha = 0.5 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 dims = [32, 32]
-sweep_method = 'grid'
-sweep_name = 'epochs_lr_temp_' + str(datetime.now.time())
+sweep_method = 'bayes'
+sweep_name = 'epochs_lr_temp_' + strftime("%H:%M:%S", gmtime())
 
 if __name__ == "__main__":
 
@@ -233,11 +230,12 @@ if __name__ == "__main__":
             'parameters': {
                 'epochs': {'values': [20, 50]},
                 'temp': {'values': [1, 5, 10]}, 
-                'lr': {'values': [0.5]},
+                'lr': {'values': [0.5, 0.3, 0.1]},
             }
         }
         sweep_id = wandb.sweep(sweep=sweep_configuration, project=project) 
         wandb.agent(sweep_id, function=sweep, count=20)
+        sweep()
 
     else:
         # Wandb stuff
@@ -252,9 +250,7 @@ if __name__ == "__main__":
                 "epochs": epochs,
                 "temp": temp,
                 "batch_size": batch_size,
-                "teacher": "LeNet5",
-                "student": "LeNet5",
-                "spurious type": "box",
+                "spurious type": exp_dict[EXP_NUM],
             }   
         )
 

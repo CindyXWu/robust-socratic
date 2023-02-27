@@ -238,7 +238,7 @@ def sweep():
 
 # CHANGE THESE ==================================================
 # Edit this to set wandb to sweep or not
-is_sweep = True
+is_sweep = False
 # Change this value to change project type and associated hyperparams as appropriate based on dict below
 EXP_NUM = 0
 
@@ -253,7 +253,7 @@ exp_dict = {0: 'lenet-lenet',
 project = exp_dict[EXP_NUM]
 
 # Hyperparams - CHANGE THESE
-lr = 0.3
+lr = 0.8
 ft_lr = 0.5
 final_lr = 0.05
 temp = 10

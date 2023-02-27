@@ -352,7 +352,7 @@ def get_spurious_ids(targets=None, n_classes=10, use_rand=False, prob=1.):
             # Bernoulli coin toss to set some of these True values False with probability (1-p)
             make_these_spurious *= (np.random.binomial(n=1, p=prob, size=make_these_spurious.shape) > 0)
         else:
-            # First p fraction are False
+            # First p fraction are False 
             make_these_spurious[int(idx.shape[0] * prob):] = False
 
         # Dictionary of dictionaries

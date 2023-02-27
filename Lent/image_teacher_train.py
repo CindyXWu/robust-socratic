@@ -95,7 +95,7 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, save=F
                 batch_size = inputs.shape[0]
                 train_acc.append(evaluate(model, train_loader, batch_size, max_ex=100))
                 test_acc.append(evaluate(model, test_loader, batch_size))
-                print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
+                print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch)
                 wandb.log({"teacher test acc": test_acc[-1], "teacher loss": train_loss[-1], "teacher lr": lr})
             it += 1
 
@@ -163,7 +163,7 @@ def sweep_teacher():
     train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs)
 
 # Change this value as appropriate based on dict below
-TEACH_NUM = 0
+TEACH_NUM = 1
 teacher_dict = {0: "LeNet5_CIFAR10", 
                 1: "ResNet50_CIFAR10"}
 teacher_name = teacher_dict[TEACH_NUM]
@@ -179,9 +179,9 @@ EXP_NUM = 0
 exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
 
 # Hyperparams - CHANGE THESE ================================================================================
-lr = 0.5
-final_lr = 0.1
-epochs = 20
+lr = 0.6
+final_lr = 0.3
+epochs = 10
 batch_size = 64
 dims = [32, 32]
 sweep_count = 4
@@ -197,8 +197,8 @@ if __name__ == "__main__":
             # CHANGE THESE ==============================================================
             'parameters': {
                 'epochs': {'values': [15, 25, 35]},
-                'lr': {'values': [1, 0.5, 0.3]},
-                'final_lr': {'values': [0.3, 0.1, 0.05]}
+                'lr': {'values': [0.3, 0.1, 0.05]},
+                'final_lr': {'values': [0.05, 0.01, 0.005]}
             },
             'early_terminate': {'type': 'hyperband', 'min_iter': 500}
         }
