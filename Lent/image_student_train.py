@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import os
 import wandb
 from tqdm import tqdm
+from datetime import datetime
 
 from image_models import *
 from plotting import *
@@ -18,6 +19,8 @@ import warnings
 warnings.filterwarnings("ignore")
 
 output_dir = "Image_Experiments/"
+# Change directory to one this file is in
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
@@ -73,37 +76,6 @@ kl_loss = nn.KLDivLoss(reduction='batchmean')
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
 mse_loss = nn.MSELoss(reduction='batchmean')
 
-def train_teacher(model, train_loader, test_loader, lr, t_epochs):
-    """Fine tune a pre-trained teacher model for specific downstream task, or train from scratch."""
-    optimizer = optim.SGD(model.parameters(), lr=lr)
-    it = 0
-
-    for epoch in range(t_epochs):
-        print("Epoch: ", epoch)
-        train_acc = [1/10]
-        test_acc = [1/10]
-        train_loss = [0]
-        
-        model.train()
-        for inputs, labels in tqdm(train_loader):
-            inputs = inputs.to(device)
-            labels = labels.to(device)
-            scores = model(inputs)
-
-            optimizer.zero_grad()
-            loss = ce_loss(scores, labels)
-            loss.backward()
-            optimizer.step()
-            train_loss.append(loss.detach().cpu().numpy())
-            
-            if it % 100 == 0:
-                batch_size = inputs.shape[0]
-                train_acc.append(evaluate(model, train_loader, batch_size, max_ex=100))
-                test_acc.append(evaluate(model, test_loader, batch_size))
-                print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
-                wandb.log({"teacher test acc": test_acc[-1], "teacher loss": train_loss[-1]})
-            it += 1
-
 def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, repeats):
     """Train student model with distillation loss.
     
@@ -122,7 +94,6 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
         weight_reset(student)
 
         for epoch in range(epochs):
-            # Student
             for inputs, labels in train_loader:
                 inputs = inputs.to(device)
                 inputs.requires_grad = True
@@ -180,7 +151,6 @@ def sweep():
             "batch_size": batch_size,
             }
     )
-
     lr = wandb.config.lr
     temp = wandb.config.temp
 
@@ -194,7 +164,6 @@ def sweep():
     student = lenet
     randomize_loc = False
     spurious_corr = 1.0
-    ft_lr = 0.3
     match EXP_NUM:
         case 0:
             spurious_type = 'plain'
@@ -219,59 +188,75 @@ def sweep():
             teacher = resnet
             spurious_type = 'plain'
             name = 'plain'
-            ft_lr = 0.01
         case 6:
             teacher = resnet
             spurious_type = 'box'
             name = 'box'
-            ft_lr = 0.01
 
     # Dataloaders
     train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
 
-    # Fine-tune or train teacher from scratch
-    train_teacher(teacher, train_loader, test_loader, ft_lr, t_epochs)
-
     # Train
     train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, temp, epochs, 1)
 
-# CHANGE THESE ==================================================
-# Edit this to set wandb to sweep or not
+# SETUP PARAMS - CHANGE THESE ==================================================
 is_sweep = True
-# Change this value to change project type and associated hyperparams as appropriate based on dict below
 EXP_NUM = 0
+STUDENT_NUM = 0
+TEACH_NUM = 0
+# ==============================================================================
 
-exp_dict = {0: 'lenet-lenet', 
-            1: 'lenet-lenet-spurious',
-            2: 'lenet-lenet-spurious-randomised',
-            3: 'lenet-lenet-spurious-0.5',
-            4: 'lenet-lenet-spurious-randomised-0.5',
-            5: 'resnet-lenet',
-            6: 'resnet-lenet-spurious',
-            }
-project = exp_dict[EXP_NUM]
+# Look at these as reference to set values for above variables
+exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
+student_dict = {0: "LeNet5_CIFAR10"}
+teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10"}
 
-# Hyperparams - CHANGE THESE
+# Student model setup (change only if adding to dicts above)
+match STUDENT_NUM:
+    case 0:
+        student = LeNet5(10).to(device)
+
+# Teacher model setup (change only if adding to dicts above)
+teacher_name = teacher_dict[TEACH_NUM]
+load_path = "Image_Experiments/teacher_"+teacher_name
+match TEACH_NUM:
+    case 0:
+        teacher = LeNet5(10).to(device)
+    case 1:
+        teacher = ResNet50_CIFAR10().to(device)
+
+# Load saved teacher model (change only if changing file locations)
+load_name = "Image_Experiments/teacher_"+teacher_name
+checkpoint = torch.load(load_name, map_location=device)
+teacher.load_state_dict(checkpoint['model_state_dict'])
+teacher.eval()
+
+print("Teacher: ", teacher_dict[TEACH_NUM])
+project = exp_dict[EXP_NUM]+"_"+teacher_name+"_"+student_dict[STUDENT_NUM]
+
+# Hyperparams - CHANGE THESE ====================================================
 lr = 0.3
-ft_lr = 0.5
 final_lr = 0.05
 temp = 10
 epochs = 20
-t_epochs = 20
+alpha = 0.5 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 dims = [32, 32]
+sweep_method = 'grid'
+sweep_name = 'epochs_lr_temp_' + str(datetime.now.time())
 
 if __name__ == "__main__":
 
     if is_sweep:
         sweep_configuration = {
-            'method': 'grid',
-            'name': 'spurious correlation sweep',
+            'method': sweep_method,
+            'name': sweep_name,
             'metric': {'goal': 'maximize', 'name': 'student final test acc',
             },
             # CHANGE THESE
             'parameters': {
+                'epochs': {'values': [20, 50]},
                 'temp': {'values': [1, 5, 10]}, 
                 'lr': {'values': [0.5]},
             }
@@ -282,9 +267,9 @@ if __name__ == "__main__":
     else:
         # Wandb stuff
         wandb.init(
-            # set the wandb project where this run will be logged
+            # Set the wandb project where this run will be logged
             project=project,
-            # track hyperparameters and run metadata
+            # Track hyperparameters and run metadata
             config={
                 "learning_rate": lr,
                 "architecture": "CNN",
@@ -298,53 +283,28 @@ if __name__ == "__main__":
             }   
         )
 
-    # Models
-    resnet = ResNet50_CIFAR10().to(device)
-    lenet = LeNet5(10).to(device)
-    lenet_to_train = LeNet5(10).to(device)
-
-    # Training-specific variables
-    teacher = lenet
-    student = lenet
     randomize_loc = False
     spurious_corr = 1.0
+    name = exp_dict[EXP_NUM]    # Dataset saved name - see dict above
     match EXP_NUM:
         case 0:
             spurious_type = 'plain'
-            name = 'plain'
         case 1:
             spurious_type = 'box'
-            name = 'box'
-        case 2:
+        case 2: 
             spurious_type = 'box'
-            name = 'box_random'
             randomize_loc = True
         case 3:
             spurious_type = 'box'
-            name = 'box_half'
             spurious_corr = 0.5
         case 4:
             spurious_type = 'box'
-            name = 'box_random_half'
-            spurious_corr = 0.5
             randomize_loc = True
-        case 5:
-            teacher = resnet
-            spurious_type = 'plain'
-            name = 'plain'
-            ft_lr = 0.01  
-        case 6:
-            teacher = resnet
-            spurious_type = 'box'
-            name = 'box'
-            ft_lr = 0.01
+            spurious_corr = 0.5
 
     # Dataloaders
     train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
-
-    # Fine-tune or train teacher from scratch
-    train_teacher(teacher, train_loader, test_loader, ft_lr, t_epochs)
 
     # Train
     train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, 1)
