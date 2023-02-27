@@ -179,8 +179,8 @@ EXP_NUM = 0
 exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
 
 # Hyperparams - CHANGE THESE ================================================================================
-lr = 0.3
-final_lr = 0.05
+lr = 0.5
+final_lr = 0.1
 epochs = 20
 batch_size = 64
 dims = [32, 32]
@@ -196,9 +196,9 @@ if __name__ == "__main__":
             },
             # CHANGE THESE ==============================================================
             'parameters': {
-                'epochs': {'values': [25, 35]},
-                'lr': {'values': [1, 0.5, 0.1]},
-                'final_lr': {'values': [0.1, 0.05]}
+                'epochs': {'values': [15, 25, 35]},
+                'lr': {'values': [1, 0.5, 0.3]},
+                'final_lr': {'values': [0.3, 0.1, 0.05]}
             },
             'early_terminate': {'type': 'hyperband', 'min_iter': 500}
         }

@@ -3,6 +3,7 @@ import torch
 import torchvision.models as models
 
 class LeNet5(nn.Module):
+    """Changed input channels to 3 and added batchnorm."""
     def __init__(self, n_classes, greyscale=False):
         super(LeNet5, self).__init__()
         
@@ -14,12 +15,15 @@ class LeNet5(nn.Module):
 
         self.feature_extractor = nn.Sequential(            
             nn.Conv2d(in_channels, out_channels=6*in_channels, kernel_size=5, stride=1),
+            nn.BatchNorm2d(6*in_channels),
             nn.Tanh(),
             nn.AvgPool2d(kernel_size=2),
             nn.Conv2d(in_channels=6*in_channels, out_channels=16*in_channels, kernel_size=5, stride=1),
+            nn.BatchNorm2d(16*in_channels),
             nn.Tanh(),
             nn.AvgPool2d(kernel_size=2),
             nn.Conv2d(in_channels=16*in_channels, out_channels=120*in_channels, kernel_size=5, stride=1),
+            nn.BatchNorm2d(120*in_channels),
             nn.Tanh()
         )
 
