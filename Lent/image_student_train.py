@@ -65,12 +65,6 @@ def weight_reset(model):
         if hasattr(layer, 'reset_parameters'):
             layer.reset_parameters()
 
-def base_distill_loss(scores, targets, T=1):
-    soft_pred = scores/T
-    soft_targets = targets/T
-    distill_loss = ce_loss(soft_pred, soft_targets)
-    return distill_loss
-
 # Instantiate losses
 kl_loss = nn.KLDivLoss(reduction='batchmean')
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
@@ -117,7 +111,7 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
                 # loss = base_distill_loss(scores, targets, temp)
 
                 # First check if failure to train is due to loss function
-                loss = ce_loss(scores, labels)
+                loss = ce_loss(scores/temp, labels/temp)
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -231,9 +225,9 @@ if __name__ == "__main__":
             },
             # CHANGE THESE
             'parameters': {
-                'epochs': {'values': [20]},
-                'temp': {'values': [1, 5]}, 
-                'lr': {'values': [5, 1, 0.5, 0.1]},
+                'epochs': {'values': [10, 20, 30, 40, 50]},
+                'temp': {'values': [1, 2.5, 5, 10, 15, 20]}, 
+                'lr': {'values': [3, 1, 0.5, 0.1]},
             },
             'early_terminate': {'type': 'hyperband', 'min_iter': 5},
         }
