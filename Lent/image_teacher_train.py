@@ -107,7 +107,7 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, save=F
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss_hist': train_loss},
-                output_dir + "teacher_"+ teacher_dict[TEACH_NUM])
+                output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+exp_dict[EXP_NUM])
 
 # Instantiate losses
 kl_loss = nn.KLDivLoss(reduction='batchmean')
@@ -168,7 +168,7 @@ EXP_NUM = 1
 # Hyperparams
 lr = 0.6
 final_lr = 0.1
-epochs = 1
+epochs = 20
 batch_size = 64
 dims = [32, 32]
 sweep_count = 10
@@ -181,7 +181,7 @@ sweep_configuration = {
     'metric': {'goal': 'maximize', 'name': 'teacher test acc'},
     # CHANGE THESE 
     'parameters': {
-        'epochs': {'values': [20, 30, 40, 50, 60, 70, 8]},
+        'epochs': {'values': [1]},
         'lr': {'distribution': 'log_uniform', 'min': math.log(0.1), 'max': math.log(1)},
         'final_lr': {'distribution': 'log_uniform', 'min': math.log(0.05), 'max': math.log(0.1)}
     },
