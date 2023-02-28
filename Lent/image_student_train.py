@@ -225,7 +225,7 @@ match TEACH_NUM:
     case 1:
         teacher = ResNet50_CIFAR10().to(device)
 # Load saved teacher model (change only if changing file locations)
-load_name = "Image_Experiments/teacher_"+teacher_name
+load_name = "Image_Experiments/teacher_"+teacher_name+"_"+exp_dict[EXP_NUM]
 checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
 teacher.eval()
