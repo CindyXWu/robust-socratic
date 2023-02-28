@@ -4,6 +4,7 @@ from torch import nn, optim
 import torch.nn.functional as F
 import os
 import wandb
+import math
 from tqdm import tqdm
 from time import gmtime, strftime
 
@@ -171,41 +172,15 @@ def sweep():
     # Train
     train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, 1)
 
-# SETUP PARAMS - CHANGE THESE ==================================================
+# SETUP PARAMS - CHANGE THESE
+#================================================================================
+#================================================================================
 is_sweep = True
 EXP_NUM = 0
 STUDENT_NUM = 0
 TEACH_NUM = 0
-# ==============================================================================
 
-# Look at these as reference to set values for above variables
-exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
-student_dict = {0: "LeNet5_CIFAR10"}
-teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10"}
-
-# Student model setup (change only if adding to dicts above)
-match STUDENT_NUM:
-    case 0:
-        student = LeNet5(10).to(device)
-
-# Teacher model setup (change only if adding to dicts above)
-teacher_name = teacher_dict[TEACH_NUM]
-load_path = "Image_Experiments/teacher_"+teacher_name
-match TEACH_NUM:
-    case 0:
-        teacher = LeNet5(10).to(device)
-    case 1:
-        teacher = ResNet50_CIFAR10().to(device)
-
-# Load saved teacher model (change only if changing file locations)
-load_name = "Image_Experiments/teacher_"+teacher_name
-checkpoint = torch.load(load_name, map_location=device)
-teacher.load_state_dict(checkpoint['model_state_dict'])
-teacher.eval()
-
-project = exp_dict[EXP_NUM]+"_"+teacher_name+"_"+student_dict[STUDENT_NUM]
-
-# Hyperparams - CHANGE THESE ====================================================
+# Hyperparams
 lr = 0.1
 final_lr = 0.05
 temp = 10
@@ -217,31 +192,54 @@ sweep_method = 'bayes'
 sweep_count = 10
 sweep_name = 'epochs_lr_temp_' + strftime("%m-%d %H:%M:%S", gmtime())
 
-if __name__ == "__main__":
+sweep_configuration = {
+    'method': sweep_method,
+    'name': sweep_name,
+    'metric': {'goal': 'maximize', 'name': 'student test acc'},
+    # CHANGE THESE
+    'parameters': {
+        'epochs': {'values': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]},
+        'temp': {'distribution': 'uniform', 'min': 15, 'max': 50}, 
+        'lr': {'distribution': 'log_uniform', 'min': math.log(0.01), 'max': math.log(0.1)},
+    },
+    'early_terminate': {'type': 'hyperband', 'min_iter': 5}
+}
 
+#================================================================================
+#================================================================================
+
+# Look at these as reference to set values for above variables
+exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
+student_dict = {0: "LeNet5_CIFAR10"}
+teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10"}
+# Student model setup (change only if adding to dicts above)
+match STUDENT_NUM:
+    case 0:
+        student = LeNet5(10).to(device)
+# Teacher model setup (change only if adding to dicts above)
+teacher_name = teacher_dict[TEACH_NUM]
+load_path = "Image_Experiments/teacher_"+teacher_name
+match TEACH_NUM:
+    case 0:
+        teacher = LeNet5(10).to(device)
+    case 1:
+        teacher = ResNet50_CIFAR10().to(device)
+# Load saved teacher model (change only if changing file locations)
+load_name = "Image_Experiments/teacher_"+teacher_name
+checkpoint = torch.load(load_name, map_location=device)
+teacher.load_state_dict(checkpoint['model_state_dict'])
+teacher.eval()
+
+project = exp_dict[EXP_NUM]+"_"+teacher_name+"_"+student_dict[STUDENT_NUM]
+
+if __name__ == "__main__":
     if is_sweep:
-        sweep_configuration = {
-            'method': sweep_method,
-            'name': sweep_name,
-            'metric': {'goal': 'maximize', 'name': 'student test acc',
-            },
-            # CHANGE THESE
-            'parameters': {
-                'epochs': {'values': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]},
-                'temp': {'distribution': 'uniform', 'min': 15, 'max': 50}, 
-                'lr': {'distribution': 'log_uniform', 'min': -4.6, 'max': -1.2},
-            },
-            'early_terminate': {'type': 'hyperband', 'min_iter': 5},
-        }
         sweep_id = wandb.sweep(sweep=sweep_configuration, project=project) 
         wandb.agent(sweep_id, function=sweep, count=sweep_count)
-
     else:
-        # Wandb stuff
         wandb.init(
             # Set the wandb project where this run will be logged
             project=project,
-            # Track hyperparameters and run metadata
             config={
                 "learning_rate": lr,
                 "architecture": "CNN",

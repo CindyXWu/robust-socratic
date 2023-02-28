@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import os
 import wandb
 from tqdm import tqdm
+import math
 from time import gmtime, strftime
 
 from image_models import *
@@ -119,6 +120,7 @@ def sweep_teacher():
         project=project,
         # track hyperparameters and run metadata
         config={
+            "name": sweep_name,
             "teacher": teacher_dict[TEACH_NUM],
             "dataset": "CIFAR-100",
             "batch_size": batch_size,
@@ -156,56 +158,64 @@ def sweep_teacher():
     # Fine-tune or train teacher from scratch
     train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs)
 
-# SETUP PARAMS - CHANGE THESE ================================================================================
+# SETUP PARAMS - CHANGE THESE
+#================================================================================
+#================================================================================
 is_sweep = True
-TEACH_NUM = 1
-EXP_NUM = 0
+TEACH_NUM = 0
+EXP_NUM = 1
 
-teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10"}
-exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
-teacher_name = teacher_dict[TEACH_NUM]
-match TEACH_NUM:
-    case 0:
-        teacher = LeNet5(10).to(device)
-    case 1:
-        teacher = ResNet50_CIFAR10().to(device)
-project = teacher_name+"_"+exp_dict[EXP_NUM]
-
-# Hyperparams - CHANGE THESE ================================================================================
+# Hyperparams
 lr = 0.6
-final_lr = 0.3
-epochs = 10
+final_lr = 0.1
+epochs = 1
 batch_size = 64
 dims = [32, 32]
 sweep_count = 10
 sweep_method = 'bayes'
 sweep_name = strftime("%m-%d %H:%M:%S", gmtime())
 
+sweep_configuration = {
+    'method': sweep_method,
+    'name': sweep_name,
+    'metric': {'goal': 'maximize', 'name': 'teacher test acc'},
+    # CHANGE THESE 
+    'parameters': {
+        'epochs': {'values': [20, 30, 40, 50, 60, 70, 8]},
+        'lr': {'distribution': 'log_uniform', 'min': math.log(0.1), 'max': math.log(1)},
+        'final_lr': {'distribution': 'log_uniform', 'min': math.log(0.05), 'max': math.log(0.1)}
+    },
+    # Iter refers to number of times in code the metric is logged
+    'early_terminate': {'type': 'hyperband', 'min_iter': 5}
+}
+
+#==============================================================================
+#==============================================================================
+
+# Look at these as reference to set values for above variables
+teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10"}
+exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
+# Teacher model setup (change only if adding to dicts above)
+teacher_name = teacher_dict[TEACH_NUM]
+match TEACH_NUM:
+    case 0:
+        teacher = LeNet5(10).to(device)
+    case 1:
+        teacher = ResNet50_CIFAR10().to(device)
+
+project = teacher_name+"_"+exp_dict[EXP_NUM]
+
 if __name__ == "__main__":
-    if is_sweep == True:
-        sweep_configuration = {
-            'method': sweep_method,
-            'name': sweep_name,
-            'metric': {'goal': 'maximize', 'name': 'teacher test acc',
-            },
-            # CHANGE THESE ==============================================================
-            'parameters': {
-                'epochs': {'values': [20, 30, 40, 50, 60]},
-                'lr': {'distribution': 'log_uniform', 'min': -4.6, 'max': -1.2},
-                'final_lr': {'distribution': 'log_uniform', 'min': -1.2, 'max': -7}
-            },
-            # Iter refers to number of times in code the metric is logged
-            'early_terminate': {'type': 'hyperband', 'min_iter': 5}
-        }
-        sweep_id = wandb.sweep(sweep=sweep_configuration, project=teacher_name) 
+    if is_sweep:
+        # Set configuration and project for sweep and initialise agent
+        sweep_id = wandb.sweep(sweep=sweep_configuration, project=project) 
         wandb.agent(sweep_id, function=sweep_teacher, count=sweep_count)
     # Should be used for retraining once best model indentified from sweep
     else:
     # Save teacher model after run
-        # Wandb stuff
         wandb.init(
-            # set the wandb project where this run will be logged
-            project=teacher_name,
+            # Set wandb project where this run will be logged
+            project=project,
             # track hyperparameters and run metadata
             config={
                 "learning_rate": lr,
