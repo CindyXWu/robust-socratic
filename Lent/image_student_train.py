@@ -70,6 +70,11 @@ kl_loss = nn.KLDivLoss(reduction='batchmean')
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
 mse_loss = nn.MSELoss(reduction='batchmean')
 
+def base_distill_loss(scores, targets, temp):
+    scores = scores/temp
+    targets = F.softmax(targets/temp).argmax(dim=1)
+    return ce_loss(scores, targets)
+
 def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, repeats):
     """Train student model with distillation loss.
     
@@ -107,13 +112,8 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
                 ## Attention jacobian loss
                 # loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, 1, 0.8, kl_loss)
 
-                # Normal distillation
-                # loss = base_distill_loss(scores, targets, temp)
-
-                # First check if failure to train is due to loss function
-                scores = scores/temp
-                targets = targets/temp
-                loss = ce_loss(scores, targets)
+                # First check on base distillation
+                loss = base_distill_loss(scores, targets, temp)
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -128,6 +128,7 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
                     test_acc.append(evaluate(student, test_loader, batch_size))
                     print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch)
                     print("Project {}, LR {}, temp {}".format(project, lr, temp))
+                    print("Loss:", train_loss[-1])
                     wandb.log({"student train acc": train_acc[-1], "student test acc": test_acc[-1], "student loss": train_loss[-1], 'student lr': lr})
                 it += 1
 
@@ -172,7 +173,7 @@ def sweep():
     train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, 1)
 
 # SETUP PARAMS - CHANGE THESE ==================================================
-is_sweep = True
+is_sweep = False
 EXP_NUM = 0
 STUDENT_NUM = 0
 TEACH_NUM = 0
@@ -206,7 +207,7 @@ teacher.eval()
 project = exp_dict[EXP_NUM]+"_"+teacher_name+"_"+student_dict[STUDENT_NUM]
 
 # Hyperparams - CHANGE THESE ====================================================
-lr = 0.5
+lr = 0.1
 final_lr = 0.05
 temp = 10
 epochs = 15

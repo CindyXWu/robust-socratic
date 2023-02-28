@@ -120,6 +120,7 @@ def sweep_teacher():
             "teacher": teacher_dict[TEACH_NUM],
             "dataset": "CIFAR-100",
             "batch_size": batch_size,
+            "experiment": exp_dict[EXP_NUM],
             }
     )
 
@@ -177,6 +178,7 @@ batch_size = 64
 dims = [32, 32]
 sweep_count = 10
 
+project = teacher_name + "_" + exp_dict[EXP_NUM]
 is_sweep = True
 if __name__ == "__main__":
     if is_sweep == True:
