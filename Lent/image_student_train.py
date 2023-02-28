@@ -111,7 +111,9 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
                 # loss = base_distill_loss(scores, targets, temp)
 
                 # First check if failure to train is due to loss function
-                loss = ce_loss(scores/temp, labels/temp)
+                scores = scores/temp
+                targets = targets/temp
+                loss = ce_loss(scores, targets)
 
                 optimizer.zero_grad()
                 loss.backward()
