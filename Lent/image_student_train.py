@@ -128,7 +128,6 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
                     test_acc.append(evaluate(student, test_loader, batch_size))
                     print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch)
                     print("Project {}, LR {}, temp {}".format(project, lr, temp))
-                    print("Loss:", train_loss[-1])
                     wandb.log({"student train acc": train_acc[-1], "student test acc": test_acc[-1], "student loss": train_loss[-1], 'student lr': lr})
                 it += 1
 
@@ -173,7 +172,7 @@ def sweep():
     train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, 1)
 
 # SETUP PARAMS - CHANGE THESE ==================================================
-is_sweep = False
+is_sweep = True
 EXP_NUM = 0
 STUDENT_NUM = 0
 TEACH_NUM = 0
@@ -216,7 +215,7 @@ batch_size = 64
 dims = [32, 32]
 sweep_method = 'bayes'
 sweep_count = 10
-sweep_name = 'epochs_lr_temp_' + strftime("%H:%M:%S", gmtime())
+sweep_name = 'epochs_lr_temp_' + strftime("%m-%d %H:%M:%S", gmtime())
 
 if __name__ == "__main__":
 
@@ -228,9 +227,9 @@ if __name__ == "__main__":
             },
             # CHANGE THESE
             'parameters': {
-                'epochs': {'values': [10, 20, 30, 40, 50]},
-                'temp': {'values': [1, 2.5, 5, 10, 15, 20]}, 
-                'lr': {'values': [3, 1, 0.5, 0.1]},
+                'epochs': {'values': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]},
+                'temp': {'distribution': 'uniform', 'min': 15, 'max': 50}, 
+                'lr': {'distribution': 'log_uniform', 'min': -4.6, 'max': -1.2},
             },
             'early_terminate': {'type': 'hyperband', 'min_iter': 5},
         }

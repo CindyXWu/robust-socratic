@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import os
 import wandb
 from tqdm import tqdm
+from time import gmtime, strftime
 
 from image_models import *
 from plotting import *
@@ -96,6 +97,7 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, save=F
                 train_acc.append(evaluate(model, train_loader, batch_size, max_ex=100))
                 test_acc.append(evaluate(model, test_loader, batch_size))
                 print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch)
+                print("Project {}, LR {}".format(project, lr))
                 wandb.log({"teacher test acc": test_acc[-1], "teacher loss": train_loss[-1], "teacher lr": lr})
             it += 1
 
@@ -114,7 +116,7 @@ mse_loss = nn.MSELoss(reduction='batchmean')
 def sweep_teacher():
     wandb.init(
         # set the wandb project where this run will be logged
-        project=teacher_name,
+        project=project,
         # track hyperparameters and run metadata
         config={
             "teacher": teacher_dict[TEACH_NUM],
@@ -154,21 +156,20 @@ def sweep_teacher():
     # Fine-tune or train teacher from scratch
     train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs)
 
-# Change this value as appropriate based on dict below
+# SETUP PARAMS - CHANGE THESE ================================================================================
+is_sweep = True
 TEACH_NUM = 1
-teacher_dict = {0: "LeNet5_CIFAR10", 
-                1: "ResNet50_CIFAR10"}
+EXP_NUM = 0
+
+teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10"}
+exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
 teacher_name = teacher_dict[TEACH_NUM]
 match TEACH_NUM:
     case 0:
         teacher = LeNet5(10).to(device)
     case 1:
         teacher = ResNet50_CIFAR10().to(device)
-print("Teacher: ", teacher_dict[TEACH_NUM])
-
-# Change this to change which dataset the teacher is trained on =============================================
-EXP_NUM = 0
-exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
+project = teacher_name+"_"+exp_dict[EXP_NUM]
 
 # Hyperparams - CHANGE THESE ================================================================================
 lr = 0.6
@@ -177,21 +178,21 @@ epochs = 10
 batch_size = 64
 dims = [32, 32]
 sweep_count = 10
+sweep_method = 'bayes'
+sweep_name = strftime("%m-%d %H:%M:%S", gmtime())
 
-project = teacher_name + "_" + exp_dict[EXP_NUM]
-is_sweep = True
 if __name__ == "__main__":
     if is_sweep == True:
         sweep_configuration = {
-            'method': 'bayes',
-            'name': teacher_name,
+            'method': sweep_method,
+            'name': sweep_name,
             'metric': {'goal': 'maximize', 'name': 'teacher test acc',
             },
             # CHANGE THESE ==============================================================
             'parameters': {
-                'epochs': {'values': [25, 35, 50]},
-                'lr': {'values': [0.3, 0.1, 0.05, 0.01]},
-                'final_lr': {'values': [0.01, 0.005]}
+                'epochs': {'values': [20, 30, 40, 50, 60]},
+                'lr': {'distribution': 'log_uniform', 'min': -4.6, 'max': -1.2},
+                'final_lr': {'distribution': 'log_uniform', 'min': -1.2, 'max': -7}
             },
             # Iter refers to number of times in code the metric is logged
             'early_terminate': {'type': 'hyperband', 'min_iter': 5}
