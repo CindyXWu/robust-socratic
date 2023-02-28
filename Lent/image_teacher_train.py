@@ -73,9 +73,9 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, save=F
 
     for epoch in range(epochs):
         print("Epoch: ", epoch)
-        train_acc = [1/10]
-        test_acc = [1/10]
-        train_loss = [0]
+        train_acc = []
+        test_acc = []
+        train_loss = []
         
         model.train()
         for inputs, labels in tqdm(train_loader):
@@ -105,12 +105,6 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, save=F
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss_hist': train_loss},
                 output_dir + "teacher_"+ teacher_dict[TEACH_NUM])
-
-def base_distill_loss(scores, targets, T=1):
-    soft_pred = scores/T
-    soft_targets = targets/T
-    distill_loss = T**2 * ce_loss(soft_pred, soft_targets)
-    return distill_loss
 
 # Instantiate losses
 kl_loss = nn.KLDivLoss(reduction='batchmean')

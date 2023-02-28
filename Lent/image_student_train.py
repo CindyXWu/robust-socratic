@@ -18,7 +18,7 @@ from utils_ekdeep import *
 import warnings
 warnings.filterwarnings("ignore")
 
-output_dir = "Image_Experiments/"
+output_dir = "Image_Experiments/"   # Directory to store and load models from
 # Change directory to one this file is in
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 if not os.path.exists(output_dir):
@@ -68,7 +68,7 @@ def weight_reset(model):
 def base_distill_loss(scores, targets, T=1):
     soft_pred = scores/T
     soft_targets = targets/T
-    distill_loss = T**2 * ce_loss(soft_pred, soft_targets)
+    distill_loss = ce_loss(soft_pred, soft_targets)
     return distill_loss
 
 # Instantiate losses
@@ -82,19 +82,17 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
     Includes LR scheduling. Change loss function as required. 
     N.B. I need to refator this at some point.
     """
-    optimizer = optim.SGD(student.parameters(), lr=lr)
-    scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
-    student = student.to(device)
-
     for _ in range(repeats):
+        optimizer = optim.SGD(student.parameters(), lr=lr)
+        scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
         it = 0
         train_acc = []
         test_acc = []
-        train_loss = [0]  # loss at iteration 0
+        train_loss = []  # loss at iteration 0
         weight_reset(student)
 
         for epoch in range(epochs):
-            for inputs, labels in train_loader:
+            for inputs, labels in tqdm(train_loader):
                 inputs = inputs.to(device)
                 inputs.requires_grad = True
                 labels = labels.to(device)
@@ -108,19 +106,25 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
                 # input_dim = 32*32*3
                 # output_dim = scores.shape[1]
                 # loss = jacobian_loss(scores, targets, inputs, 1, 0, batch_size, kl_loss, input_dim, output_dim)
-                loss = base_distill_loss(scores, targets, temp)
+
                 ## Feature map loss
                 # loss = feature_map_diff(s_map, t_map, False)
+
                 ## Attention jacobian loss
                 # loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, 1, 0.8, kl_loss)
 
-                loss.backward()
+                # Normal distillation
+                # loss = base_distill_loss(scores, targets, temp)
+
+                # First check if failure to train is due to loss function
+                loss = ce_loss(scores, labels)
+
                 optimizer.zero_grad()
+                loss.backward()
                 optimizer.step()
                 scheduler.step()
                 lr = scheduler.get_lr()
                 train_loss.append(loss.detach().cpu().numpy())
-                wandb.log({"student loss per iter": train_loss[-1]})
 
                 if it % 100 == 0:
                     batch_size = inputs.shape[0]
@@ -229,13 +233,12 @@ if __name__ == "__main__":
             'parameters': {
                 'epochs': {'values': [20]},
                 'temp': {'values': [1, 5]}, 
-                'lr': {'values': [0.5, 0.3]},
+                'lr': {'values': [5, 1, 0.5, 0.1]},
             },
             'early_terminate': {'type': 'hyperband', 'min_iter': 5},
         }
         sweep_id = wandb.sweep(sweep=sweep_configuration, project=project) 
         wandb.agent(sweep_id, function=sweep, count=sweep_count)
-        sweep()
 
     else:
         # Wandb stuff
