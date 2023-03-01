@@ -176,20 +176,20 @@ def sweep():
 #================================================================================
 #================================================================================
 is_sweep = True
-EXP_NUM = 0
+EXP_NUM = 1
 STUDENT_NUM = 0
 TEACH_NUM = 0
 
 # Hyperparams
 lr = 0.1
 final_lr = 0.05
-temp = 10
-epochs = 15
+temp = 20
+epochs = 3
 alpha = 0.5 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 dims = [32, 32]
 sweep_method = 'bayes'
-sweep_count = 10
+sweep_count = 15
 sweep_name = 'epochs_lr_temp_' + strftime("%m-%d %H:%M:%S", gmtime())
 
 sweep_configuration = {
@@ -198,9 +198,9 @@ sweep_configuration = {
     'metric': {'goal': 'maximize', 'name': 'student test acc'},
     # CHANGE THESE
     'parameters': {
-        'epochs': {'values': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]},
+        'epochs': {'values': [3, 4, 5, 6, 7]},
         'temp': {'distribution': 'uniform', 'min': 15, 'max': 50}, 
-        'lr': {'distribution': 'log_uniform', 'min': math.log(0.01), 'max': math.log(0.1)},
+        'lr': {'distribution': 'log_uniform', 'min': math.log(0.08), 'max': math.log(0.5)},
     },
     'early_terminate': {'type': 'hyperband', 'min_iter': 5}
 }
