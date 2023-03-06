@@ -3,7 +3,29 @@ import torch
 import torchvision.models as models
 
 class LeNet5(nn.Module):
-    """Changed input channels to 3 and added batchnorm."""
+    """Changed input channels to 3 and added batchnorm.
+    list(model.children()) gives 2 layers: 
+    LAYER 0 +++++++++++++++++++++++++++++++
+    Sequential(
+    (0): Conv2d(1, 6, kernel_size=(5, 5), stride=(1, 1))
+    (1): BatchNorm2d(6, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (2): Tanh()
+    (3): AvgPool2d(kernel_size=2, stride=2, padding=0)
+    (4): Conv2d(6, 16, kernel_size=(5, 5), stride=(1, 1))
+    (5): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (6): Tanh()
+    (7): AvgPool2d(kernel_size=2, stride=2, padding=0)
+    (8): Conv2d(16, 120, kernel_size=(5, 5), stride=(1, 1))
+    (9): BatchNorm2d(120, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (10): Tanh()
+    )
+    LAYER 1 +++++++++++++++++++++++++++++++
+    Sequential(
+    (0): Linear(in_features=120, out_features=84, bias=True)
+    (1): Tanh()
+    (2): Linear(in_features=84, out_features=10, bias=True)
+)
+    """
     def __init__(self, n_classes, greyscale=False):
         super(LeNet5, self).__init__()
         
@@ -116,3 +138,5 @@ if __name__ == "__main__":
     # Test LeNet5
     model = LeNet5(n_classes=10, greyscale=True)
     show_model(model)
+
+    print(list(model.children())[0][8])

@@ -102,7 +102,7 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                 input_dim = 32*32*3
                 output_dim = scores.shape[1]
                 batch_size = inputs.shape[0]
-                layer = list(model.children())[9] # Last conv layer for LeNet
+                layer = list(student.children())[0][9] # Last conv layer for LeNet
                 match loss_num:
                     case 0: # Base distillation loss
                         loss = base_distill_loss(scores, targets, temp)
