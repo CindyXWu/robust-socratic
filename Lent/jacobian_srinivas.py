@@ -31,9 +31,9 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
     t_jac = get_jacobian(targets, inputs, batch_size, input_dim, output_dim)
     s_jac = get_jacobian(scores, inputs, batch_size, input_dim, output_dim)
 
-    # t_jac = get_approx_jacobian(targets, inputs, batch_size, input_dim, output_dim)
+    # t_jac = get_approx_jacobian(targets, inputs, batch_size, output_dim)
     # i = torch.argmax(targets, dim=1)
-    # s_jac = get_approx_jacobian(scores, inputs, batch_size, input_dim, output_dim, i)
+    # s_jac = get_approx_jacobian(scores, inputs, batch_size, output_dim, i)
     s_jac= torch.div(s_jac, torch.norm(s_jac, 2, dim=-1).unsqueeze(1))
     t_jac = torch.div(t_jac, torch.norm(t_jac, 2, dim=-1).unsqueeze(1))
     jacobian_loss = torch.norm(t_jac-s_jac, 2, dim=1)
@@ -42,7 +42,7 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
     loss = (1-alpha) * distill_loss + alpha * jacobian_loss
     return  loss
 
-def get_approx_jacobian(output, x, batch_size, input_dim, output_dim, i=None):
+def get_approx_jacobian(output, x, batch_size, output_dim, i=None):
     """Rather than computing Jacobian for all output classes, compute for most probable class.
     Args:
         output: [batch_size, output_dim=num_classes]
@@ -72,8 +72,8 @@ def get_approx_jacobian(output, x, batch_size, input_dim, output_dim, i=None):
 #         x.grad.zero_()
 #     return jacobian.view(batch_size, -1) # Flatten
 
-# Deprecated - autograd method
 def get_jacobian(output, x, batch_size, input_dim, output_dim):
+    """Autograd method. Need to keep grads, so set create_graph to True."""
     assert output.requires_grad
     jacobian = torch.zeros(batch_size, output_dim, input_dim, device=x.device)
     for i in range(output_dim):
@@ -81,7 +81,6 @@ def get_jacobian(output, x, batch_size, input_dim, output_dim):
         grad_output[:, i] = 1
         grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True)[0]
         jacobian[:, i, :] = grad_input.view(batch_size, input_dim)
-    print("Jacobian with autograd requires grad:", jacobian.requires_grad)
     return jacobian.view(batch_size, -1) # Flatten
 #===================================================================================================
 

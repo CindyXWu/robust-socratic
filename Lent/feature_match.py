@@ -13,8 +13,9 @@ def feature_map_diff(s_map, t_map, aggregate_chan):
     if aggregate_chan:
         s_map = torch.sqrt(torch.sum(torch.abs(s_map)**2, dim=1))
         t_map = torch.sqrt(torch.sum(torch.abs(t_map)**2, dim=1))
+    assert s_map.requires_grad
     # Compute the difference between the feature maps
-    diff = torch.mean(s_map/torch.norm(s_map, p=2, dim=-1).unsqueeze(-1) - t_map/torch.norm(t_map, p=2, dim=-1).unsqueeze(-1) )
+    diff = torch.sum((s_map/torch.norm(s_map, p=2, dim=-1).unsqueeze(-1) - t_map/torch.norm(t_map, p=2, dim=-1).unsqueeze(-1))**2 )
     return diff
 
 def feature_extractor(model, inputs, batch_size, layer_num):
@@ -37,5 +38,6 @@ def feature_extractor(model, inputs, batch_size, layer_num):
     layer = list(model.children())[0][layer_num] # Length 2 list so get 0th index to access layers
     layer.register_forward_hook(get_activations(batch_size))  # Register hook
     model(inputs) # Forward pass
+    assert features[0].requires_grad
     return features[0]
     
