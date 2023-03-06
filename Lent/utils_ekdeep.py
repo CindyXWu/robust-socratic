@@ -275,7 +275,7 @@ def get_transform(tform_type='plain'):
 def get_dataloader(load_type='train', base_dataset='CIFAR10', spurious_type='plain', spurious_corr=1.0, spurious_intensity=1., 
                     spurious_boxsize=3, tform_type='plain', randomize_intensity=False, randomize_size=False, randomize_loc=False, 
                     randomize_bgd=False, randomize_color=False, batch_size=64, use_spurious_by_ids=False, randomize_img=False,
-                    data_dir='data', name=None, finding_connectivity=False, subset_ids=None):
+                    data_dir='data', finding_connectivity=False, subset_ids=None):
     """Returns dataloader for specified dataset.
     Args:
         load_type: 'train' or 'test'
@@ -304,7 +304,7 @@ def get_dataloader(load_type='train', base_dataset='CIFAR10', spurious_type='pla
 
     # define base dataset (pick train or test)
     dset_type = getattr(torchvision.datasets, base_dataset)
-    dset = dset_type(root=f'{data_dir}/{base_dataset.lower()}/{name}', 
+    dset = dset_type(root=f'{data_dir}/{base_dataset.lower()}', 
                      train=is_train, download=True, transform=transform)
 
     # pick normal vs. spurious

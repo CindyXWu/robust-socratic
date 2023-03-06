@@ -67,9 +67,10 @@ def weight_reset(model):
             layer.reset_parameters()
 
 # Instantiate losses
-kl_loss = nn.KLDivLoss(reduction='batchmean')
+kl_loss = nn.KLDivLoss(reduction='batchmean', log_target=True)
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
-mse_loss = nn.MSELoss(reduction='batchmean')
+mse_loss = nn.MSELoss(reduction='mean')
+
 
 def base_distill_loss(scores, targets, temp):
     scores = scores/temp
@@ -98,23 +99,23 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
                 labels = labels.to(device)
                 scores = student(inputs)
                 targets = teacher(inputs)
+                
+                # Jacobian loss
+                input_dim = 32*32*3
+                output_dim = scores.shape[1]
+                batch_size = inputs.shape[0]
+                loss = jacobian_loss(scores, targets, inputs, T=1, alpha=1, batch_size=batch_size, loss_fn=mse_loss, input_dim=input_dim, output_dim=output_dim)
 
+                # # Feature map loss
                 # s_map = feature_extractor(student, inputs, batch_size, 2)
                 # t_map = feature_extractor(teacher, inputs, batch_size, 2)
-                
-                ## Jacobian loss
-                # input_dim = 32*32*3
-                # output_dim = scores.shape[1]
-                # loss = jacobian_loss(scores, targets, inputs, 1, 0, batch_size, kl_loss, input_dim, output_dim)
-
-                ## Feature map loss
                 # loss = feature_map_diff(s_map, t_map, False)
 
                 ## Attention jacobian loss
                 # loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, 1, 0.8, kl_loss)
 
-                # First check on base distillation
-                loss = base_distill_loss(scores, targets, temp)
+                # # First check on base distillation
+                # loss = base_distill_loss(scores, targets, temp)
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -127,7 +128,7 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
                     batch_size = inputs.shape[0]
                     train_acc.append(evaluate(student, train_loader, batch_size, max_ex=100))
                     test_acc.append(evaluate(student, test_loader, batch_size))
-                    print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch)
+                    print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch, "Loss: ", train_loss[-1])
                     print("Project {}, LR {}, temp {}".format(project, lr, temp))
                     wandb.log({"student train acc": train_acc[-1], "student test acc": test_acc[-1], "student loss": train_loss[-1], 'student lr': lr})
                 it += 1
@@ -172,17 +173,20 @@ def sweep():
     # Train
     train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, 1)
 
+def eval_spurious():
+    dataset = get_dataloader(load_type='test', spurious_type='box', spurious_corr=1, randomize_loc=False, name='cifar10')
 # SETUP PARAMS - CHANGE THESE
 #================================================================================
 #================================================================================
-is_sweep = True
-EXP_NUM = 1
+is_sweep = False
+EXP_NUM = 0
 STUDENT_NUM = 0
 TEACH_NUM = 0
+LOSS_NUM = 1
 
 # Hyperparams
-lr = 0.1
-final_lr = 0.05
+lr = 1
+final_lr = 0.1
 temp = 20
 epochs = 3
 alpha = 0.5 # Fraction of other distillation losses (1-alpha for distillation loss)
@@ -212,6 +216,7 @@ sweep_configuration = {
 exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
 student_dict = {0: "LeNet5_CIFAR10"}
 teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10"}
+loss_dict  = {0: "Base Distillation", 1: "Jacobian", 0: "Feature Map", 3: "Attention Jacobian"}
 # Student model setup (change only if adding to dicts above)
 match STUDENT_NUM:
     case 0:
@@ -230,7 +235,8 @@ checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
 teacher.eval()
 
-project = exp_dict[EXP_NUM]+"_"+teacher_name+"_"+student_dict[STUDENT_NUM]
+# Project name for logging to wandb
+project = exp_dict[EXP_NUM]+"_"+teacher_name+"_"+student_dict[STUDENT_NUM] + "_" + loss_dict[LOSS_NUM]
 
 if __name__ == "__main__":
     if is_sweep:
@@ -270,9 +276,16 @@ if __name__ == "__main__":
             randomize_loc = True
             spurious_corr = 0.5
 
-    # Dataloaders
-    train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
-    test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
+    train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+    test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+
+    # # Dataloaders - regardless of experiment type, always evaluate on these three
+    # plain_train_loader = get_dataloader(load_type ='train', spurious_type='plain', spurious_corr=1, randomize_loc=False)
+    # plain_test_loader = get_dataloader(load_type ='test', spurious_type='plain', spurious_corr=1, randomize_loc=False)
+    # box_train_loader = get_dataloader(load_type ='train', spurious_type='box', spurious_corr=1, randomize_loc=False)
+    # box_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=False)
+    # randbox_train_loader = get_dataloader(load_type ='train', spurious_type='box', spurious_corr=1, randomize_loc=True)
+    # randbox_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=True)
 
     # Train
     train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, 1)

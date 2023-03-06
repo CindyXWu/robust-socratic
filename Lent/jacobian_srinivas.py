@@ -16,53 +16,58 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
         loss_fn: for classical distill loss - MSE, BCE, KLDiv
     """
     # Only compute softmax for KL divergence loss
-    if loss_fn == nn.KLDivLoss:
+    if isinstance(loss_fn, nn.KLDivLoss):
         soft_pred = F.log_softmax(scores/T, dim=1)
-        soft_targets = F.log_softmax(targets/T, dim=1)
-    elif loss_fn == nn.CrossEntropyLoss:
+        soft_targets = F.log_softmax(targets/T, dim=1)  # Have set log_target=True
+    elif isinstance(loss_fn, nn.CrossEntropyLoss):
         soft_pred = scores/T
         soft_targets = F.softmax(targets/T).argmax(dim=1)
-    elif loss_fn == nn.MSELoss:
+    elif isinstance(loss_fn, nn.MSELoss):
         soft_pred = F.softmax(scores/T, dim=1)
         soft_targets = F.softmax(targets/T, dim=1)
     else:
         raise ValueError("Loss function not supported.")
         
-    s_jac = get_approx_jacobian(scores, inputs, batch_size, input_dim, output_dim)
-    t_jac = get_approx_jacobian(targets, inputs, batch_size, input_dim, output_dim)
-
-    # Don't add batch size to norm calculation
-    s_norm = s_jac / torch.norm(s_jac, 2, dim=-1).unsqueeze(1)
-    t_norm = t_jac / torch.norm(t_jac, 2, dim=-1).unsqueeze(1)
-    jacobian_loss = torch.norm(s_norm - t_norm, 2, dim=1)**2
-    jacobian_loss = torch.mean(jacobian_loss)   # Batchwise mean
-    jacobian_loss.requires_grad = True
-    distill_loss = T**2 * loss_fn(soft_pred, soft_targets)
+    t_jac = get_jacobian(targets, inputs, batch_size, input_dim, output_dim)
+    i = torch.argmax(targets, dim=1)
+    s_jac = get_jacobian(scores, inputs, batch_size, input_dim, output_dim)
+    s_jac= torch.div(s_jac, torch.norm(s_jac, 2, dim=-1).unsqueeze(1))
+    t_jac = torch.div(t_jac, torch.norm(t_jac, 2, dim=-1).unsqueeze(1))
+    jacobian_loss = torch.norm(t_jac-s_jac, 2, dim=1)
+    jacobian_loss = torch.mean(jacobian_loss)  # Batchwise reduction
+    distill_loss = loss_fn(soft_pred, soft_targets)
     loss = (1-alpha) * distill_loss + alpha * jacobian_loss
     return  loss
 
-def get_approx_jacobian(output, x, batch_size, input_dim, output_dim):
+def get_approx_jacobian(output, x, batch_size, input_dim, output_dim, i=None):
     """Rather than computing Jacobian for all output classes, compute for most probable class.
     Args:
         output: [batch_size, output_dim=num_classes]
         x: input with requres_grad() True [batch_size, input_dim]
+        i: index of most probable class in teacher model. If None, calculate (assume for teacher). If not None, assume for calculating for student (needs to match teacher).
     """
+    assert x.requires_grad
+
     grad_output = torch.zeros(batch_size, output_dim, device=x.device)
-    # Index of most likely class
-    i = torch.argmax(output, dim=1)
+    if i == None:
+        i = torch.argmax(output, dim=1) # Index of most likely class
     grad_output[:, i] = 1
-    jacobian = torch.autograd.grad(output, x, grad_output, retain_graph=True)[0]
+    output.backward(grad_output, retain_graph=True)
+    jacobian = x.grad.data.view(batch_size, -1)
+    print("Jacobian as calculated requires grad:", jacobian.requires_grad)
     return jacobian.view(batch_size, input_dim)
 
-# TODO: LAST DEBUG
 def get_jacobian(output, x, batch_size, input_dim, output_dim):
     jacobian = torch.zeros(batch_size, output_dim, input_dim, device=x.device)
     for i in range(output_dim):
         grad_output = torch.zeros(batch_size, output_dim, device=x.device)
         grad_output[:, i] = 1
-        grad_input, = torch.autograd.grad(output, x, grad_output, retain_graph=True)[0]
-        jacobian[:, i, :] = grad_input.view(batch_size, input_dim)
-    return jacobian
+        output.backward(grad_output, retain_graph=True)
+        jacobian[:, i, :] = x.grad.data.view(batch_size, -1)
+        x.grad.zero_()
+    jacobian.requires_grad = True
+    jacobian.retain_grad()
+    return jacobian.view(batch_size, -1) # Flatten
 
 #===================================================================================================
 
@@ -79,13 +84,13 @@ def jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_siz
     s_jac = get_grads(student, inputs, batch_size, 3)
     t_jac = get_grads(teacher, inputs, batch_size, 3)
 
-    if loss_fn == nn.KLDivLoss:
+    if isinstance(loss_fn, nn.KLDivLoss):
         soft_pred = F.log_softmax(scores/T, dim=1)
         soft_targets = F.log_softmax(targets/T, dim=1)
-    elif loss_fn == nn.CrossEntropyLoss:
+    elif isinstance(loss_fn, nn.CrossEntropyLoss):
         soft_pred = scores/T
         soft_targets = F.softmax(targets/T).argmax(dim=1)
-    elif loss_fn == nn.MSELoss:
+    elif isinstance(loss_fn, nn.MSELoss):
         soft_pred = F.softmax(scores/T, dim=1)
         soft_targets = F.softmax(targets/T, dim=1)
     else:
