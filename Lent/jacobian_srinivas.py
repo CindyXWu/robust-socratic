@@ -117,7 +117,7 @@ def jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_siz
     loss = (1 - alpha) * distill_loss + alpha * jacobian_loss
     return loss
 
-def get_grads(model, inputs, batch_size, layer_num):
+def get_grads(model, inputs, batch_size, layer):
     """Extract feature maps from model and call backward() to get input grad.
     Args:
         model: torch model, model to extract feature maps from
@@ -131,7 +131,6 @@ def get_grads(model, inputs, batch_size, layer_num):
         return forward_hook
 
     features = []
-    layer = list(model.children())[0][layer_num] # Length 2 list so get 0th index to access layers
     layer.register_forward_hook(get_activations())  # Register hook
     model(inputs) # Forward pass
     

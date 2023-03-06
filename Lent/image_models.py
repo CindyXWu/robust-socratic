@@ -65,6 +65,26 @@ class ResNet50_CIFAR10(models.ResNet):
         return x
 
 class ResNet18_CIFAR10(models.ResNet):
+    """10 layers in total.
+    Layers 4-7 inclusive are blocks. Each block has a two sub-block of BasicBlock() structure:
+    Sequential(
+    (0): BasicBlock(
+        (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (relu): ReLU(inplace=True)
+        (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    )
+    (1): BasicBlock(
+        (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (relu): ReLU(inplace=True)
+        (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    )
+    )
+    To access e.g. conv1, do list(model.children())[layer][0].conv1
+    """
     def __init__(self):
         super(ResNet18_CIFAR10, self).__init__(block=models.resnet.BasicBlock, layers=[2, 2, 2, 2], num_classes=10)
         # Modify the first convolution layer to accept 3-channel input with 32 x 32 dimensions
@@ -85,3 +105,14 @@ class ResNet18_CIFAR10(models.ResNet):
         x = self.fc(x)
 
         return x
+
+def show_model(model):
+    print("List of model layers:")
+    for layer in range(len(list(model.children()))):
+        print("LAYER {} +++++++++++++++++++++++++++++++".format(layer))
+        print(list(model.children())[layer])
+
+if __name__ == "__main__":
+    # Test LeNet5
+    model = LeNet5(n_classes=10, greyscale=True)
+    show_model(model)

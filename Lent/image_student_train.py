@@ -102,7 +102,7 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                 input_dim = 32*32*3
                 output_dim = scores.shape[1]
                 batch_size = inputs.shape[0]
-                layer_num = 10
+                layer = list(model.children())[9] # Last conv layer for LeNet
                 match loss_num:
                     case 0: # Base distillation loss
                         loss = base_distill_loss(scores, targets, temp)
@@ -112,15 +112,14 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                         batch_size = inputs.shape[0]
                         loss = jacobian_loss(scores, targets, inputs, T=1, alpha=1, batch_size=batch_size, loss_fn=mse_loss, input_dim=input_dim, output_dim=output_dim)
                     case 2: # Feature map loss - currently only for self-distillation
-                        print("Layers:", list(student.children())[0])
-                        s_map = feature_extractor(student, inputs, batch_size, layer_num)
-                        t_map = feature_extractor(teacher, inputs, batch_size, layer_num)
+                        s_map = feature_extractor(student, inputs, batch_size, layer)
+                        t_map = feature_extractor(teacher, inputs, batch_size, layer)
                         loss = feature_map_diff(s_map, t_map, False)
                     case 3: # Attention Jacobian loss
                         loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, 1, 0.8, kl_loss)
                     case 4: # Contrastive loss
-                        s_map = feature_extractor(student, inputs, batch_size, layer_num)
-                        t_map = feature_extractor(teacher, inputs, batch_size, layer_num)
+                        s_map = feature_extractor(student, inputs, batch_size, layer)
+                        t_map = feature_extractor(teacher, inputs, batch_size, layer)
                         loss = ContrastiveRep(t_map.view(batch_size, -1).shape[1], s_map.view(batch_size, -1).shape[1], len(train_loader)*batch_size)
 
                 optimizer.zero_grad()
@@ -243,6 +242,8 @@ match TEACH_NUM:
         teacher = LeNet5(10).to(device)
     case 1:
         teacher = ResNet50_CIFAR10().to(device)
+    case 2:
+        teacher = ResNet18_CIFAR10().to(device)
 # Load saved teacher model (change only if changing file locations)
 load_name = "Image_Experiments/teacher_"+teacher_name+"_"+exp_dict[EXP_NUM]
 checkpoint = torch.load(load_name, map_location=device)
