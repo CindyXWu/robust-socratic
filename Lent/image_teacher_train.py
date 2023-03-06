@@ -193,7 +193,7 @@ sweep_configuration = {
 #==============================================================================
 
 # Look at these as reference to set values for above variables
-teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10"}
+teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10", 2: "ResNet18_CIFAR10"}
 exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
 # Teacher model setup (change only if adding to dicts above)
 teacher_name = teacher_dict[TEACH_NUM]
