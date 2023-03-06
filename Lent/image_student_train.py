@@ -119,6 +119,7 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                     case 2: # Feature map loss - currently only for self-distillation
                         s_map = feature_extractor(student, inputs, batch_size, slayer)
                         t_map = feature_extractor(teacher, inputs, batch_size, tlayer)
+                        t_map.requires_grad = False
                         loss = feature_map_diff(s_map, t_map, False)
                     case 3: # Attention Jacobian loss
                         loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, 1, 0.8, kl_loss)
@@ -135,6 +136,9 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                 train_loss.append(loss.detach().cpu().numpy())
 
                 if it % 100 == 0:
+                    # Check that model is training correctly
+                    for param in student.parameters():
+                        assert param.grad is not None
                     batch_size = inputs.shape[0]
                     train_acc.append(evaluate(student, train_loader, batch_size, max_ex=100))
                     test_acc.append(evaluate(student, test_loader, batch_size))
@@ -199,11 +203,11 @@ is_sweep = False
 EXP_NUM = 0
 STUDENT_NUM = 0
 TEACH_NUM = 0
-LOSS_NUM = 2
+LOSS_NUM = 1
 
 # Hyperparams
-lr = 0.1
-final_lr = 0.1
+lr = 0.01
+final_lr = 0.001
 temp = 20
 epochs = 3
 alpha = 0.5 # Fraction of other distillation losses (1-alpha for distillation loss)
