@@ -77,7 +77,7 @@ def base_distill_loss(scores, targets, temp):
     targets = F.softmax(targets/temp).argmax(dim=1)
     return ce_loss(scores, targets)
 
-def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, repeats):
+def train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, ranbox_test_loader, lr, final_lr, temp, epochs, repeats, loss_num):
     """Train student model with distillation loss.
     
     Includes LR scheduling. Change loss function as required. 
@@ -100,22 +100,24 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
                 scores = student(inputs)
                 targets = teacher(inputs)
                 
-                # Jacobian loss
-                input_dim = 32*32*3
-                output_dim = scores.shape[1]
-                batch_size = inputs.shape[0]
-                loss = jacobian_loss(scores, targets, inputs, T=1, alpha=1, batch_size=batch_size, loss_fn=mse_loss, input_dim=input_dim, output_dim=output_dim)
-
-                # # Feature map loss
-                # s_map = feature_extractor(student, inputs, batch_size, 2)
-                # t_map = feature_extractor(teacher, inputs, batch_size, 2)
-                # loss = feature_map_diff(s_map, t_map, False)
-
-                ## Attention jacobian loss
-                # loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, 1, 0.8, kl_loss)
-
-                # # First check on base distillation
-                # loss = base_distill_loss(scores, targets, temp)
+                match loss_num:
+                    case 0: # Base distillation loss
+                        loss = base_distill_loss(scores, targets, temp)
+                    case 1: # Jacobian loss
+                        input_dim = 32*32*3
+                        output_dim = scores.shape[1]
+                        batch_size = inputs.shape[0]
+                        loss = jacobian_loss(scores, targets, inputs, T=1, alpha=1, batch_size=batch_size, loss_fn=mse_loss, input_dim=input_dim, output_dim=output_dim)
+                    case 2: # Feature map loss
+                        s_map = feature_extractor(student, inputs, batch_size, 2)
+                        t_map = feature_extractor(teacher, inputs, batch_size, 2)
+                        loss = feature_map_diff(s_map, t_map, False)
+                    case 3: # Attention Jacobian loss
+                        loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, 1, 0.8, kl_loss)
+                    case 4: # Contrastive loss
+                        s_map = feature_extractor(student, inputs, batch_size, 2)
+                        t_map = feature_extractor(teacher, inputs, batch_size, 2)
+                        loss = ContrastiveRep(t_map.view(batch_size, -1).shape[1], s_map.view(batch_size, -1).shape[1], len(train_loader)*batch_size)
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -128,9 +130,12 @@ def train_distill(loss, teacher, student, train_loader, test_loader, lr, final_l
                     batch_size = inputs.shape[0]
                     train_acc.append(evaluate(student, train_loader, batch_size, max_ex=100))
                     test_acc.append(evaluate(student, test_loader, batch_size))
+                    plain_acc = evaluate(student, plain_test_loader, batch_size)
+                    box_acc = evaluate(student, box_test_loader, batch_size)
+                    randbox_acc = evaluate(student, ranbox_test_loader, batch_size)
                     print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch, "Loss: ", train_loss[-1])
                     print("Project {}, LR {}, temp {}".format(project, lr, temp))
-                    wandb.log({"student train acc": train_acc[-1], "student test acc": test_acc[-1], "student loss": train_loss[-1], 'student lr': lr})
+                    wandb.log({"student train acc": train_acc[-1], "student test acc": test_acc[-1], "student plain training test acc": plain_acc, "student spurious box test acc": box_acc, "student randomised spurious box test acc": randbox_acc, "student loss": train_loss[-1], 'student lr': lr})
                 it += 1
 
 def sweep():
@@ -195,6 +200,7 @@ dims = [32, 32]
 sweep_method = 'bayes'
 sweep_count = 15
 sweep_name = 'epochs_lr_temp_' + strftime("%m-%d %H:%M:%S", gmtime())
+e_dim = 50 # embedding size for contrastive loss
 
 sweep_configuration = {
     'method': sweep_method,
@@ -279,13 +285,13 @@ if __name__ == "__main__":
     train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
-    # # Dataloaders - regardless of experiment type, always evaluate on these three
-    # plain_train_loader = get_dataloader(load_type ='train', spurious_type='plain', spurious_corr=1, randomize_loc=False)
-    # plain_test_loader = get_dataloader(load_type ='test', spurious_type='plain', spurious_corr=1, randomize_loc=False)
-    # box_train_loader = get_dataloader(load_type ='train', spurious_type='box', spurious_corr=1, randomize_loc=False)
-    # box_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=False)
-    # randbox_train_loader = get_dataloader(load_type ='train', spurious_type='box', spurious_corr=1, randomize_loc=True)
-    # randbox_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=True)
+    # Dataloaders - regardless of experiment type, always evaluate on these three
+    plain_train_loader = get_dataloader(load_type ='train', spurious_type='plain', spurious_corr=1, randomize_loc=False)
+    plain_test_loader = get_dataloader(load_type ='test', spurious_type='plain', spurious_corr=1, randomize_loc=False)
+    box_train_loader = get_dataloader(load_type ='train', spurious_type='box', spurious_corr=1, randomize_loc=False)
+    box_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=False)
+    randbox_train_loader = get_dataloader(load_type ='train', spurious_type='box', spurious_corr=1, randomize_loc=True)
+    randbox_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=True)
 
     # Train
-    train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, 1)
+    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM)
