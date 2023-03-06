@@ -172,14 +172,12 @@ def sweep():
             spurious_corr = 0.5
 
     # Dataloaders
-    train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
-    test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
+    train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+    test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
     # Train
     train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, 1)
 
-def eval_spurious():
-    dataset = get_dataloader(load_type='test', spurious_type='box', spurious_corr=1, randomize_loc=False, name='cifar10')
 # SETUP PARAMS - CHANGE THESE
 #================================================================================
 #================================================================================

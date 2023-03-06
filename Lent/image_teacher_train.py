@@ -152,8 +152,8 @@ def sweep_teacher():
             spurious_corr = 0.5
 
     # Dataloaders
-    train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
-    test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
+    train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+    test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
     # Fine-tune or train teacher from scratch
     train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs)
@@ -246,8 +246,8 @@ if __name__ == "__main__":
                 spurious_corr = 0.5
 
         # Dataloaders
-        train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
-        test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc, name=name)
+        train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+        test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
         # Fine-tune or train teacher from scratch
         train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, save=True)
