@@ -29,12 +29,15 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
         raise ValueError("Loss function not supported.")
         
     t_jac = get_jacobian(targets, inputs, batch_size, input_dim, output_dim)
-    i = torch.argmax(targets, dim=1)
     s_jac = get_jacobian(scores, inputs, batch_size, input_dim, output_dim)
+
+    # t_jac = get_approx_jacobian(targets, inputs, batch_size, input_dim, output_dim)
+    # i = torch.argmax(targets, dim=1)
+    # s_jac = get_approx_jacobian(scores, inputs, batch_size, input_dim, output_dim, i)
     s_jac= torch.div(s_jac, torch.norm(s_jac, 2, dim=-1).unsqueeze(1))
     t_jac = torch.div(t_jac, torch.norm(t_jac, 2, dim=-1).unsqueeze(1))
     jacobian_loss = torch.norm(t_jac-s_jac, 2, dim=1)
-    jacobian_loss = torch.mean(jacobian_loss)  # Batchwise reduction
+    jacobian_loss = torch.sum(jacobian_loss)  # Batchwise reduction
     distill_loss = loss_fn(soft_pred, soft_targets)
     loss = (1-alpha) * distill_loss + alpha * jacobian_loss
     return  loss
@@ -47,28 +50,39 @@ def get_approx_jacobian(output, x, batch_size, input_dim, output_dim, i=None):
         i: index of most probable class in teacher model. If None, calculate (assume for teacher). If not None, assume for calculating for student (needs to match teacher).
     """
     assert x.requires_grad
-
     grad_output = torch.zeros(batch_size, output_dim, device=x.device)
     if i == None:
         i = torch.argmax(output, dim=1) # Index of most likely class
     grad_output[:, i] = 1
-    output.backward(grad_output, retain_graph=True)
-    jacobian = x.grad.data.view(batch_size, -1)
-    print("Jacobian as calculated requires grad:", jacobian.requires_grad)
-    return jacobian.view(batch_size, input_dim)
+    # create_graph=True to keep grads
+    output.backward(grad_output, create_graph=True)
+    jacobian = x.grad.view(batch_size, -1)
+    return jacobian
 
+# def get_jacobian(output, x, batch_size, input_dim, output_dim):
+#     """In order to keep grads, need to set create_graph to True, but computation very slow."""
+#     assert x.requires_grad
+#     jacobian = torch.zeros(batch_size, output_dim, input_dim, device=x.device)
+#     for i in range(output_dim):
+#         grad_output = torch.zeros(batch_size, output_dim, device=x.device)
+#         grad_output[:, i] = 1
+#         # create_graph = True to keep grads
+#         output.backward(grad_output, create_graph=True)
+#         jacobian[:, i, :] = x.grad.view(batch_size, -1)
+#         x.grad.zero_()
+#     return jacobian.view(batch_size, -1) # Flatten
+
+# Deprecated - autograd method
 def get_jacobian(output, x, batch_size, input_dim, output_dim):
+    assert output.requires_grad
     jacobian = torch.zeros(batch_size, output_dim, input_dim, device=x.device)
     for i in range(output_dim):
         grad_output = torch.zeros(batch_size, output_dim, device=x.device)
         grad_output[:, i] = 1
-        output.backward(grad_output, retain_graph=True)
-        jacobian[:, i, :] = x.grad.data.view(batch_size, -1)
-        x.grad.zero_()
-    jacobian.requires_grad = True
-    jacobian.retain_grad()
+        grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True)[0]
+        jacobian[:, i, :] = grad_input.view(batch_size, input_dim)
+    print("Jacobian with autograd requires grad:", jacobian.requires_grad)
     return jacobian.view(batch_size, -1) # Flatten
-
 #===================================================================================================
 
 def jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, T, alpha, loss_fn):
@@ -130,7 +144,7 @@ def get_grads(model, inputs, batch_size, layer_num):
     grads = inputs.grad.view(batch_size, -1)
 
     # Clear grads and set requires_grad to True
-    inputs.grad.detach().zero_()
+    inputs.grad.zero_()
     model.zero_grad()
     grads.requires_grad = True
 

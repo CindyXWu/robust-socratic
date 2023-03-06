@@ -71,7 +71,6 @@ kl_loss = nn.KLDivLoss(reduction='batchmean', log_target=True)
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
 mse_loss = nn.MSELoss(reduction='mean')
 
-
 def base_distill_loss(scores, targets, temp):
     scores = scores/temp
     targets = F.softmax(targets/temp).argmax(dim=1)
@@ -175,8 +174,22 @@ def sweep():
     train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
+    # Dataloaders - regardless of experiment type, always evaluate on these three
+    plain_train_loader = get_dataloader(load_type ='train', spurious_type='plain', spurious_corr=1, randomize_loc=False)
+    plain_test_loader = get_dataloader(load_type ='test', spurious_type='plain', spurious_corr=1, randomize_loc=False)
+    box_train_loader = get_dataloader(load_type ='train', spurious_type='box', spurious_corr=1, randomize_loc=False)
+    box_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=False)
+    randbox_train_loader = get_dataloader(load_type ='train', spurious_type='box', spurious_corr=1, randomize_loc=True)
+    randbox_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=True)
+
     # Train
-    train_distill(jacobian_loss, teacher, student, train_loader, test_loader, lr, final_lr, temp, epochs, 1)
+    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM)
+
+# Look at these as reference to set values for above variables
+exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
+student_dict = {0: "LeNet5_CIFAR10"}
+teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10", 2: "ResNet18_CIFAR10"}
+loss_dict  = {0: "Base Distillation", 1: "Jacobian", 2: "Feature Map", 3: "Attention Jacobian"}
 
 # SETUP PARAMS - CHANGE THESE
 #================================================================================
@@ -216,11 +229,6 @@ sweep_configuration = {
 #================================================================================
 #================================================================================
 
-# Look at these as reference to set values for above variables
-exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
-student_dict = {0: "LeNet5_CIFAR10"}
-teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10"}
-loss_dict  = {0: "Base Distillation", 1: "Jacobian", 0: "Feature Map", 3: "Attention Jacobian"}
 # Student model setup (change only if adding to dicts above)
 match STUDENT_NUM:
     case 0:
@@ -290,6 +298,5 @@ if __name__ == "__main__":
     box_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=False)
     randbox_train_loader = get_dataloader(load_type ='train', spurious_type='box', spurious_corr=1, randomize_loc=True)
     randbox_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=True)
-
     # Train
     train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM)

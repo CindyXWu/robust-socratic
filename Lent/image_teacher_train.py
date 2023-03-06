@@ -161,14 +161,14 @@ def sweep_teacher():
 # SETUP PARAMS - CHANGE THESE
 #================================================================================
 #================================================================================
-is_sweep = True
-TEACH_NUM = 0
+is_sweep = False
+TEACH_NUM = 2
 EXP_NUM = 1
 
 # Hyperparams
 lr = 0.6
-final_lr = 0.1
-epochs = 20
+final_lr = 0.3
+epochs = 1
 batch_size = 64
 dims = [32, 32]
 sweep_count = 10
@@ -202,6 +202,8 @@ match TEACH_NUM:
         teacher = LeNet5(10).to(device)
     case 1:
         teacher = ResNet50_CIFAR10().to(device)
+    case 2:
+        teacher = ResNet18_CIFAR10().to(device)
 
 project = teacher_name+"_"+exp_dict[EXP_NUM]
 
