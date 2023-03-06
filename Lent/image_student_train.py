@@ -174,14 +174,6 @@ def sweep():
     train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
-    # Dataloaders - regardless of experiment type, always evaluate on these three
-    plain_train_loader = get_dataloader(load_type ='train', spurious_type='plain', spurious_corr=1, randomize_loc=False)
-    plain_test_loader = get_dataloader(load_type ='test', spurious_type='plain', spurious_corr=1, randomize_loc=False)
-    box_train_loader = get_dataloader(load_type ='train', spurious_type='box', spurious_corr=1, randomize_loc=False)
-    box_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=False)
-    randbox_train_loader = get_dataloader(load_type ='train', spurious_type='box', spurious_corr=1, randomize_loc=True)
-    randbox_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=True)
-
     # Train
     train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM)
 
@@ -198,7 +190,7 @@ is_sweep = False
 EXP_NUM = 0
 STUDENT_NUM = 0
 TEACH_NUM = 0
-LOSS_NUM = 1
+LOSS_NUM = 0
 
 # Hyperparams
 lr = 1
@@ -225,6 +217,11 @@ sweep_configuration = {
     },
     'early_terminate': {'type': 'hyperband', 'min_iter': 5}
 }
+
+# Dataloaders - regardless of experiment type, always evaluate on these three
+plain_test_loader = get_dataloader(load_type ='test', spurious_type='plain', spurious_corr=1, randomize_loc=False)
+box_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=False)
+randbox_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=True)
 
 #================================================================================
 #================================================================================
@@ -291,12 +288,5 @@ if __name__ == "__main__":
     train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
-    # Dataloaders - regardless of experiment type, always evaluate on these three
-    plain_train_loader = get_dataloader(load_type ='train', spurious_type='plain', spurious_corr=1, randomize_loc=False)
-    plain_test_loader = get_dataloader(load_type ='test', spurious_type='plain', spurious_corr=1, randomize_loc=False)
-    box_train_loader = get_dataloader(load_type ='train', spurious_type='box', spurious_corr=1, randomize_loc=False)
-    box_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=False)
-    randbox_train_loader = get_dataloader(load_type ='train', spurious_type='box', spurious_corr=1, randomize_loc=True)
-    randbox_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=True)
     # Train
     train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM)

@@ -305,7 +305,7 @@ def get_dataloader(load_type='train', base_dataset='CIFAR10', spurious_type='pla
     # define base dataset (pick train or test)
     dset_type = getattr(torchvision.datasets, base_dataset)
     dset = dset_type(root=f'{data_dir}/{base_dataset.lower()}', 
-                     train=is_train, download=True, transform=transform)
+                     train=is_train, download=False, transform=transform)
 
     # pick normal vs. spurious
     if (spurious_type == 'plain'):
@@ -320,7 +320,7 @@ def get_dataloader(load_type='train', base_dataset='CIFAR10', spurious_type='pla
     elif (spurious_type == 'dominoes'):
         dset_type = getattr(torchvision.datasets, 'FashionMNIST')
         dset_simple = dset_type(root=f'{data_dir}/FashionMNIST/', 
-                        train=is_train, download=True, transform=get_transform('dominoes'))
+                        train=is_train, download=False, transform=get_transform('dominoes'))
 
         dset = domDataset(dset, dset_simple, spurious_corr=spurious_corr, randomize_bgd=randomize_bgd, randomize_img=randomize_img, use_spurious_by_ids=use_spurious_by_ids)
 

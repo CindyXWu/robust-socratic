@@ -59,30 +59,30 @@ def get_approx_jacobian(output, x, batch_size, input_dim, output_dim, i=None):
     jacobian = x.grad.view(batch_size, -1)
     return jacobian
 
-def get_jacobian(output, x, batch_size, input_dim, output_dim):
-    """In order to keep grads, need to set create_graph to True, but computation very slow."""
-    assert x.requires_grad
-    jacobian = torch.zeros(batch_size, output_dim, input_dim, device=x.device)
-    for i in range(output_dim):
-        grad_output = torch.zeros(batch_size, output_dim, device=x.device)
-        grad_output[:, i] = 1
-        # create_graph = True to keep grads
-        output.backward(grad_output, create_graph=True)
-        jacobian[:, i, :] = x.grad.view(batch_size, -1)
-        x.grad.zero_()
-    return jacobian.view(batch_size, -1) # Flatten
-
-# # Deprecated - autograd method
 # def get_jacobian(output, x, batch_size, input_dim, output_dim):
-#     assert output.requires_grad
+#     """In order to keep grads, need to set create_graph to True, but computation very slow."""
+#     assert x.requires_grad
 #     jacobian = torch.zeros(batch_size, output_dim, input_dim, device=x.device)
 #     for i in range(output_dim):
 #         grad_output = torch.zeros(batch_size, output_dim, device=x.device)
 #         grad_output[:, i] = 1
-#         grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True)[0]
-#         jacobian[:, i, :] = grad_input.view(batch_size, input_dim)
-#     print("Jacobian with autograd requires grad:", jacobian.requires_grad)
+#         # create_graph = True to keep grads
+#         output.backward(grad_output, create_graph=True)
+#         jacobian[:, i, :] = x.grad.view(batch_size, -1)
+#         x.grad.zero_()
 #     return jacobian.view(batch_size, -1) # Flatten
+
+# Deprecated - autograd method
+def get_jacobian(output, x, batch_size, input_dim, output_dim):
+    assert output.requires_grad
+    jacobian = torch.zeros(batch_size, output_dim, input_dim, device=x.device)
+    for i in range(output_dim):
+        grad_output = torch.zeros(batch_size, output_dim, device=x.device)
+        grad_output[:, i] = 1
+        grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True)[0]
+        jacobian[:, i, :] = grad_input.view(batch_size, input_dim)
+    print("Jacobian with autograd requires grad:", jacobian.requires_grad)
+    return jacobian.view(batch_size, -1) # Flatten
 #===================================================================================================
 
 def jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, T, alpha, loss_fn):
