@@ -16,9 +16,10 @@ def feature_map_diff(s_map, t_map, aggregate_chan):
     assert s_map.requires_grad
     # Compute the difference between the feature maps
     diff = torch.sum((s_map/torch.norm(s_map, p=2, dim=-1).unsqueeze(-1) - t_map/torch.norm(t_map, p=2, dim=-1).unsqueeze(-1))**2 )
+    assert diff.requires_grad
     return diff
 
-def feature_extractor(model, inputs, batch_size, layer_num):
+def feature_extractor(model, inputs, batch_size, layer):
     """Extract feature maps from model.
     Args:
         model: torch model, model to extract feature maps from
@@ -35,7 +36,7 @@ def feature_extractor(model, inputs, batch_size, layer_num):
 
     batch_size = inputs.shape[0]
     features = []
-    layer = list(model.children())[0][layer_num] # Length 2 list so get 0th index to access layers
+    # Length 2 list so get 0th index to access layers
     layer.register_forward_hook(get_activations(batch_size))  # Register hook
     model(inputs) # Forward pass
     assert features[0].requires_grad

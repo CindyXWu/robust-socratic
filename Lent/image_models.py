@@ -4,27 +4,7 @@ import torchvision.models as models
 
 class LeNet5(nn.Module):
     """Changed input channels to 3 and added batchnorm.
-    list(model.children()) gives 2 layers: 
-    LAYER 0 +++++++++++++++++++++++++++++++
-    Sequential(
-    (0): Conv2d(1, 6, kernel_size=(5, 5), stride=(1, 1))
-    (1): BatchNorm2d(6, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (2): Tanh()
-    (3): AvgPool2d(kernel_size=2, stride=2, padding=0)
-    (4): Conv2d(6, 16, kernel_size=(5, 5), stride=(1, 1))
-    (5): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (6): Tanh()
-    (7): AvgPool2d(kernel_size=2, stride=2, padding=0)
-    (8): Conv2d(16, 120, kernel_size=(5, 5), stride=(1, 1))
-    (9): BatchNorm2d(120, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (10): Tanh()
-    )
-    LAYER 1 +++++++++++++++++++++++++++++++
-    Sequential(
-    (0): Linear(in_features=120, out_features=84, bias=True)
-    (1): Tanh()
-    (2): Linear(in_features=84, out_features=10, bias=True)
-)
+    list(model.children()) gives 2 layers (feature extractor and classifier, which can be called with model.feature_extractor)
     """
     def __init__(self, n_classes, greyscale=False):
         super(LeNet5, self).__init__()
@@ -106,6 +86,7 @@ class ResNet18_CIFAR10(models.ResNet):
     )
     )
     To access e.g. conv1, do list(model.children())[layer][0].conv1
+    OR model.layer1[0].conv1 (note for this second method, conv layers numbered 1-3)
     """
     def __init__(self):
         super(ResNet18_CIFAR10, self).__init__(block=models.resnet.BasicBlock, layers=[2, 2, 2, 2], num_classes=10)
@@ -139,4 +120,6 @@ if __name__ == "__main__":
     model = LeNet5(n_classes=10, greyscale=True)
     show_model(model)
 
-    print(list(model.children())[0][8])
+    resnet = ResNet50_CIFAR10()
+    print("Now ResNet =====================================")
+    print(resnet.layer4[2].conv2)
