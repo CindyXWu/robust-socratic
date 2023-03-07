@@ -4,9 +4,7 @@ import torchvision.models as models
 from torch_intermediate_layer_getter import IntermediateLayerGetter as MidGet
 
 class LeNet5(nn.Module):
-    """Changed input channels to 3 and added batchnorm.
-    list(model.children()) gives 2 layers (feature extractor and classifier, which can be called with model.feature_extractor)
-    """
+    """Changed input channels to 3 and added batchnorm."""
     def __init__(self, n_classes, greyscale=False):
         super(LeNet5, self).__init__()
         
@@ -36,6 +34,20 @@ class LeNet5(nn.Module):
             nn.Linear(in_features=84*in_channels, out_features=n_classes),
         )
 
+    def attention_map(self, x, layer):
+        layer_index = None
+        for i, (name, _) in enumerate(self.named_modules()):
+            # For some reason first 2 modles is the entire model so skip it
+            if i <=1:
+                continue
+            if name == layer:
+                layer_index = i
+                break
+        if layer_index is None:
+            raise ValueError("Layer not found.")
+        submodel = nn.Sequential(*list(self.modules())[2:layer_index+1])
+        return submodel(x)  
+
     def forward(self, x):
         x = self.feature_extractor(x)
         x = torch.flatten(x, 1)
@@ -43,13 +55,14 @@ class LeNet5(nn.Module):
         probs = nn.functional.softmax(logits, dim=1)
         return logits
 
+
 class ResNet50_CIFAR10(models.ResNet):
     def __init__(self):
         super(ResNet50_CIFAR10, self).__init__(block=models.resnet.Bottleneck, layers=[3, 4, 6, 3], num_classes=10)
         # Modify the first convolution layer to accept 3-channel input with 32 x 32 dimensions
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
         self.maxpool = nn.Identity()
-
+    
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
@@ -85,14 +98,29 @@ class ResNet18_CIFAR10(models.ResNet):
         (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
         (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
     )
-    )
-    To access e.g. conv1, do list(model.children())[layer][0].conv1
-    OR model.layer1[0].conv1 (note for this second method, conv layers numbered 1-3)
     """
     def __init__(self):
         super(ResNet18_CIFAR10, self).__init__(block=models.resnet.BasicBlock, layers=[2, 2, 2, 2], num_classes=10)
         # Modify the first convolution layer to accept 3-channel input with 32 x 32 dimensions
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+
+    def attention_map(self, x, layer):
+        layer_index = None
+        # Check modules
+        # for module in self.modules():
+        #     print("==================================")
+        #     print(module)
+        for i, (name, _) in enumerate(self.named_modules()):
+            # For some reason first module is the entire model so skip it
+            if i == 0:
+                continue
+            if name == layer:
+                layer_index = i
+                break
+        if layer_index is None:
+            raise ValueError("Layer not found.")
+        submodel = nn.Sequential(*list(self.modules())[1:layer_index+1])
+        return submodel(x)  
 
     def forward(self, x):
         x = self.conv1(x)
@@ -132,3 +160,5 @@ def show_model(model):
 
 if __name__ == "__main__":
     resnet = ResNet18_CIFAR10()
+    lenet = LeNet5(10)
+    lenet.attention_map(torch.randn(1, 3, 32, 32), "feature_extractor.8")

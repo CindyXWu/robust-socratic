@@ -37,7 +37,7 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
     s_jac= torch.div(s_jac, torch.norm(s_jac, 2, dim=-1).unsqueeze(1))
     t_jac = torch.div(t_jac, torch.norm(t_jac, 2, dim=-1).unsqueeze(1))
     jacobian_loss = torch.norm(t_jac-s_jac, 2, dim=1)
-    jacobian_loss = torch.sum(jacobian_loss)  # Batchwise reduction
+    jacobian_loss = torch.mean(jacobian_loss)  # Batchwise reduction
     distill_loss = loss_fn(soft_pred, soft_targets)
     loss = (1-alpha) * distill_loss + alpha * jacobian_loss
     return  loss

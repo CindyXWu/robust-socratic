@@ -3,6 +3,7 @@ AugMix implemented from Hendrycks et al. (2019) https://arxiv.org/abs/1912.02781
 import torchvision.datasets as datasets
 import torchvision.transforms.functional as TF
 import torch
+import torch.nn as nn
 import random
 
 def get_aug_dataloader(dataset, alpha, beta, mix_prob, crop_prob, flip_prob, rotate_prob, jitter_prob, erase_prob, *args, **kwargs):
@@ -92,6 +93,3 @@ def jitter(x, jitter_prob):
     contrast = [0.4, 0.5]
     hue = [0.1, 0.3]
     return TF.colorjitter(x, brightness, contrast, saturation, hue)
-
-if __name__ == '__main__':
-    train_dataset = get_aug_dataloader(datasets.CIFAR10, alpha=1.0, beta=1.0, mix_prob=0.3, crop_prob=0.3, flip_prob=0.3, rotate_prob=0.3, jitter_prob=0.3, erase_prob=0.3, root='./data/aug', download=True, train=True)

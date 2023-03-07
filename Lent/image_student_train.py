@@ -14,6 +14,7 @@ from jacobian_srinivas import *
 from contrastive import *
 from feature_match import *
 from utils_ekdeep import *
+from image_utils import *
 
 # Suppress warnings "divide by zero" produced by NaN gradients
 import warnings
@@ -103,6 +104,8 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                 output_dim = scores.shape[1]
                 batch_size = inputs.shape[0]
 
+                for param in student.parameters():
+                    assert param.requires_grad
                 match loss_num:
                     case 0: # Base distillation loss
                         loss = base_distill_loss(scores, targets, temp)
@@ -112,17 +115,13 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                         batch_size = inputs.shape[0]
                         loss = jacobian_loss(scores, targets, inputs, T=1, alpha=1, batch_size=batch_size, loss_fn=mse_loss, input_dim=input_dim, output_dim=output_dim)
                     case 2: # Feature map loss - currently only for self-distillation
-                        return_layers = {'feature_extractor.8': 'conv layer'}
-                        s_map = feature_extractor(student, inputs, return_layers)
-                        t_map = feature_extractor(teacher, inputs, return_layers, grad=False)
+                        layer = 'feature_extractor.8'
+                        s_map = student.attention_map(inputs, layer)
+                        t_map = teacher.attention_map(inputs, layer).detach()
                         loss = feature_map_diff(s_map, t_map, aggregate_chan=False)
                         assert loss.requires_grad
                     case 3: # Attention Jacobian loss
                         loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, T=1, alpha=0.8, loss_fn=kl_loss)
-                    case 4: # Contrastive loss
-                        s_map = feature_extractor(student, inputs, batch_size, return_layers)
-                        t_map = feature_extractor(teacher, inputs, batch_size, return_layers)
-                        loss = ContrastiveRep(t_map.view(batch_size, -1).shape[1], s_map.view(batch_size, -1).shape[1], len(train_loader)*batch_size)
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -131,10 +130,10 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                 lr = scheduler.get_lr()
                 train_loss.append(loss.detach().cpu().numpy())
 
-                # if it == 0:
-                #     # Check that model is training correctly
-                #     for param in student.parameters():
-                #         assert param.grad is not None
+                if it == 0:
+                    # Check that model is training correctly
+                    for param in student.parameters():
+                        assert param.grad is not None
                 if it % 100 == 0:
                     batch_size = inputs.shape[0]
                     train_acc.append(evaluate(student, train_loader, batch_size, max_ex=100))
@@ -197,16 +196,17 @@ loss_dict  = {0: "Base Distillation", 1: "Jacobian", 2: "Feature Map", 3: "Atten
 #================================================================================
 #================================================================================
 is_sweep = False
-EXP_NUM = 0
+EXP_NUM = 1
 STUDENT_NUM = 0
 TEACH_NUM = 0
-LOSS_NUM = 2
+LOSS_NUM = 1
+check_models = False
 
 # Hyperparams
-lr = 0.05
-final_lr = 0.01
+lr = 0.5
+final_lr = 0.1
 temp = 20
-epochs = 3
+epochs = 2
 alpha = 0.5 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 dims = [32, 32]
@@ -257,9 +257,11 @@ match TEACH_NUM:
 load_name = "Image_Experiments/teacher_"+teacher_name+"_"+exp_dict[EXP_NUM]
 checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
-# for name, param in teacher.named_parameters():
-#         print(name, param)
-# Project name for logging to wandb
+
+if check_models:
+    print("STUDENT ==============================================")
+    get_submodules(student)
+    
 project = exp_dict[EXP_NUM]+"_"+teacher_name+"_"+student_dict[STUDENT_NUM] + "_" + loss_dict[LOSS_NUM]
 
 if __name__ == "__main__":
