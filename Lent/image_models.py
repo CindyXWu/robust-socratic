@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch
 import torchvision.models as models
+from torch_intermediate_layer_getter import IntermediateLayerGetter as MidGet
 
 class LeNet5(nn.Module):
     """Changed input channels to 3 and added batchnorm.
@@ -96,7 +97,7 @@ class ResNet18_CIFAR10(models.ResNet):
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
-        x = self.relu(x)
+        x1= self.relu(x)
 
         x = self.layer1(x)
         x = self.layer2(x)
@@ -109,6 +110,20 @@ class ResNet18_CIFAR10(models.ResNet):
 
         return x
 
+def get_submodules(model):
+    """ Get names of all submodules in model as dict."""
+    submodules = {}
+    for name, module in model.named_modules():
+        if isinstance(module, nn.Conv2d):
+            submodules[name] = f"conv_{name.split('.')[-1]}"
+        elif isinstance(module, nn.BatchNorm2d):
+            submodules[name] = f"bn_{name.split('.')[-1]}"
+        elif isinstance(module, nn.Linear):
+            submodules[name] = f"fc_{name.split('.')[-1]}"
+        else:
+            submodules[name] = name
+    print(submodules)
+
 def show_model(model):
     print("List of model layers:")
     for layer in range(len(list(model.children()))):
@@ -116,10 +131,4 @@ def show_model(model):
         print(list(model.children())[layer])
 
 if __name__ == "__main__":
-    # Test LeNet5
-    model = LeNet5(n_classes=10, greyscale=True)
-    show_model(model)
-
-    resnet = ResNet50_CIFAR10()
-    print("Now ResNet =====================================")
-    print(resnet.layer4[2].conv2)
+    resnet = ResNet18_CIFAR10()

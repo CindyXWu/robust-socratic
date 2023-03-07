@@ -102,12 +102,7 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                 input_dim = 32*32*3
                 output_dim = scores.shape[1]
                 batch_size = inputs.shape[0]
-                slayer = student.feature_extractor[8] # Last conv layer for LeNet
-                tlayer = teacher.feature_extractor[8]
 
-                ## For ResNet
-                # slayer = student.layer4[2].conv2
-                # tlayer = teacher.layer4[2].conv2
                 match loss_num:
                     case 0: # Base distillation loss
                         loss = base_distill_loss(scores, targets, temp)
@@ -117,15 +112,16 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                         batch_size = inputs.shape[0]
                         loss = jacobian_loss(scores, targets, inputs, T=1, alpha=1, batch_size=batch_size, loss_fn=mse_loss, input_dim=input_dim, output_dim=output_dim)
                     case 2: # Feature map loss - currently only for self-distillation
-                        s_map = feature_extractor(student, inputs, batch_size, slayer)
-                        t_map = feature_extractor(teacher, inputs, batch_size, tlayer)
-                        t_map.requires_grad = False
-                        loss = feature_map_diff(s_map, t_map, False)
+                        return_layers = {'feature_extractor.8': 'conv layer'}
+                        s_map = feature_extractor(student, inputs, return_layers)
+                        t_map = feature_extractor(teacher, inputs, return_layers, grad=False)
+                        loss = feature_map_diff(s_map, t_map, aggregate_chan=False)
+                        assert loss.requires_grad
                     case 3: # Attention Jacobian loss
-                        loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, 1, 0.8, kl_loss)
+                        loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, T=1, alpha=0.8, loss_fn=kl_loss)
                     case 4: # Contrastive loss
-                        s_map = feature_extractor(student, inputs, batch_size, slayer)
-                        t_map = feature_extractor(teacher, inputs, batch_size, tlayer)
+                        s_map = feature_extractor(student, inputs, batch_size, return_layers)
+                        t_map = feature_extractor(teacher, inputs, batch_size, return_layers)
                         loss = ContrastiveRep(t_map.view(batch_size, -1).shape[1], s_map.view(batch_size, -1).shape[1], len(train_loader)*batch_size)
 
                 optimizer.zero_grad()
@@ -135,10 +131,11 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                 lr = scheduler.get_lr()
                 train_loss.append(loss.detach().cpu().numpy())
 
+                # if it == 0:
+                #     # Check that model is training correctly
+                #     for param in student.parameters():
+                #         assert param.grad is not None
                 if it % 100 == 0:
-                    # Check that model is training correctly
-                    for param in student.parameters():
-                        assert param.grad is not None
                     batch_size = inputs.shape[0]
                     train_acc.append(evaluate(student, train_loader, batch_size, max_ex=100))
                     test_acc.append(evaluate(student, test_loader, batch_size))
@@ -203,11 +200,11 @@ is_sweep = False
 EXP_NUM = 0
 STUDENT_NUM = 0
 TEACH_NUM = 0
-LOSS_NUM = 1
+LOSS_NUM = 2
 
 # Hyperparams
-lr = 0.01
-final_lr = 0.001
+lr = 0.05
+final_lr = 0.01
 temp = 20
 epochs = 3
 alpha = 0.5 # Fraction of other distillation losses (1-alpha for distillation loss)
@@ -243,6 +240,9 @@ randbox_test_loader = get_dataloader(load_type ='test', spurious_type='box', spu
 match STUDENT_NUM:
     case 0:
         student = LeNet5(10).to(device)
+# # Get names of all submodules in model
+# get_submodules(student)
+
 # Teacher model setup (change only if adding to dicts above)
 teacher_name = teacher_dict[TEACH_NUM]
 load_path = "Image_Experiments/teacher_"+teacher_name
@@ -257,8 +257,8 @@ match TEACH_NUM:
 load_name = "Image_Experiments/teacher_"+teacher_name+"_"+exp_dict[EXP_NUM]
 checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
-teacher.eval()
-
+# for name, param in teacher.named_parameters():
+#         print(name, param)
 # Project name for logging to wandb
 project = exp_dict[EXP_NUM]+"_"+teacher_name+"_"+student_dict[STUDENT_NUM] + "_" + loss_dict[LOSS_NUM]
 
