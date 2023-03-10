@@ -46,7 +46,7 @@ class LeNet5(nn.Module):
         if layer_index is None:
             raise ValueError("Layer not found.")
         submodel = nn.Sequential(*list(self.modules())[2:layer_index+1])
-        return submodel(x)  
+        return submodel(x)
 
     def forward(self, x):
         x = self.feature_extractor(x)
@@ -54,7 +54,6 @@ class LeNet5(nn.Module):
         logits = self.classifier(x)
         probs = nn.functional.softmax(logits, dim=1)
         return logits
-
 
 class ResNet50_CIFAR10(models.ResNet):
     def __init__(self):

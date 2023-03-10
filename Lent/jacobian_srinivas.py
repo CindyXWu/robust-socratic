@@ -15,6 +15,22 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
         alpha: float, weight of jacobian penalty
         loss_fn: for classical distill loss - MSE, BCE, KLDiv
     """
+    distill_loss = get_distill_loss(scores, targets, T, loss_fn)
+
+    t_jac = get_jacobian(targets, inputs, batch_size, input_dim, output_dim)
+    s_jac = get_jacobian(scores, inputs, batch_size, input_dim, output_dim)
+    # t_jac = get_approx_jacobian(targets, inputs, batch_size, output_dim)
+    # i = torch.argmax(targets, dim=1)
+    # s_jac = get_approx_jacobian(scores, inputs, batch_size, output_dim, i)
+    s_jac= torch.div(s_jac, torch.norm(s_jac, 2, dim=-1).unsqueeze(1))
+    t_jac = torch.div(t_jac, torch.norm(t_jac, 2, dim=-1).unsqueeze(1))
+    jacobian_loss = torch.norm(t_jac-s_jac, 2, dim=1)
+    jacobian_loss = torch.mean(jacobian_loss)  # Batchwise reduction
+    loss = (1-alpha) * distill_loss + alpha * jacobian_loss
+    return  loss
+
+def get_distill_loss(scores, targets, T, loss_fn):
+    """Distillation loss function."""
     # Only compute softmax for KL divergence loss
     if isinstance(loss_fn, nn.KLDivLoss):
         soft_pred = F.log_softmax(scores/T, dim=1)
@@ -27,20 +43,8 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
         soft_targets = F.softmax(targets/T, dim=1)
     else:
         raise ValueError("Loss function not supported.")
-        
-    t_jac = get_jacobian(targets, inputs, batch_size, input_dim, output_dim)
-    s_jac = get_jacobian(scores, inputs, batch_size, input_dim, output_dim)
-
-    # t_jac = get_approx_jacobian(targets, inputs, batch_size, output_dim)
-    # i = torch.argmax(targets, dim=1)
-    # s_jac = get_approx_jacobian(scores, inputs, batch_size, output_dim, i)
-    s_jac= torch.div(s_jac, torch.norm(s_jac, 2, dim=-1).unsqueeze(1))
-    t_jac = torch.div(t_jac, torch.norm(t_jac, 2, dim=-1).unsqueeze(1))
-    jacobian_loss = torch.norm(t_jac-s_jac, 2, dim=1)
-    jacobian_loss = torch.mean(jacobian_loss)  # Batchwise reduction
-    distill_loss = loss_fn(soft_pred, soft_targets)
-    loss = (1-alpha) * distill_loss + alpha * jacobian_loss
-    return  loss
+    distill_loss = T**2 * loss_fn(soft_pred, soft_targets)
+    return distill_loss
 
 def get_approx_jacobian(output, x, batch_size, output_dim, i=None):
     """Rather than computing Jacobian for all output classes, compute for most probable class.
@@ -82,6 +86,7 @@ def get_jacobian(output, x, batch_size, input_dim, output_dim):
         grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True)[0]
         jacobian[:, i, :] = grad_input.view(batch_size, input_dim)
     return jacobian.view(batch_size, -1) # Flatten
+
 #===================================================================================================
 
 def jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, T, alpha, loss_fn):
@@ -94,26 +99,14 @@ def jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_siz
         alpha: float, weight of the jacobian penalty
         loss_fn: base loss function - MSE, CE, KL
     """
+    distill_loss = get_distill_loss(scores, targets, T, loss_fn)
+
     s_jac = get_grads(student, inputs, batch_size, 3)
     t_jac = get_grads(teacher, inputs, batch_size, 3)
-
-    if isinstance(loss_fn, nn.KLDivLoss):
-        soft_pred = F.log_softmax(scores/T, dim=1)
-        soft_targets = F.log_softmax(targets/T, dim=1)
-    elif isinstance(loss_fn, nn.CrossEntropyLoss):
-        soft_pred = scores/T
-        soft_targets = F.softmax(targets/T).argmax(dim=1)
-    elif isinstance(loss_fn, nn.MSELoss):
-        soft_pred = F.softmax(scores/T, dim=1)
-        soft_targets = F.softmax(targets/T, dim=1)
-    else:
-        raise ValueError("Loss function not supported.")
-
     s_norm = s_jac / torch.norm(s_jac, 2, dim=-1).unsqueeze(1) 
     t_norm = t_jac / torch.norm(t_jac, 2, dim=-1).unsqueeze(1)
     jacobian_loss = torch.norm(s_norm - t_norm, 2)
     jacobian_loss = torch.mean(jacobian_loss)   # Batchwise mean
-    distill_loss = T**2 * loss_fn(soft_pred, soft_targets)
     loss = (1 - alpha) * distill_loss + alpha * jacobian_loss
     return loss
 

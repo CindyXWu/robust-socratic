@@ -3,22 +3,24 @@ import torch
 from basic1_models import *
 import torch.nn.functional as F
 from torch_intermediate_layer_getter import IntermediateLayerGetter as MidGet
+from jacobian_srinivas import *
 
-def feature_map_diff(s_map, t_map, aggregate_chan):
+def feature_map_diff(scores, targets, s_map, t_map, T, alpha, loss_fn, aggregate_chan):
     """Compute the difference between the feature maps of the student and teacher models.
     Args:
         s_map: torch tensor, activation map of teacher model [batch_size, num_channels]
         t_map: torch tensor, output of teacher model [batch_size, num_channels]
         aggregate_chan: bool, whether to aggregate the channels of the feature activation
     """
+    distill_loss = get_distill_loss(scores, targets, T, loss_fn)
     # Aggregate the channels of the feature activation using root squared absolute value of channels to create activation map
     if aggregate_chan:
         s_map = torch.sqrt(torch.sum(torch.abs(s_map)**2, dim=1))
         t_map = torch.sqrt(torch.sum(torch.abs(t_map)**2, dim=1))
-    assert s_map.requires_grad
     # Compute the difference between the feature maps
-    # loss = F.mse_loss(s_map, t_map, reduction='mean').requires_grad_()
-    loss = torch.mean((s_map/torch.norm(s_map, p=2, dim=-1).unsqueeze(-1) - t_map/torch.norm(t_map, p=2, dim=-1).unsqueeze(-1))**2 )
+    feature_loss = F.mse_loss(s_map, t_map, reduction='mean').requires_grad_()
+    # loss = torch.mean((s_map/torch.norm(s_map, p=2, dim=-1).unsqueeze(-1) - t_map/torch.norm(t_map, p=2, dim=-1).unsqueeze(-1))**2 )
+    loss = (1 - alpha) * distill_loss + alpha * feature_loss
     assert loss.requires_grad
     return loss
 
