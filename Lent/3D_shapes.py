@@ -7,20 +7,6 @@ from torch.utils.data import DataLoader, Dataset
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
- # load dataset
-dataset = h5py.File('3dshapes.h5', 'r')
-print(dataset.keys())
-images = dataset['images']  # array shape [480000,64,64,3], uint8 in range(256)
-labels = dataset['labels']  # array shape [480000,6], float64
-image_shape = images.shape[1:]  # [64,64,3]
-label_shape = labels.shape[1:]  # [6]
-n_samples = labels.shape[0]  # 10*10*10*8*4*15=480000
-
-_FACTORS_IN_ORDER = ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape',
-                    'orientation']
-_NUM_VALUES_PER_FACTOR = {'floor_hue': 10, 'wall_hue': 10, 'object_hue': 10, 
-                        'scale': 8, 'shape': 4, 'orientation': 15}
-
 # methods for sampling unconditionally/conditionally on a given factor
 def get_index(factors):
     """ Converts factors to indices in range(num_data)
@@ -126,10 +112,14 @@ class Shapes3D(Dataset):
 
     def __getitem__(self, idx):
         shape = self.labels[idx,4]
-        # 0 if negative, 1 if positive
-        orientation = (self.labels[idx,5] + 30) // 30
-        # Split orientation into 2 groups
-        label = shape + orientation * 2
+        # Split object colour into 3 distinct groups
+        if self.labels[idx,2] < 0.33:
+            hue = 0
+        elif 0.33 <= self.labels[idx,3] < 0.67:
+            hue = 1
+        else:
+            hue = 2
+        label = shape + hue*4
         return self.images[idx,:,:,:], label
 
     def __len__(self):
@@ -142,9 +132,25 @@ def dataloader_3D_shapes(load_type, batch_size):
     return dataloader
 
 if __name__ == "__main__":
-    shapes_dataloader = dataloader_3D_shapes('train', 64)
+
+    # load dataset
+    dataset = h5py.File('3dshapes.h5', 'r')
+    # print(dataset.keys())
+    images = dataset['images']  # array shape [480000,64,64,3], uint8 in range(256)
+    labels = dataset['labels']  # array shape [480000,6], float64
+    image_shape = images.shape[1:]  # [64,64,3]
+    label_shape = labels.shape[1:]  # [6]
+    n_samples = labels.shape[0]  # 10*10*10*8*4*15=480000
+
+    _FACTORS_IN_ORDER = ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape',
+                        'orientation']
+    _NUM_VALUES_PER_FACTOR = {'floor_hue': 10, 'wall_hue': 10, 'object_hue': 10, 
+                            'scale': 8, 'shape': 4, 'orientation': 15}
+    
+    shapes_dataloader = dataloader_3D_shapes('train', 32)
     # Get a single batch from the dataloader
     iterator = iter(shapes_dataloader)
     batch = next(iterator)
     images, labels = batch
+    # show_images_grid(images, 16)
     print(labels)
