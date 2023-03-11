@@ -118,7 +118,7 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                         layer = 'feature_extractor.10'
                         s_map = student.attention_map(inputs, layer)
                         t_map = teacher.attention_map(inputs, layer).detach()
-                        loss = feature_map_diff(s_map, t_map, aggregate_chan=False)
+                        loss = feature_map_diff(scores, targets, s_map, t_map, T=1, alpha=0.2, loss_fn=mse_loss, aggregate_chan=False)
                     case 3: # Attention Jacobian loss
                         loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, T=1, alpha=0.8, loss_fn=kl_loss)
 
@@ -155,9 +155,8 @@ def sweep():
             "batch_size": batch_size,
             }
     )
-    lr = wandb.config.lr
-    temp = wandb.config.temp
-    epochs = wandb.config.epochs
+    alpha = wandb.config.alpha
+    # spurious_corr = wandb.config.spurious_corr
 
     randomize_loc = False
     spurious_corr = 1.0
@@ -194,23 +193,23 @@ loss_dict  = {0: "Base Distillation", 1: "Jacobian", 2: "Feature Map", 3: "Atten
 # SETUP PARAMS - CHANGE THESE
 #================================================================================
 #================================================================================
-is_sweep = False
+is_sweep = True
 EXP_NUM = 1
 STUDENT_NUM = 0
 TEACH_NUM = 0
-LOSS_NUM = 2
+LOSS_NUM = 1
 
 # Hyperparams
-lr = 0.7
-final_lr = 0.2
-temp = 20
-epochs = 10
+lr = 0.3
+final_lr = 0.08
+temp = 30
+epochs = 3
 alpha = 0.5 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 dims = [32, 32]
 sweep_method = 'bayes'
-sweep_count = 15
-sweep_name = 'epochs_lr_temp_' + strftime("%m-%d %H:%M:%S", gmtime())
+sweep_count = 10
+sweep_name = 'Feature map match for alpha' + strftime("%m-%d %H:%M:%S", gmtime())
 e_dim = 50 # embedding size for contrastive loss
 
 sweep_configuration = {
@@ -219,9 +218,12 @@ sweep_configuration = {
     'metric': {'goal': 'maximize', 'name': 'student test acc'},
     # CHANGE THESE
     'parameters': {
-        'epochs': {'values': [3, 4, 5, 6, 7]},
-        'temp': {'distribution': 'uniform', 'min': 15, 'max': 50}, 
-        'lr': {'distribution': 'log_uniform', 'min': math.log(0.08), 'max': math.log(0.5)},
+        # 'epochs': {'values': [1]},
+        # 'temp': {'distribution': 'uniform', 'min': 15, 'max': 50}, 
+        # 'lr': {'distribution': 'log_uniform', 'min': math.log(0.08), 'max': math.log(0.5)},
+        # 'alpha': {'values': [0, 0.2, 0.4, 0.6, 0.8, 1]}, # For grid search
+        'alpha': {'distribution': 'uniform', 'min': 0, 'max': 1}, # For bayes search
+        # 'spurious_corr': {'distribution': 'uniform', 'min': 0, 'max': 1}
     },
     'early_terminate': {'type': 'hyperband', 'min_iter': 5}
 }
