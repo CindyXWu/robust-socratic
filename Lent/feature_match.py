@@ -18,8 +18,7 @@ def feature_map_diff(scores, targets, s_map, t_map, T, alpha, loss_fn, aggregate
         s_map = torch.sqrt(torch.sum(torch.abs(s_map)**2, dim=1))
         t_map = torch.sqrt(torch.sum(torch.abs(t_map)**2, dim=1))
     # Compute the difference between the feature maps
-    feature_loss = F.mse_loss(s_map, t_map, reduction='mean').requires_grad_()
-    # loss = torch.mean((s_map/torch.norm(s_map, p=2, dim=-1).unsqueeze(-1) - t_map/torch.norm(t_map, p=2, dim=-1).unsqueeze(-1))**2 )
+    feature_loss = F.mse_loss(s_map/torch.norm(s_map, p=2, dim=-1).unsqueeze(-1), t_map/torch.norm(t_map, p=2, dim=-1), reduction='mean').requires_grad_()
     loss = (1 - alpha) * distill_loss + alpha * feature_loss
     assert loss.requires_grad
     return loss
