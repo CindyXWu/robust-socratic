@@ -7,6 +7,7 @@ import wandb
 import math
 from tqdm import tqdm
 from time import gmtime, strftime
+import yaml 
 
 from image_models import *
 from plotting import *
@@ -28,6 +29,12 @@ if not os.path.exists(output_dir):
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # print(f"Using {device} device")
+
+with open('configs.yaml', 'r') as f:
+    configs = yaml.safe_load(f)
+
+# for experiment in configs:
+#     print(f"Running {experiment['experiment_name']} with learning rate {experiment['learning_rate']} and batch size {experiment['batch_size']}")
 
 def load_cifar_10(dims):
     """Load CIFAR-10 dataset and return dataloaders.
@@ -77,7 +84,7 @@ def base_distill_loss(scores, targets, temp):
     targets = F.softmax(targets/temp).argmax(dim=1)
     return ce_loss(scores, targets)
 
-def train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, ranbox_test_loader, lr, final_lr, temp, epochs, repeats, loss_num):
+def train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, ranbox_test_loader, lr, final_lr, temp, epochs, repeats, loss_num, alpha=None):
     """Train student model with distillation loss.
     
     Includes LR scheduling. Change loss function as required. 
@@ -182,7 +189,7 @@ def sweep():
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
     # Train
-    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM)
+    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, alpha=alpha)
 
 # Look at these as reference to set values for above variables
 exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
@@ -203,14 +210,17 @@ LOSS_NUM = 1
 lr = 0.3
 final_lr = 0.08
 temp = 30
-epochs = 3
+epochs = 1
 alpha = 0.5 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 dims = [32, 32]
-sweep_method = 'bayes'
-sweep_count = 10
+sweep_method = 'grid'
+sweep_count = 7
 sweep_name = 'Feature map match for alpha' + strftime("%m-%d %H:%M:%S", gmtime())
 e_dim = 50 # embedding size for contrastive loss
+repeats = 1 # I don't think I will use this - repeats will be done by calling this script multiple times
+
+wandb.config.tags = ['no_spurious', '0,5', '0.6', '0.7', '0.8', '0.9', '1_spurious']
 
 sweep_configuration = {
     'method': sweep_method,
@@ -221,11 +231,11 @@ sweep_configuration = {
         # 'epochs': {'values': [1]},
         # 'temp': {'distribution': 'uniform', 'min': 15, 'max': 50}, 
         # 'lr': {'distribution': 'log_uniform', 'min': math.log(0.08), 'max': math.log(0.5)},
-        # 'alpha': {'values': [0, 0.2, 0.4, 0.6, 0.8, 1]}, # For grid search
-        'alpha': {'distribution': 'uniform', 'min': 0, 'max': 1}, # For bayes search
+        'alpha': {'values': [0, 0.5, 0.6, 0.7, 0.8, 0.9, 1]}, # For grid search
+        # 'alpha': {'distribution': 'uniform', 'min': 0, 'max': 1}, # For bayes search
         # 'spurious_corr': {'distribution': 'uniform', 'min': 0, 'max': 1}
     },
-    'early_terminate': {'type': 'hyperband', 'min_iter': 5}
+    # 'early_terminate': {'type': 'hyperband', 'min_iter': 5}
 }
 
 # Dataloaders - regardless of experiment type, always evaluate on these three
@@ -302,4 +312,4 @@ if __name__ == "__main__":
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
     # Train
-    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM)
+    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, alpha=alpha)
