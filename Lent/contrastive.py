@@ -8,9 +8,8 @@ eps = 1e-7
 
 class ContrastiveRep(nn.Module):
     """CRD Loss function
-    # Includes two symmetric parts:
-    # (a) Using teacher as anchor, choose positive and negatives over the student side.
-    # (b) Using student as anchor, choose positive and negatives over the teacher side.
+    Using teacher as anchor, choose positive and negative samples over the student side.
+    This means the teacher data distribution is fixed
     Note original implementation uses memory buffer to allow large N (hence tighter bounds on MI) but this is not implemented here.
     Args:
         s_dim: dimension of student's feature
@@ -20,7 +19,7 @@ class ContrastiveRep(nn.Module):
         T: temperature
         n_data: number of samples in the training set, therefore the memory buffer is: n_data * e_dim
     """
-    def __init__(self, t_dim, s_dim, e_dim, k, T, n_data):
+    def __init__(self, t_dim, s_dim, n_data, e_dim=50, k=10, T=1):
         super(ContrastiveRep, self).__init__()
         self.embed_s = Embed(dim_in=s_dim, dim_out=e_dim)
         self.embed_t = Embed(dim_in=t_dim, dim_out=e_dim)
@@ -38,7 +37,7 @@ class ContrastiveRep(nn.Module):
         Returns:
             The contrastive loss
         """
-        # TODO: figure out data loading and what is meant by fixing teacher or student side when loading samples
+        # N.B. if I fix teacher side, then I will assume teacher samples are fixed and I am optimising 
         # Embed module forward function
         f_s = self.embed_s(f_s)
         f_t = self.embed_t(f_t)

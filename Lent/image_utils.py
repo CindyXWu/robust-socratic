@@ -10,7 +10,7 @@ import einops
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 # Dataset for inheritance for AugDataset
 
-class AugDataset(Shapes3D):
+class AugShapes3D(Shapes3D):
     """Custom augmented dataset implementation. Inherits from other dataloaders, but must be multichannel images: [channels, height, width] OR [height, width, channels]
     Always check dimensions if unsure.
     """
@@ -97,7 +97,7 @@ class AugDataset(Shapes3D):
 
 if __name__ == "__main__":
     batch_size = 16
-    aug_set = AugDataset(alpha=5, beta=3, mix_prob=0.5, crop_prob=0.5, crop_size=30, flip_prob=0.5, rotate_prob=0.5)
+    aug_set = AugShapes3D(alpha=5, beta=3, mix_prob=0.5, crop_prob=0.5, crop_size=30, flip_prob=0.5, rotate_prob=0.5)
     aug_loader = DataLoader(aug_set, batch_size=batch_size, shuffle=True)
     iterator = iter(aug_loader)
     x, y = next(iterator)
