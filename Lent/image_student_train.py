@@ -147,9 +147,11 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                     plain_acc = evaluate(student, plain_test_loader, batch_size)
                     box_acc = evaluate(student, box_test_loader, batch_size)
                     randbox_acc = evaluate(student, ranbox_test_loader, batch_size)
+                    teacher_test_acc = evaluate(teacher, test_loader, batch_size)
+                    error = teacher_test_acc - test_acc[-1]
                     print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch, "Loss: ", train_loss[-1])
                     print("Project {}, LR {}, temp {}".format(project, lr, temp))
-                    wandb.log({"student train acc": train_acc[-1], "student test acc": test_acc[-1], "student plain training test acc": plain_acc, "student spurious box test acc": box_acc, "student randomised spurious box test acc": randbox_acc, "student loss": train_loss[-1], 'student lr': lr})
+                    wandb.log({"Student-teacher error": error, "Student train accuracy": train_acc[-1], "Student test accuracy": test_acc[-1], "Student plain test accuracy": plain_acc, "Student box test accuracy": box_acc, "student randomised box test acc": randbox_acc, "Student loss": train_loss[-1], 'Student LR': lr})
                 it += 1
 
 def sweep():
@@ -163,6 +165,7 @@ def sweep():
             }
     )
     alpha = wandb.config.alpha
+    wandb.config.tags = 'alpha='+str(alpha)
     # spurious_corr = wandb.config.spurious_corr
 
     randomize_loc = False
@@ -220,8 +223,6 @@ sweep_name = 'Feature map match for alpha' + strftime("%m-%d %H:%M:%S", gmtime()
 e_dim = 50 # embedding size for contrastive loss
 repeats = 1 # I don't think I will use this - repeats will be done by calling this script multiple times
 
-wandb.config.tags = ['no_spurious', '0,5', '0.6', '0.7', '0.8', '0.9', '1_spurious']
-
 sweep_configuration = {
     'method': sweep_method,
     'name': sweep_name,
@@ -272,7 +273,7 @@ project = exp_dict[EXP_NUM]+"_"+teacher_name+"_"+student_dict[STUDENT_NUM] + "_"
 
 if __name__ == "__main__":
     if is_sweep:
-        sweep_id = wandb.sweep(sweep=sweep_configuration, project=project) 
+        sweep_id = wandb.sweep(sweep=sweep_configuration, project=project)
         wandb.agent(sweep_id, function=sweep, count=sweep_count)
     else:
         wandb.init(
@@ -307,6 +308,9 @@ if __name__ == "__main__":
             spurious_type = 'box'
             randomize_loc = True
             spurious_corr = 0.5
+    
+    # Set wandb config for grouping
+    wandb.config.tags = 'alpha='+str(alpha) + ", spurious corr="+str(spurious_corr)
 
     train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
     test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)

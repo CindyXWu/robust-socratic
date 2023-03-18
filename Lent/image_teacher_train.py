@@ -162,19 +162,19 @@ def sweep_teacher():
 #================================================================================
 #================================================================================
 is_sweep = False
-TEACH_NUM = 2
-EXP_NUM = 1
+TEACH_NUM = 3
+EXP_NUM = 0
 
 # Hyperparams
-lr = 0.6
-final_lr = 0.3
-epochs = 1
+lr = 0.1
+final_lr = 0.01
+epochs = 15
 batch_size = 64
 dims = [32, 32]
+
 sweep_count = 10
 sweep_method = 'bayes'
 sweep_name = strftime("%m-%d %H:%M:%S", gmtime())
-
 sweep_configuration = {
     'method': sweep_method,
     'name': sweep_name,
@@ -193,17 +193,23 @@ sweep_configuration = {
 #==============================================================================
 
 # Look at these as reference to set values for above variables
-teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10", 2: "ResNet18_CIFAR10"}
+teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10", 2: "ResNet18_CIFAR10", 3: "ResNet18_CIFAR100"}
 exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
 # Teacher model setup (change only if adding to dicts above)
 teacher_name = teacher_dict[TEACH_NUM]
 match TEACH_NUM:
     case 0:
         teacher = LeNet5(10).to(device)
+        base_dataset = 'CIFAR10'
     case 1:
-        teacher = ResNet50_CIFAR10().to(device)
+        teacher = ResNet50_CIFAR(10).to(device)
+        base_dataset = 'CIFAR10'
     case 2:
-        teacher = ResNet18_CIFAR10().to(device)
+        teacher = ResNet18_CIFAR(10).to(device)
+        base_dataset = 'CIFAR10'
+    case 3:
+        teacher = ResNet18_CIFAR(100).to(device)
+        base_dataset = 'CIFAR100'
 
 project = teacher_name+"_"+exp_dict[EXP_NUM]
 
@@ -221,7 +227,7 @@ if __name__ == "__main__":
             # track hyperparameters and run metadata
             config={
                 "learning_rate": lr,
-                "dataset": "CIFAR-10",
+                "dataset": base_dataset,
                 "epochs": epochs,
                 "batch_size": batch_size,
                 "spurious type": exp_dict[EXP_NUM]
@@ -248,8 +254,8 @@ if __name__ == "__main__":
                 spurious_corr = 0.5
 
         # Dataloaders
-        train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
-        test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+        train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+        test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
         # Fine-tune or train teacher from scratch
         train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, save=True)

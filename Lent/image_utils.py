@@ -1,6 +1,8 @@
 """Custom datasets and augmentation methods for training and testing."""
 import torchvision.transforms.functional as TF
+import torchvision.datasets as datasets
 import torchvision.transforms as T
+import torch.nn.functional as F
 import torch
 import random
 import os
@@ -11,8 +13,12 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 # Dataset for inheritance for AugDataset
 
 class AugShapes3D(Shapes3D):
-    """Custom augmented dataset implementation. Inherits from other dataloaders, but must be multichannel images: [channels, height, width] OR [height, width, channels]
-    Always check dimensions if unsure.
+    """Custom augmented dataset implementation for 3D shapes dataset.
+    Includes transforms from numpy to tensor.
+    Also includes handling of dimensions (automatically [h w c ] for base class, but PyTorch prefers [c h w]).
+    Returns:
+        x: torch tensor
+        y: soft label tensor of size num_classes
     """
     def __init__(self, alpha, beta, mix_prob, crop_prob, crop_size, flip_prob, rotate_prob):
         super().__init__()
@@ -56,6 +62,8 @@ class AugShapes3D(Shapes3D):
         # Lambda parameter, from beta distribution
         lam = random.betavariate(alpha, beta)
         x2 = torch.from_numpy(self.images[index,:,:,:]).contiguous()
+        # Inherit number of image classes from parent class
+        y = F.one_hot(y, num_classes=self.num_classes)
         y2 = self.oh_labels[index, :]
         mixed_x = x.mul(lam).add(x2,alpha=1-lam)
         mixed_y = y.mul(lam).add(y2,alpha=1-lam)
@@ -91,9 +99,74 @@ class AugShapes3D(Shapes3D):
         if random.uniform(0,1) > self.rotate_prob:
             return x
         angle = random.randint(0, 45)
-        print("Angle", angle)
         x = TF.rotate(x, random.randint(0, angle))
         return x
+
+class AugCIFAR10(datasets.CIFAR10):
+        """Custom augmented CIFAR10 implementation."""
+        def __init__(self, alpha, beta, mix_prob, crop_prob, flip_prob, rotate_prob, jitter_prob, erase_prob, *args, **kwargs):
+            """Set parameters for transform probability."""
+            super(AugCIFAR10, self).__init__(*args, **kwargs)
+            # Params for beta distribution
+            self.alpha = alpha
+            self.beta = beta
+            self.mix_prob = mix_prob
+            self.crop_prob = crop_prob
+            self.flip_prob = flip_prob
+            self.rotate_prob = rotate_prob
+            self.jitter_prob = jitter_prob
+            self.erase_prob = erase_prob
+
+        def __getitem__(self, index):
+            """Turn x into torch tensor and permute to [c h w] format."""
+            x, y = super().__getitem__(index)
+            y = F.one_hot(torch.tensor(y), 10)
+            x, y = self.mixup(x, y, self.alpha, self.beta)
+            x = self.crop(x)
+            x = self.flip(x)
+            # x = self.rotate(x)
+            print(x, y)
+            return x, y
+
+        def mixup(self, x, y, alpha, beta):
+            if torch.rand(1) > self.mix_prob:
+                return x, y
+            index = random.randint(0, self.__len__()-1)
+            # Lambda parameter, from beta distribution
+            lam = random.betavariate(alpha, beta)
+            # Return PIL.Image.Image, int
+            x2, y2 = self[index]
+            mixed_x = x.mul(lam).add(x2,alpha=1-lam)
+            mixed_y = y.mul(lam).add(F.one_hot(torch.tensor(y2), 10),alpha=1-lam)
+            return mixed_x, mixed_y
+
+        def crop(self, x):
+            """Randomly crop images and return resized to original size."""
+            if random.uniform(0,1) > self.crop_prob:
+                return x
+            h = w = x.shape[1]
+            # Randomly select top left corner of crop's y coordinate
+            i = random.randint(0, w - self.crop_size)
+            # Randomly select top left corner of crop's x coordinate
+            j = random.randint(0, h - self.crop_size)
+            cropped = TF.crop(x, j, i, self.crop_size, self.crop_size)
+            return TF.resize(cropped, (w, h))
+
+        def flip(self, x):
+            """Randomly flip images both horizontally and vertically with probability flip_prob."""
+            if random.uniform(0,1) < self.flip_prob:
+                x = TF.hflip(x)
+            if random.uniform(0,1) < self.flip_prob:
+                x = TF.vflip(x)
+            return x
+
+        def rotate(self, x):
+            """Randomly rotate images with probability rotate_prob by a random angle."""
+            if random.uniform(0,1) > self.rotate_prob:
+                return x
+            angle = random.randint(0, 45)
+            x = TF.rotate(x, random.randint(0, angle))
+            return x
 
 if __name__ == "__main__":
     batch_size = 16
@@ -105,23 +178,22 @@ if __name__ == "__main__":
     x = einops.rearrange(x, 'b c h w -> b h w c')
     show_images_grid(x, batch_size)
 
-    ## Deprecated: batch mixup method. Superseded by mixup method that acts on individual images (ABOVE)
-    # def mixup(self, x, y, alpha, beta):
-    #     """Mixup function using beta distribution for mixing.
-    #     If alpha = beta = 1, distribution uniform.
-    #     If alpha > beta, distribution skewed towards 0.
-    #     If alpha < beta, distribution skewed towards 1.
-    #     When alpha > 1 and beta > 1, distribution is concentrated around 0 and 1 - more likely to interpolate samples with similar features.
-    #     When alpha < 1 and beta < 1, distribution is concentrated around 0.5, = more likely to interpolate samples with dissimilar features.
-    #     """
-    #     if random.uniform(0,1) > self.mix_prob:
-    #         return x, y
-    #     batch_size = x.shape[0]
-    #     # Lambda parameter, from beta distribution
-    #     lam = torch.tensor([random.betavariate(alpha, beta) for _ in range(batch_size)])
-    #     index = torch.randperm(batch_size)
-    #     # Broadcast dimensions of lam to match x - which has shape [batch_size, channels, height, width]
-    #     mixed_x = lam.view(batch_size, 1, 1, 1) * x + (1 - lam.view(batch_size, 1, 1, 1)) * x[index, :]
-    #     mixed_y = lam.view(batch_size, 1) * y + (1 - lam.view(batch_size, 1)) * y[index, :]
-    #     return mixed_x, mixed_y
-    
+## Deprecated: batch mixup method. Superseded by mixup method that acts on individual images (ABOVE)
+# def mixup(self, x, y, alpha, beta):
+#     """Mixup function using beta distribution for mixing.
+#     If alpha = beta = 1, distribution uniform.
+#     If alpha > beta, distribution skewed towards 0.
+#     If alpha < beta, distribution skewed towards 1.
+#     When alpha > 1 and beta > 1, distribution is concentrated around 0 and 1 - more likely to interpolate samples with similar features.
+#     When alpha < 1 and beta < 1, distribution is concentrated around 0.5, = more likely to interpolate samples with dissimilar features.
+#     """
+#     if random.uniform(0,1) > self.mix_prob:
+#         return x, y
+#     batch_size = x.shape[0]
+#     # Lambda parameter, from beta distribution
+#     lam = torch.tensor([random.betavariate(alpha, beta) for _ in range(batch_size)])
+#     index = torch.randperm(batch_size)
+#     # Broadcast dimensions of lam to match x - which has shape [batch_size, channels, height, width]
+#     mixed_x = lam.view(batch_size, 1, 1, 1) * x + (1 - lam.view(batch_size, 1, 1, 1)) * x[index, :]
+#     mixed_y = lam.view(batch_size, 1) * y + (1 - lam.view(batch_size, 1)) * y[index, :]
+#     return mixed_x, mixed_y

@@ -55,9 +55,9 @@ class LeNet5(nn.Module):
         probs = nn.functional.softmax(logits, dim=1)
         return logits
 
-class ResNet50_CIFAR10(models.ResNet):
-    def __init__(self):
-        super(ResNet50_CIFAR10, self).__init__(block=models.resnet.Bottleneck, layers=[3, 4, 6, 3], num_classes=10)
+class ResNet50_CIFAR(models.ResNet):
+    def __init__(self, num_classes=10):
+        super(ResNet50_CIFAR, self).__init__(block=models.resnet.Bottleneck, layers=[3, 4, 6, 3], num_classes=num_classes)
         # Modify the first convolution layer to accept 3-channel input with 32 x 32 dimensions
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
         self.maxpool = nn.Identity()
@@ -79,7 +79,7 @@ class ResNet50_CIFAR10(models.ResNet):
 
         return x
 
-class ResNet18_CIFAR10(models.ResNet):
+class ResNet18_CIFAR(models.ResNet):
     """10 layers in total.
     Layers 4-7 inclusive are blocks. Each block has a two sub-block of BasicBlock() structure:
     Sequential(
@@ -98,8 +98,8 @@ class ResNet18_CIFAR10(models.ResNet):
         (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
     )
     """
-    def __init__(self):
-        super(ResNet18_CIFAR10, self).__init__(block=models.resnet.BasicBlock, layers=[2, 2, 2, 2], num_classes=10)
+    def __init__(self, num_classes=10):
+        super(ResNet18_CIFAR, self).__init__(block=models.resnet.BasicBlock, layers=[2, 2, 2, 2], num_classes=num_classes)
         # Modify the first convolution layer to accept 3-channel input with 32 x 32 dimensions
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
 
@@ -158,6 +158,6 @@ def show_model(model):
         print(list(model.children())[layer])
 
 if __name__ == "__main__":
-    resnet = ResNet18_CIFAR10()
+    resnet = ResNet18_CIFAR()
     lenet = LeNet5(10)
     lenet.attention_map(torch.randn(1, 3, 32, 32), "feature_extractor.8")
