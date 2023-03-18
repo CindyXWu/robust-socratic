@@ -162,13 +162,13 @@ def sweep_teacher():
 #================================================================================
 #================================================================================
 is_sweep = False
-TEACH_NUM = 3
+TEACH_NUM = 4
 EXP_NUM = 0
 
 # Hyperparams
 lr = 0.1
 final_lr = 0.01
-epochs = 15
+epochs = 100
 batch_size = 64
 dims = [32, 32]
 
@@ -193,7 +193,7 @@ sweep_configuration = {
 #==============================================================================
 
 # Look at these as reference to set values for above variables
-teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10", 2: "ResNet18_CIFAR10", 3: "ResNet18_CIFAR100"}
+teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10", 2: "ResNet18_CIFAR10", 3: "ResNet18_CIFAR100", 4: "ResNet50_CIFAR100"}
 exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
 # Teacher model setup (change only if adding to dicts above)
 teacher_name = teacher_dict[TEACH_NUM]
@@ -209,6 +209,9 @@ match TEACH_NUM:
         base_dataset = 'CIFAR10'
     case 3:
         teacher = ResNet18_CIFAR(100).to(device)
+        base_dataset = 'CIFAR100'
+    case 4:
+        teacher = ResNet50_CIFAR(100).to(device)
         base_dataset = 'CIFAR100'
 
 project = teacher_name+"_"+exp_dict[EXP_NUM]
