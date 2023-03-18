@@ -1,5 +1,6 @@
 """Custom datasets and augmentation methods for training and testing."""
 import torchvision.transforms.functional as TF
+from torchvision import datasets, transforms
 import torchvision.datasets as datasets
 import torchvision.transforms as T
 import torch.nn.functional as F
@@ -167,6 +168,19 @@ class AugCIFAR10(datasets.CIFAR10):
             angle = random.randint(0, 45)
             x = TF.rotate(x, random.randint(0, angle))
             return x
+def load_cifar_10(dims):
+    """Load CIFAR-10 dataset and return dataloaders.
+    :param dims: tuple, dimensions of the images
+    """
+    transform = transforms.Compose([transforms.Resize((dims[0],dims[1])),
+                                transforms.ToTensor(),
+                                transforms.Normalize([0.485,0.456,  
+                                0.406], [0.229, 0.224, 0.225])])
+    trainset = datasets.CIFAR10(root='./data/'+str(dims[0]), download=True, train=True, transform=transform)
+    testset = datasets.CIFAR10(root='./data/'+str(dims[0]), download=True, train=False, transform=transform)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, num_workers=0, shuffle=True, drop_last=True)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, num_workers=0, shuffle=True, drop_last=True)
+    return trainset, testset, trainloader, testloader
 
 if __name__ == "__main__":
     batch_size = 16

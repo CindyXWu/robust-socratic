@@ -4,11 +4,11 @@ from torch import nn, optim
 import torch.nn.functional as F
 import os
 import wandb
-import math
+import argparse
 from tqdm import tqdm
 from time import gmtime, strftime
 import yaml 
-
+from pathlib import Path
 from image_models import *
 from plotting import *
 from jacobian_srinivas import *
@@ -21,35 +21,38 @@ from image_utils import *
 import warnings
 warnings.filterwarnings("ignore")
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+# print(f"Using {device} device")
+
+## OPEN YAML CONFIGS ## ===================================================
+# Get the absolute path of the directory containing the current Python file
+filename = "Lenet_exp_loss_configs.yml"
+# # Go up one level with messy os code
+# parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# file_name = os.path.join(os.path.join(parent_dir, 'configs'), filename)
+# Better code - using pathlib
+file_name = Path(__file__).resolve().parent.parent / "configs" / "Lenet_exp_loss_configs.yml"
+
+# Load the config file
+with open(file_name, 'r') as f:
+    configs = yaml.safe_load(f)[0]
+print(configs)
+
+## ARGPARSE ## ============================================================
+# Add boolean flag for whether to use config file and sweep
+parser = argparse.ArgumentParser()
+# Default config
+parser.add_argument("--config", type=bool, default=True)
+# Default sweep
+parser.add_argument("--sweep", type=bool, default=True)
+args = parser.parse_args()
+
 output_dir = "Image_Experiments/"   # Directory to store and load models from
 # Change directory to one this file is in
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-# print(f"Using {device} device")
-
-with open('configs.yaml', 'r') as f:
-    configs = yaml.safe_load(f)
-
-# for experiment in configs:
-#     print(f"Running {experiment['experiment_name']} with learning rate {experiment['learning_rate']} and batch size {experiment['batch_size']}")
-
-def load_cifar_10(dims):
-    """Load CIFAR-10 dataset and return dataloaders.
-    :param dims: tuple, dimensions of the images
-    """
-    transform = transforms.Compose([transforms.Resize((dims[0],dims[1])),
-                                transforms.ToTensor(),
-                                transforms.Normalize([0.485,0.456,  
-                                0.406], [0.229, 0.224, 0.225])])
-    trainset = datasets.CIFAR10(root='./data/'+str(dims[0]), download=True, train=True, transform=transform)
-    testset = datasets.CIFAR10(root='./data/'+str(dims[0]), download=True, train=False, transform=transform)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, num_workers=0, shuffle=True, drop_last=True)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, num_workers=0, shuffle=True, drop_last=True)
-    return trainset, testset, trainloader, testloader
-    
 @torch.no_grad()
 def evaluate(model, dataset, batch_size, max_ex=0):
     """Evaluate model accuracy on dataset."""
@@ -164,13 +167,12 @@ def sweep():
             "batch_size": batch_size,
             }
     )
-    alpha = wandb.config.alpha
-    wandb.config.tags = 'alpha='+str(alpha)
-    # spurious_corr = wandb.config.spurious_corr
+    # alpha = wandb.config.alpha
+    # wandb.config.tags = 'alpha='+str(alpha)
+    spurious_corr = wandb.config.spurious_corr
+    wandb.config.tags = 'spurious_corr='+str(spurious_corr)
 
     randomize_loc = False
-    spurious_corr = 1.0
-    name = exp_dict[EXP_NUM]    # Dataset saved name - see dict above
     match EXP_NUM:
         case 0:
             spurious_type = 'plain'
@@ -188,8 +190,8 @@ def sweep():
             spurious_corr = 0.5
 
     # Dataloaders
-    train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
-    test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+    train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+    test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
     # Train
     train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, alpha=alpha)
@@ -197,31 +199,39 @@ def sweep():
 # Look at these as reference to set values for above variables
 exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
 student_dict = {0: "LeNet5_CIFAR10"}
-teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10", 2: "ResNet18_CIFAR10"}
+teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10", 2: "ResNet18_CIFAR10", 3: "ResNet18_CIFAR100"}
 loss_dict  = {0: "Base Distillation", 1: "Jacobian", 2: "Feature Map", 3: "Attention Jacobian"}
 
-# SETUP PARAMS - CHANGE THESE
-#================================================================================
-#================================================================================
-is_sweep = True
+# Semi-automated setup params
+is_sweep = args.sweep
+use_config = args.config
 EXP_NUM = 1
 STUDENT_NUM = 0
 TEACH_NUM = 0
 LOSS_NUM = 1
+if use_config:
+    EXP_NUM = configs['experiment_num']
+    STUDENT_NUM = configs['student_num']
+    TEACH_NUM = configs['teacher_num']
+    LOSS_NUM = configs['loss_num']
+project = exp_dict[EXP_NUM]+"_"+teacher_dict[TEACH_NUM]+"_"+student_dict[STUDENT_NUM] + "_" + loss_dict[LOSS_NUM]
 
-# Hyperparams
+# SETUP PARAMS REQUIRING MANUAL INPUT
+# ======================================================================================
+# ======================================================================================
 lr = 0.3
 final_lr = 0.08
 temp = 30
-epochs = 1
+epochs = 15
 alpha = 0.5 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 dims = [32, 32]
 sweep_method = 'grid'
 sweep_count = 7
-sweep_name = 'Feature map match for alpha' + strftime("%m-%d %H:%M:%S", gmtime())
+sweep_name = strftime("%m-%d %H:%M:%S", gmtime())
 e_dim = 50 # embedding size for contrastive loss
 repeats = 1 # I don't think I will use this - repeats will be done by calling this script multiple times
+spurious_corr = 1.0
 
 sweep_configuration = {
     'method': sweep_method,
@@ -229,21 +239,11 @@ sweep_configuration = {
     'metric': {'goal': 'maximize', 'name': 'student test acc'},
     # CHANGE THESE
     'parameters': {
-        # 'epochs': {'values': [1]},
-        # 'temp': {'distribution': 'uniform', 'min': 15, 'max': 50}, 
-        # 'lr': {'distribution': 'log_uniform', 'min': math.log(0.08), 'max': math.log(0.5)},
-        'alpha': {'values': [0, 0.5, 0.6, 0.7, 0.8, 0.9, 1]}, # For grid search
+        'spurious_corr': {'values': [0.5, 0.6, 0.7, 0.8, 0.9, 1]}, # For grid search
         # 'alpha': {'distribution': 'uniform', 'min': 0, 'max': 1}, # For bayes search
-        # 'spurious_corr': {'distribution': 'uniform', 'min': 0, 'max': 1}
     },
     # 'early_terminate': {'type': 'hyperband', 'min_iter': 5}
 }
-
-# Dataloaders - regardless of experiment type, always evaluate on these three
-plain_test_loader = get_dataloader(load_type ='test', spurious_type='plain', spurious_corr=1, randomize_loc=False)
-box_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=False)
-randbox_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=True)
-
 #================================================================================
 #================================================================================
 
@@ -251,8 +251,6 @@ randbox_test_loader = get_dataloader(load_type ='test', spurious_type='box', spu
 match STUDENT_NUM:
     case 0:
         student = LeNet5(10).to(device)
-# # Get names of all submodules in model
-# get_submodules(student)
 
 # Teacher model setup (change only if adding to dicts above)
 teacher_name = teacher_dict[TEACH_NUM]
@@ -260,16 +258,27 @@ load_path = "Image_Experiments/teacher_"+teacher_name
 match TEACH_NUM:
     case 0:
         teacher = LeNet5(10).to(device)
+        base_dataset = 'CIFAR10'
     case 1:
-        teacher = ResNet50_CIFAR10().to(device)
+        teacher = ResNet50_CIFAR(10).to(device)
+        base_dataset = 'CIFAR10'
     case 2:
-        teacher = ResNet18_CIFAR10().to(device)
+        teacher = ResNet18_CIFAR(10).to(device)
+        base_dataset = 'CIFAR10'
+    case 3:
+        teacher = ResNet18_CIFAR(100).to(device)
+        base_dataset = 'CIFAR100'
 # Load saved teacher model (change only if changing file locations)
 load_name = "Image_Experiments/teacher_"+teacher_name+"_"+exp_dict[EXP_NUM]
 checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
-    
-project = exp_dict[EXP_NUM]+"_"+teacher_name+"_"+student_dict[STUDENT_NUM] + "_" + loss_dict[LOSS_NUM]
+
+
+# Dataloaders - regardless of experiment type, always evaluate on these three
+plain_test_loader = get_dataloader(load_type ='test', spurious_type='plain', spurious_corr=1, randomize_loc=False)
+box_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=False)
+randbox_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=True)
+
 
 if __name__ == "__main__":
     if is_sweep:
@@ -289,10 +298,10 @@ if __name__ == "__main__":
                 "spurious type": exp_dict[EXP_NUM],
             }   
         )
+        # wandb.config.tags = 'alpha='+str(alpha)
+        wandb.config.spurious_corr = 'spurious_corr' + str(spurious_corr)
 
     randomize_loc = False
-    spurious_corr = 1.0
-    name = exp_dict[EXP_NUM]    # Dataset saved name - see dict above
     match EXP_NUM:
         case 0:
             spurious_type = 'plain'
@@ -312,8 +321,8 @@ if __name__ == "__main__":
     # Set wandb config for grouping
     wandb.config.tags = 'alpha='+str(alpha) + ", spurious corr="+str(spurious_corr)
 
-    train_loader = get_dataloader(load_type='train', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
-    test_loader = get_dataloader(load_type ='test', spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+    train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+    test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
     # Train
     train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, alpha=alpha)
