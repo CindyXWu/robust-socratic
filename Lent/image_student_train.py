@@ -24,28 +24,30 @@ warnings.filterwarnings("ignore")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # print(f"Using {device} device")
 
+## ARGPARSE ## ============================================================
+# Add boolean flag for whether to use config file and sweep
+parser = argparse.ArgumentParser()
+# # Default config
+# parser.add_argument("--config", type=bool, default=True)
+# Default sweep
+parser.add_argument("--config_name", type=str, default=None)
+parser.add_argument("--sweep", type=bool, default=True)
+args = parser.parse_args()
+
 ## OPEN YAML CONFIGS ## ===================================================
-# Get the absolute path of the directory containing the current Python file
-filename = "Lenet_exp_loss_configs.yml"
+config_name = "Lenet_exp_loss_configs.yml"
+if args.config_name:
+    config_name = args.config_name
 # # Go up one level with messy os code
 # parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # file_name = os.path.join(os.path.join(parent_dir, 'configs'), filename)
 # Better code - using pathlib
-file_name = Path(__file__).resolve().parent.parent / "configs" / "Lenet_exp_loss_configs.yml"
+file_name = Path(__file__).resolve().parent.parent / "configs" / config_name
 
 # Load the config file
 with open(file_name, 'r') as f:
     configs = yaml.safe_load(f)[0]
 print(configs)
-
-## ARGPARSE ## ============================================================
-# Add boolean flag for whether to use config file and sweep
-parser = argparse.ArgumentParser()
-# Default config
-parser.add_argument("--config", type=bool, default=True)
-# Default sweep
-parser.add_argument("--sweep", type=bool, default=True)
-args = parser.parse_args()
 
 output_dir = "Image_Experiments/"   # Directory to store and load models from
 # Change directory to one this file is in
@@ -204,12 +206,11 @@ loss_dict  = {0: "Base Distillation", 1: "Jacobian", 2: "Feature Map", 3: "Atten
 
 # Semi-automated setup params
 is_sweep = args.sweep
-use_config = args.config
 EXP_NUM = 1
 STUDENT_NUM = 0
 TEACH_NUM = 0
 LOSS_NUM = 1
-if use_config:
+if args.config_name:
     EXP_NUM = configs['experiment_num']
     STUDENT_NUM = configs['student_num']
     TEACH_NUM = configs['teacher_num']

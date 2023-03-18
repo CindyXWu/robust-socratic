@@ -151,6 +151,7 @@ def get_submodules(model):
             submodules[name] = name
     print(submodules)
 
+
 def show_model(model):
     print("List of model layers:")
     for layer in range(len(list(model.children()))):

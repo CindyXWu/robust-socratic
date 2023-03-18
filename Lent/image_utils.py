@@ -103,11 +103,11 @@ class AugShapes3D(Shapes3D):
         x = TF.rotate(x, random.randint(0, angle))
         return x
 
-class AugCIFAR10(datasets.CIFAR10):
+class AugCIFAR(datasets.CIFAR10):
         """Custom augmented CIFAR10 implementation."""
         def __init__(self, alpha, beta, mix_prob, crop_prob, flip_prob, rotate_prob, jitter_prob, erase_prob, *args, **kwargs):
             """Set parameters for transform probability."""
-            super(AugCIFAR10, self).__init__(*args, **kwargs)
+            super(AugCIFAR, self).__init__(*args, **kwargs)
             # Params for beta distribution
             self.alpha = alpha
             self.beta = beta
@@ -168,6 +168,7 @@ class AugCIFAR10(datasets.CIFAR10):
             angle = random.randint(0, 45)
             x = TF.rotate(x, random.randint(0, angle))
             return x
+        
 def load_cifar_10(dims):
     """Load CIFAR-10 dataset and return dataloaders.
     :param dims: tuple, dimensions of the images

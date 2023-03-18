@@ -5,3 +5,5 @@ data/
 **/wandb/*
 
 3dshapes.h5
+
+*.swp

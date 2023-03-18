@@ -55,7 +55,7 @@ source .bashrc
 #! Insert additional module load commands after this line if needed:
 
 #! Full path to application executable: 
-application="python image_teacher_train.py"
+application="python image_student_train.py"
 
 #! Run options for the application:
 options=""
@@ -78,6 +78,19 @@ CMD="$application $options"
 #! Choose this for a MPI code using OpenMPI:
 #CMD="mpirun -npernode $mpi_tasks_per_node -np $np $application $options"
 
+#! Additional commands to be run before the application:
+# Define the configurations to use
+config_file="configs.yaml"
+config_data=$(python -c "import yaml; print(yaml.safe_load(open('$config_file')))")
+configs=($(python -c "import yaml; print(' '.join(yaml.safe_dump($config_data).splitlines()))"))
+
+# Loop through each configuration and run the Python script
+for config in "${configs[@]}"
+do
+  CMD="$application --config \"$config\""
+  echo "Running command: $CMD"
+  eval $CMD
+done
 
 ###############################################################
 ### You should not have to change anything below this line ####
@@ -102,7 +115,5 @@ if [ "$SLURM_JOB_NODELIST" ]; then
 fi
 
 echo -e "\nnumtasks=$numtasks, numnodes=$numnodes, mpi_tasks_per_node=$mpi_tasks_per_node (OMP_NUM_THREADS=$OMP_NUM_THREADS)"
-
 echo -e "\nExecuting command:\n==================\n$CMD\n"
-
 eval $CMD 
