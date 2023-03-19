@@ -164,6 +164,10 @@ def sweep():
         config={
             "dataset": "CIFAR-10",
             "batch_size": batch_size,
+            "epochs": epochs,
+            "lr": lr,
+            "final_lr": final_lr,
+            "temp": temp,
             }
     )
     # alpha = wandb.config.alpha
@@ -218,9 +222,9 @@ project = exp_dict[EXP_NUM]+"_"+teacher_dict[TEACH_NUM]+"_"+student_dict[STUDENT
 # ======================================================================================
 # ======================================================================================
 lr = 0.3
-final_lr = 0.08
+final_lr = 0.05
 temp = 30
-epochs = 15
+epochs = 5
 alpha = 0.5 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 dims = [32, 32]

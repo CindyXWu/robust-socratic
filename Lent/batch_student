@@ -80,21 +80,12 @@ CMD="$application $options"
 
 #! Additional commands to be run before the application:
 # Define the configurations to use
-config_file="Lenet_exp_loss_configs.yml"
+config_file=$CONFIG_FILE
+i = $IDX
 config_data=$(python -c "import yaml; print(yaml.safe_load(open('$config_file')))")
 configs=($(python -c "import yaml; print(' '.join(yaml.safe_dump($config_data).splitlines()))"))
-
-# Define the number of configurations
-num_configs=${#configs[@]}
-
-# Loop through each configuration and run the Python script
-for ((i=0; i<$num_configs; i++))
-do
-  echo "Running configuration $i"
-  CMD="$application --config_num $i"
-  echo "Running command: $CMD"
-  eval $CMD
-done
+CMD="$application --config_num $i --config_name $config_file"
+eval $CMD
 
 ###############################################################
 ### You should not have to change anything below this line ####
