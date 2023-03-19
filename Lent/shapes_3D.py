@@ -6,6 +6,7 @@ import os
 from torch.utils.data import DataLoader, Dataset
 import torch.nn.functional as F
 import torch
+import einops
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -67,15 +68,18 @@ class Shapes3D(Dataset):
 
     def __getitem__(self, idx):
         """Returns:
-        image: numpy array image of shape [64,64,3]
-        label: torch tensor label in range [1,12]
+        image: numpy array image of shape [3, 64, 64]
+        label: scalar torch tensor label in range 1-12
         """
-        return self.images[idx,:,:,:], self.new_labels[idx]
+        # Rearrange format using einops
+        x = einops.rearrange(self.images[idx,:,:,:], 'h w c -> c h w')
+        return x, self.new_labels[idx]
 
     def __len__(self):
         return self.n_samples
 
 def show_images_grid(imgs_, num_images=25):
+  """Now modified to show both [c h w] and [h w c] images."""
   ncols = int(np.ceil(num_images**0.5))
   nrows = int(np.ceil(num_images / ncols))
   _, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
@@ -83,7 +87,10 @@ def show_images_grid(imgs_, num_images=25):
 
   for ax_i, ax in enumerate(axes):
     if ax_i < num_images:
-      ax.imshow(imgs_[ax_i], cmap='Greys_r', interpolation='nearest')
+      img = imgs_[ax_i]
+      if img.ndim == 3 and img.shape[0] == 3:
+        img = img.transpose(1, 2, 0)
+      ax.imshow(img, cmap='Greys_r', interpolation='nearest')
       ax.set_xticks([])
       ax.set_yticks([])
     else:

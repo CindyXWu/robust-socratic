@@ -44,8 +44,7 @@ class AugShapes3D(Shapes3D):
         x = self.flip(x)
         # x = self.rotate(x)
         if x.shape[0] != 3:
-            x = einops.rearrange(x, 'h w c -> c h w')  # new shape: (3, 64, 64)
-        print(y)
+            x = einops.rearrange(x, 'h w c -> c h w')  # Ensure shape: (3, 64, 64)
         return x, y
 
     def __len__(self):
@@ -68,7 +67,6 @@ class AugShapes3D(Shapes3D):
         y2 = self.oh_labels[index, :]
         mixed_x = x.mul(lam).add(x2,alpha=1-lam)
         mixed_y = y.mul(lam).add(y2,alpha=1-lam)
-        print(mixed_y)
         return mixed_x, mixed_y
     
     def crop(self, x):

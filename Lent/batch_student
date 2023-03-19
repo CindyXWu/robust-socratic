@@ -53,6 +53,8 @@ module load rhel8/default-amp              # REQUIRED - loads the basic environm
 source .bashrc
 
 #! Insert additional module load commands after this line if needed:
+config_file=$CONFIG_FILE
+i=$IDX
 
 #! Full path to application executable: 
 application="python image_student_train.py"
@@ -73,17 +75,11 @@ np=$[${numnodes}*${mpi_tasks_per_node}]
 
 #! Choose this for a pure shared-memory OpenMP parallel program on a single node:
 #! (OMP_NUM_THREADS threads will be created):
-CMD="$application $options"
+#CMD="$application $options"
+CMD="$application --config_num $i --config_name $config_file"
 
 #! Choose this for a MPI code using OpenMPI:
 #CMD="mpirun -npernode $mpi_tasks_per_node -np $np $application $options"
-
-#! Additional commands to be run before the application:
-# Define the configurations to use
-config_file=$CONFIG_FILE
-i = $IDX
-CMD="$application --config_num $i --config_name $config_file"
-eval $CMD
 
 ###############################################################
 ### You should not have to change anything below this line ####

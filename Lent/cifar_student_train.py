@@ -1,5 +1,4 @@
 import torch
-from torchvision import datasets, transforms
 from torch import nn, optim
 import torch.nn.functional as F
 import os
@@ -8,7 +7,7 @@ import argparse
 from tqdm import tqdm
 from time import gmtime, strftime
 import yaml 
-from pathlib import Path
+
 from image_models import *
 from plotting import *
 from jacobian_srinivas import *
@@ -16,6 +15,7 @@ from contrastive import *
 from feature_match import *
 from utils_ekdeep import *
 from image_utils import *
+from info_dictionaries import *
 
 # Suppress warnings "divide by zero" produced by NaN gradients
 import warnings
@@ -199,12 +199,6 @@ def sweep():
     # Train
     train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, alpha=alpha)
 
-# Look at these as reference to set values for above variables
-exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
-student_dict = {0: "LeNet5_CIFAR10"}
-teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10", 2: "ResNet18_CIFAR10", 3: "ResNet18_CIFAR100"}
-loss_dict  = {0: "Base Distillation", 1: "Jacobian", 2: "Feature Map", 3: "Attention Jacobian"}
-
 # Semi-automated setup params
 is_sweep = args.sweep
 EXP_NUM = 1
@@ -225,7 +219,7 @@ lr = 0.3
 final_lr = 0.05
 temp = 30
 epochs = 5
-alpha = 0.5 # Fraction of other distillation losses (1-alpha for distillation loss)
+alpha = 1 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 dims = [32, 32]
 sweep_method = 'grid'
@@ -270,17 +264,19 @@ match TEACH_NUM:
     case 3:
         teacher = ResNet18_CIFAR(100).to(device)
         base_dataset = 'CIFAR100'
+    case 4:
+        teacher = ResNet50_CIFAR(100).to(device)
+        base_dataset = 'CIFAR100'
+
+        
 # Load saved teacher model (change only if changing file locations)
 load_name = "Image_Experiments/teacher_"+teacher_name+"_"+exp_dict[EXP_NUM]
 checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
 
-
-# Dataloaders - regardless of experiment type, always evaluate on these three
 plain_test_loader = get_dataloader(load_type ='test', spurious_type='plain', spurious_corr=1, randomize_loc=False)
 box_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=False)
 randbox_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=True)
-
 
 if __name__ == "__main__":
     if is_sweep:
