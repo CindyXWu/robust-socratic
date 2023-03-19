@@ -90,7 +90,7 @@ sweep_configuration = {
 }
 
 #==============================================================================
-#==============================================================================
+
 # Teacher model setup (change only if adding to dicts above)
 match TEACH_NUM:
     case 0:

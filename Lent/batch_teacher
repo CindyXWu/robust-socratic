@@ -1,12 +1,4 @@
 #!/bin/bash
-#!
-#! Example SLURM job script for Wilkes3 (AMD EPYC 7763, ConnectX-6, A100)
-#! Last updated: Fri 30 Jul 11:07:58 BST 2021
-#!
-
-#!#############################################################
-#!#### Modify the options in this section as appropriate ######
-#!#############################################################
 
 #! sbatch directives begin here ###############################
 #! Name of the job:
@@ -55,7 +47,7 @@ source .bashrc
 #! Insert additional module load commands after this line if needed:
 
 #! Full path to application executable: 
-application="python image_teacher_train.py"
+application="python cifar_teacher_train.py"
 
 #! Run options for the application:
 options=""

@@ -39,17 +39,10 @@ args = parser.parse_args()
 
 ## OPEN YAML CONFIGS ## ===================================================
 if args.config_name:
-    config_name = args.config_name
     # Load the config file - contains list of dictionaries
-    with open(config_name, 'r') as f:
+    with open(args.config_name, 'r') as f:
         configs = yaml.safe_load(f)
-    # # Iterate through each configuration and print its keys
-    # for config in configs:
-    #     print(config.keys())
-    config_num = args.config_num
-    if config_num is None:
-        config_num = 0
-    config = configs[config_num]
+    config = configs[args.config_num]
 
 def sweep():
     """Main function for sweep."""
@@ -135,7 +128,6 @@ sweep_configuration = {
     },
     # 'early_terminate': {'type': 'hyperband', 'min_iter': 5}
 }
-#================================================================================
 #================================================================================
 
 # Student model setup (change only if adding to dicts above)

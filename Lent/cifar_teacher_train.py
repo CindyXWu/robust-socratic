@@ -2,6 +2,8 @@ import torch
 import os
 import wandb
 import math
+import argparse
+import yaml
 from time import gmtime, strftime
 
 from image_models import *
@@ -25,6 +27,22 @@ if not os.path.exists(output_dir):
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # print(f"Using {device} device")
+
+## ARGPARSE ## ============================================================
+# Add boolean flag for whether to use config file and sweep
+parser = argparse.ArgumentParser()
+parser.add_argument("--config_name", type=str, default=None)
+# Indexes into list of dictionaries for config file
+parser.add_argument('--config_num', type=int, help='Index of the configuration to use')
+parser.add_argument("--sweep", type=bool, default=False)
+args = parser.parse_args()
+
+## OPEN YAML CONFIGS ## ===================================================
+if args.config_name:
+    # Load the config file - contains list of dictionaries
+    with open(args.config_name, 'r') as f:
+        configs = yaml.safe_load(f)
+    config = configs[args.config_num]
 
 def sweep_teacher():
     wandb.init(
@@ -76,7 +94,9 @@ def sweep_teacher():
 is_sweep = False
 TEACH_NUM = 3
 EXP_NUM = 0
-
+if args.config_name:
+    EXP_NUM = config['experiment_num']
+    TEACH_NUM = config['teacher_num']
 # Hyperparams
 lr = 0.1
 final_lr = 0.05
@@ -121,6 +141,12 @@ match TEACH_NUM:
     case 4:
         teacher = ResNet50_CIFAR(100).to(device)
         base_dataset = 'CIFAR100'
+    case 5:
+        teacher = CustomResNet18(100).to(device)
+        base_dataset = 'CIFAR100'
+    case 6:
+        teacher = CustomResNet18(10).to(device)
+        base_dataset = 'CIFAR10'
 
 project = teacher_name+"_"+exp_dict[EXP_NUM]
 

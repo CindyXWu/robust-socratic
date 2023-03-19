@@ -40,7 +40,7 @@ config_file=$CONFIG_FILE
 i=$IDX
 
 #! Full path to application executable: 
-application="python image_student_train.py"
+application="python cifar_student_train.py"
 
 #! Run options for the application:
 options=""
