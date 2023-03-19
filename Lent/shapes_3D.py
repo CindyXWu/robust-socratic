@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 import torch.nn.functional as F
 import torch
 import einops
+import timeit
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -16,13 +17,12 @@ class Shapes3D(Dataset):
         fixed_factors: factors indexing into _FACTORS_IN_ORDER that are predictive of label (currently only supports a single factor). Index of factor that is fixed in range(6).
         Labels returned one hot encoded.
         """
-        # load dataset
-        self.dataset = h5py.File('3dshapes.h5', 'r')
-        self.images = self.dataset['images']  # array shape [480000,64,64,3], uint8 in range(256)
-        self.labels = self.dataset['labels']  # array shape [480000,6], float64
-        self.image_shape = self.images.shape[1:]  # [64,64,3]
-        self.label_shape = self.labels.shape[1:]  # [6]
-        self.n_samples = self.labels.shape[0]  # 10*10*10*8*4*15=480000
+        with h5py.File('3dshapes.h5', 'r') as dataset:  # use 'with' statement to ensure the file is closed
+            self.images = np.array(dataset['images'])  # convert h5py Dataset to numpy array shape [480000,64,64,3], uint8 in range(256)
+            self.labels = np.array(dataset['labels'])  # convert h5py Dataset to numpy array shape [480000,6], float64
+            self.image_shape = self.images.shape[1:]  # [64,64,3]
+            self.label_shape = self.labels.shape[1:]  # [6]
+            self.n_samples = self.labels.shape[0]  # 10*10*10*8*4*15=480000
         self.num_classes = 12 # CHANGE THIS
 
         self._FACTORS_IN_ORDER = ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape',
@@ -100,16 +100,19 @@ def show_images_grid(imgs_, num_images=25):
 def dataloader_3D_shapes(load_type, batch_size):
     """Load dataset."""
     dataset = Shapes3D()
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=(load_type=='train'), drop_last=True)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=(load_type=='train'), drop_last=True, num_workers=0)
     return dataloader
 
 if __name__ == "__main__":
-    shapes_dataloader = dataloader_3D_shapes('train', 1)
-    # Get a single batch from the dataloader
-    iterator = iter(shapes_dataloader)
-    batch = next(iterator)
-    images, labels = batch
-    print(images.shape)
-    print(labels.shape)
-    # show_images_grid(images, 16)
-    print(labels)
+    # Start timing code 
+    start = timeit.default_timer()
+    shapes_dataloader = dataloader_3D_shapes('train', 64)
+    print(timeit.default_timer() - start)
+    t = timeit.default_timer()
+    i = 0
+    for images, labels in shapes_dataloader:
+        print(timeit.default_timer() - t)
+        t = timeit.default_timer()
+        i += 1
+        if i == 5:
+            break
