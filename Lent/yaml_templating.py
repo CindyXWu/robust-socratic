@@ -5,7 +5,7 @@ import yaml
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Define the filename for your configuration file
-filename = "cifar_teacher.yaml"
+filename = "cifar_teacher.yml"
 experiment_nums = [0, 1, 2]
 teacher_nums = [2, 3, 4]
 
