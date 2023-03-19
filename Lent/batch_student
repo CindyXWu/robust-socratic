@@ -34,6 +34,7 @@ source .bashrc
 
 #! Insert additional module load commands after this line if needed:
 module load miniconda/3
+conda init
 conda activate pytorch
 config_file=$CONFIG_FILE
 i=$IDX

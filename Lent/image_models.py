@@ -137,6 +137,64 @@ class ResNet18_CIFAR(models.ResNet):
 
         return x
 
+class ResNet18_3Dshapes(models.ResNet):
+    def __init__(self, num_classes=12):
+        super(ResNet18_3Dshapes, self).__init__(block=models.resnet.BasicBlock, layers=[2, 2, 2, 2], num_classes=num_classes)
+        # Modify the first convolution layer to accept 3-channel input with 64 x 64 dimensions
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.relu = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        
+        # Change the average pooling layer to adapt to the 64x64 input size
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(512 * models.resnet.BasicBlock.expansion, num_classes)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+
+        return x
+
+class CustomResNet18(models.ResNet):
+    """This model accepts images of any size using adaptive average pooling."""
+    def __init__(self, num_classes):
+        super(CustomResNet18, self).__init__(
+            block=models.resnet.BasicBlock,
+            layers=[2, 2, 2, 2],
+            num_classes=num_classes
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(512 * models.resnet.BasicBlock.expansion, num_classes)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.fc(x)
+
+        return x
+
 def get_submodules(model):
     """ Get names of all submodules in model as dict."""
     submodules = {}

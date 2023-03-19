@@ -36,7 +36,6 @@ class AugShapes3D(Shapes3D):
     def __getitem__(self, index):
         """Turn x into torch tensor and permute to [c h w] format."""
         x, y = super().__getitem__(index)
-        x = torch.from_numpy(x).contiguous()
         # Important - mixup needs to be implemented before other transforms
         x, y = self.mixup(x, y, self.alpha, self.beta)
         x = x.div(255.0)
@@ -61,10 +60,11 @@ class AugShapes3D(Shapes3D):
         index = random.randint(0, self.__len__()-1)
         # Lambda parameter, from beta distribution
         lam = random.betavariate(alpha, beta)
-        x2 = torch.from_numpy(self.images[index,:,:,:]).contiguous()
+        x2 = torch.from_numpy(self.images[index,:,:,:])
         # Inherit number of image classes from parent class
         y = F.one_hot(y, num_classes=self.num_classes)
-        y2 = self.oh_labels[index, :]
+        # Labels have to be in long form for cross entropy loss
+        y2 = torch.from_numpy(self.oh_labels[index, :]).to(torch.long)
         mixed_x = x.mul(lam).add(x2,alpha=1-lam)
         mixed_y = y.mul(lam).add(y2,alpha=1-lam)
         return mixed_x, mixed_y
