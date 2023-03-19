@@ -73,7 +73,8 @@ class Shapes3D(Dataset):
         """
         # Rearrange format using einops
         x = einops.rearrange(self.images[idx,:,:,:], 'h w c -> c h w')
-        return x, self.new_labels[idx]
+        y = int(self.new_labels[idx])
+        return torch.from_numpy(x).to(torch.float32), torch.tensor(y, dtype=torch.long)
 
     def __len__(self):
         return self.n_samples

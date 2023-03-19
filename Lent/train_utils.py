@@ -3,7 +3,6 @@ from torch import nn, optim
 import os
 import wandb
 from tqdm import tqdm
-from time import gmtime, strftime
 
 from image_models import *
 from plotting import *
@@ -17,9 +16,9 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 # print(f"Using {device} device")
 
 # Instantiate losses
-kl_loss = nn.KLDivLoss(reduction='batchmean')
+kl_loss = nn.KLDivLoss(reduction='mean', log_target=True)
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
-mse_loss = nn.MSELoss(reduction='batchmean')
+mse_loss = nn.MSELoss(reduction='mean')
 
 output_dir = "Image_Experiments/"
 # Change directory to one this file is in
@@ -51,7 +50,7 @@ def weight_reset(model):
         if hasattr(layer, 'reset_parameters'):
             layer.reset_parameters()
 
-def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, save=False):
+def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, project, teach_num, exp_num, save=False):
     """Fine tune a pre-trained teacher model for specific downstream task, or train from scratch."""
     optimizer = optim.SGD(model.parameters(), lr=lr)
     it = 0
@@ -91,14 +90,14 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, save=F
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss_hist': train_loss},
-                output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+exp_dict[EXP_NUM])
+                output_dir+"teacher_"+teacher_dict[teach_num]+"_"+exp_dict[exp_num])
 
 def base_distill_loss(scores, targets, temp):
     scores = scores/temp
     targets = F.softmax(targets/temp).argmax(dim=1)
     return ce_loss(scores, targets)
 
-def train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, ranbox_test_loader, lr, final_lr, temp, epochs, repeats, loss_num, alpha=None):
+def train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, ranbox_test_loader, lr, final_lr, temp, epochs, repeats, loss_num, project, alpha=None):
     """Train student model with distillation loss.
     
     Includes LR scheduling. Change loss function as required. 

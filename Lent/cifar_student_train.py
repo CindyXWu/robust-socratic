@@ -1,10 +1,7 @@
 import torch
-from torch import nn, optim
-import torch.nn.functional as F
 import os
 import wandb
 import argparse
-from tqdm import tqdm
 from time import gmtime, strftime
 import yaml 
 
@@ -16,6 +13,7 @@ from feature_match import *
 from utils_ekdeep import *
 from image_utils import *
 from info_dictionaries import *
+from train_utils import *
 
 # Suppress warnings "divide by zero" produced by NaN gradients
 import warnings
@@ -40,121 +38,18 @@ parser.add_argument("--sweep", type=bool, default=True)
 args = parser.parse_args()
 
 ## OPEN YAML CONFIGS ## ===================================================
-config_name = "Lenet_exp_loss_configs.yml"
-# Load the config file - contains list of dictionaries
-with open(config_name, 'r') as f:
-    configs = yaml.safe_load(f)
-# # Iterate through each configuration and print its keys
-# for config in configs:
-#     print(config.keys())
-config_num = args.config_num
-if config_num is None:
-    config_num = 0
-config = configs[config_num]
-
-@torch.no_grad()
-def evaluate(model, dataset, batch_size, max_ex=0):
-    """Evaluate model accuracy on dataset."""
-    acc = 0
-    for i, (features, labels) in enumerate(dataset):
-        labels = labels.to(device)
-        features = features.to(device)
-        # Batch size in length, varying from 0 to 1
-        scores = nn.functional.softmax(model(features.to(device)), dim=1)
-        _, pred = torch.max(scores, 1)
-        # Save to pred 
-        acc += torch.sum(torch.eq(pred, labels)).item()
-        if max_ex != 0 and i >= max_ex:
-            break
-    # Return average accuracy as a percentage
-    # Fraction of data points correctly classified
-    return (acc*100 / ((i+1)*batch_size))
-
-def weight_reset(model):
-    """Reset weights of model at start of training."""
-    for layer in model.modules():
-        if hasattr(layer, 'reset_parameters'):
-            layer.reset_parameters()
-
-# Instantiate losses
-kl_loss = nn.KLDivLoss(reduction='batchmean', log_target=True)
-ce_loss = nn.CrossEntropyLoss(reduction='mean')
-mse_loss = nn.MSELoss(reduction='mean')
-
-def base_distill_loss(scores, targets, temp):
-    scores = scores/temp
-    targets = F.softmax(targets/temp).argmax(dim=1)
-    return ce_loss(scores, targets)
-
-def train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, ranbox_test_loader, lr, final_lr, temp, epochs, repeats, loss_num, alpha=None):
-    """Train student model with distillation loss.
-    
-    Includes LR scheduling. Change loss function as required. 
-    N.B. I need to refator this at some point.
-    """
-    for _ in range(repeats):
-        optimizer = optim.SGD(student.parameters(), lr=lr)
-        scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
-        it = 0
-        train_acc = []
-        test_acc = []
-        train_loss = []  # loss at iteration 0
-        weight_reset(student)
-
-        for epoch in range(epochs):
-            for inputs, labels in tqdm(train_loader):
-                inputs = inputs.to(device)
-                inputs.requires_grad = True
-                labels = labels.to(device)
-                scores = student(inputs)
-                targets = teacher(inputs)
-
-                input_dim = 32*32*3
-                output_dim = scores.shape[1]
-                batch_size = inputs.shape[0]
-
-                # for param in student.parameters():
-                #     assert param.requires_grad
-                match loss_num:
-                    case 0: # Base distillation loss
-                        loss = base_distill_loss(scores, targets, temp)
-                    case 1: # Jacobian loss
-                        input_dim = 32*32*3
-                        output_dim = scores.shape[1]
-                        batch_size = inputs.shape[0]
-                        loss = jacobian_loss(scores, targets, inputs, T=1, alpha=1, batch_size=batch_size, loss_fn=mse_loss, input_dim=input_dim, output_dim=output_dim)
-                    case 2: # Feature map loss - currently only for self-distillation
-                        layer = 'feature_extractor.10'
-                        s_map = student.attention_map(inputs, layer)
-                        t_map = teacher.attention_map(inputs, layer).detach()
-                        loss = feature_map_diff(scores, targets, s_map, t_map, T=1, alpha=0.2, loss_fn=mse_loss, aggregate_chan=False)
-                    case 3: # Attention Jacobian loss
-                        loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, T=1, alpha=0.8, loss_fn=kl_loss)
-
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                scheduler.step()
-                lr = scheduler.get_lr()
-                train_loss.append(loss.detach().cpu().numpy())
-
-                # if it == 0:
-                #     # Check that model is training correctly
-                #     for param in student.parameters():
-                #         assert param.grad is not None
-                if it % 100 == 0:
-                    batch_size = inputs.shape[0]
-                    train_acc.append(evaluate(student, train_loader, batch_size, max_ex=100))
-                    test_acc.append(evaluate(student, test_loader, batch_size))
-                    plain_acc = evaluate(student, plain_test_loader, batch_size)
-                    box_acc = evaluate(student, box_test_loader, batch_size)
-                    randbox_acc = evaluate(student, ranbox_test_loader, batch_size)
-                    teacher_test_acc = evaluate(teacher, test_loader, batch_size)
-                    error = teacher_test_acc - test_acc[-1]
-                    print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch, "Loss: ", train_loss[-1])
-                    print("Project {}, LR {}, temp {}".format(project, lr, temp))
-                    wandb.log({"Student-teacher error": error, "Student train accuracy": train_acc[-1], "Student test accuracy": test_acc[-1], "Student plain test accuracy": plain_acc, "Student box test accuracy": box_acc, "student randomised box test acc": randbox_acc, "Student loss": train_loss[-1], 'Student LR': lr})
-                it += 1
+if args.config_name:
+    config_name = args.config_name
+    # Load the config file - contains list of dictionaries
+    with open(config_name, 'r') as f:
+        configs = yaml.safe_load(f)
+    # # Iterate through each configuration and print its keys
+    # for config in configs:
+    #     print(config.keys())
+    config_num = args.config_num
+    if config_num is None:
+        config_num = 0
+    config = configs[config_num]
 
 def sweep():
     """Main function for sweep."""
@@ -197,7 +92,7 @@ def sweep():
     test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
     # Train
-    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, alpha=alpha)
+    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, project, alpha=alpha)
 
 # Semi-automated setup params
 is_sweep = args.sweep
@@ -247,6 +142,8 @@ sweep_configuration = {
 match STUDENT_NUM:
     case 0:
         student = LeNet5(10).to(device)
+    case 1:
+        student = ResNet50_CIFAR(10).to(device)
 
 # Teacher model setup (change only if adding to dicts above)
 teacher_name = teacher_dict[TEACH_NUM]
@@ -296,7 +193,7 @@ if __name__ == "__main__":
                 "spurious type": exp_dict[EXP_NUM],
             }   
         )
-        # wandb.config.tags = 'alpha='+str(alpha)
+        wandb.config.tags = "spurious_corr="+str(spurious_corr)
         wandb.config.spurious_corr = 'spurious_corr' + str(spurious_corr)
 
     randomize_loc = False
@@ -323,4 +220,4 @@ if __name__ == "__main__":
     test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
     # Train
-    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, alpha=alpha)
+    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, project, alpha=alpha)

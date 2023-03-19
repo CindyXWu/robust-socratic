@@ -12,6 +12,7 @@ from feature_match import *
 from utils_ekdeep import *
 from info_dictionaries import * 
 from train_utils import *
+from shapes_3D import *
 
 # Suppress warnings "divide by zero" produced by NaN gradients
 import warnings
@@ -26,6 +27,8 @@ if not os.path.exists(output_dir):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # print(f"Using {device} device")
 
+shapes_dataloader = dataloader_3D_shapes('train', 1)
+
 def sweep_teacher():
     wandb.init(
         # set the wandb project where this run will be logged
@@ -33,10 +36,10 @@ def sweep_teacher():
         # track hyperparameters and run metadata
         config={
             "name": sweep_name,
-            "teacher": teacher_dict[TEACH_NUM],
+            "teacher": s_teacher_dict[TEACH_NUM],
             "dataset": "CIFAR-100",
             "batch_size": batch_size,
-            "experiment": exp_dict[EXP_NUM],
+            "experiment": s_exp_dict[EXP_NUM],
             }
     )
 
@@ -44,43 +47,28 @@ def sweep_teacher():
     final_lr = wandb.config.final_lr
     epochs = wandb.config.epochs
 
-    name = exp_dict[EXP_NUM]
-    randomize_loc = False
-    spurious_corr = 1
-    match EXP_NUM:
-        case 0:
-            spurious_type = 'plain'
-        case 1:
-            spurious_type = 'box'
-        case 2: 
-            spurious_type = 'box'
-            randomize_loc = True
-        case 3:
-            spurious_type = 'box'
-            spurious_corr = 0.5
-        case 4:
-            spurious_type = 'box'
-            randomize_loc = True
-            spurious_corr = 0.5
+    # match EXP_NUM:
 
     # Dataloaders
-    train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
-    test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+    train_loader = dataloader_3D_shapes('train', batch_size)
+    test_loader = dataloader_3D_shapes('test', batch_size)
 
     # Fine-tune or train teacher from scratch
-    train_teacher(teacher, train_loader, test_loader, lr, final_lr, project, TEACH_NUM, EXP_NUM, epochs)
+    train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, project, TEACH_NUM, EXP_NUM)
 
 # SETUP PARAMS - CHANGE THESE
 #================================================================================
+# Refer to dictionaries s_exp_num, aug_dict, s_teach_num in info_dictionaries.py
 #================================================================================
 is_sweep = False
-TEACH_NUM = 3
+TEACH_NUM = 2
 EXP_NUM = 0
+AUG_NUM = 0
 
 # Hyperparams
 lr = 0.1
-final_lr = 0.05
-epochs = 5
+final_lr = 0.01
+epochs = 100
 batch_size = 64
 dims = [32, 32]
 
@@ -104,25 +92,15 @@ sweep_configuration = {
 #==============================================================================
 #==============================================================================
 # Teacher model setup (change only if adding to dicts above)
-teacher_name = teacher_dict[TEACH_NUM]
 match TEACH_NUM:
     case 0:
-        teacher = LeNet5(10).to(device)
-        base_dataset = 'CIFAR10'
+        teacher = ResNet18_3Dshapes(12).to(device)
     case 1:
-        teacher = ResNet50_CIFAR(10).to(device)
-        base_dataset = 'CIFAR10'
+        teacher = ResNet18_3Dshapes(12).to(device)
     case 2:
-        teacher = ResNet18_CIFAR(10).to(device)
-        base_dataset = 'CIFAR10'
-    case 3:
-        teacher = ResNet18_CIFAR(100).to(device)
-        base_dataset = 'CIFAR100'
-    case 4:
-        teacher = ResNet50_CIFAR(100).to(device)
-        base_dataset = 'CIFAR100'
+        teacher = CustomResNet18(12).to(device)
 
-project = teacher_name+"_"+exp_dict[EXP_NUM]
+project = s_teacher_dict[TEACH_NUM]+"_"+s_exp_dict[EXP_NUM]
 
 if __name__ == "__main__":
     if is_sweep:
@@ -138,35 +116,20 @@ if __name__ == "__main__":
             # track hyperparameters and run metadata
             config={
                 "learning_rate": lr,
-                "dataset": base_dataset,
+                "dataset": '3D shapes',
                 "epochs": epochs,
                 "batch_size": batch_size,
-                "spurious type": exp_dict[EXP_NUM]
+                "spurious type": exp_dict[EXP_NUM],
+                "Augmentation": aug_dict[AUG_NUM]
             }   
         )
 
-        name = exp_dict[EXP_NUM]
-        randomize_loc = False
-        spurious_corr = 1
-        match EXP_NUM:
-            case 0:
-                spurious_type = 'plain'
-            case 1:
-                spurious_type = 'box'
-            case 2: 
-                spurious_type = 'box'
-                randomize_loc = True
-            case 3:
-                spurious_type = 'box'
-                spurious_corr = 0.5
-            case 4:
-                spurious_type = 'box'
-                randomize_loc = True
-                spurious_corr = 0.5
+        # match EXP_NUM:
+        # Todo: add different spurious correlation experiments
 
         # Dataloaders
-        train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
-        test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+        train_loader = dataloader_3D_shapes('train', batch_size)
+        test_loader = dataloader_3D_shapes('test', batch_size)
 
         # Fine-tune or train teacher from scratch
         train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, project, TEACH_NUM, EXP_NUM, save=True)

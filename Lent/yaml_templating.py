@@ -21,7 +21,7 @@ loss_num: {{ loss_num }}
 
 experiments = []
 for exp_num in experiment_nums:
-    experiments.append({'experiment_num': exp_num,'teacher_num': teacher_num})
+    experiments.append({'experiment_nu100m': exp_num,'teacher_num': teacher_num})
 
 with open(filename, "w") as f:
     yaml.dump(experiments, f)
