@@ -25,8 +25,7 @@ class ContrastiveRep(nn.Module):
         self.embed_t = Embed(dim_in=t_dim, dim_out=e_dim)
         self.criterion_t = ContrastLoss(n_data)
         self.criterion_s = ContrastLoss(n_data)
-        self.T = T
-    
+
     def forward(self, f_s, f_t, idx, contrast_idx=None):
         """
         Args:

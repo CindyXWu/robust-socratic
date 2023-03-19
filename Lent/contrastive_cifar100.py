@@ -198,4 +198,14 @@ def get_cifar100_dataloaders_sample(batch_size=128, num_workers=8, k=4096, mode=
     return train_loader, test_loader, n_data
 
 if __name__ == "__main__":
-    dataloader = get_cifar100_dataloaders_sample(batch_size=64, num_workers=1, k=4096, mode='exact')
+    train_loader, test_loader, n_data = get_cifar100_dataloaders_sample(batch_size=64, num_workers=1, k=4096, mode='exact')
+    # Inspect the first batch of the train DataLoader
+    for i, (images, targets, indices, sample_idx) in enumerate(train_loader):
+        print("Batch", i+1)
+        print("Images:", images.shape)
+        print("Targets:", targets)
+        print("Indices:", indices)
+        print("Indices size:", indices.shape)
+        print("Sample Indices:", sample_idx)
+        print("Sample Indices size:", sample_idx.shape)
+        break  # Only print the first batch

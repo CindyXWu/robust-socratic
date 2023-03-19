@@ -2,6 +2,8 @@ import torch
 from torch import nn
 from contrast_memory import *
 
+eps = 1e-7
+
 class CRDLoss(nn.Module):
     """CRD Loss function
     includes two symmetric parts:

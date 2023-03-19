@@ -2,17 +2,16 @@ from jinja2 import Template
 import os
 import yaml
 
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 # Templating for initial sweeps over loss function and teacher training type for teacher being LeNet5 only
 exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
 student_dict = {0: "LeNet5_CIFAR10"}
 teacher_dict = {0: "LeNet5_CIFAR10", 1: "ResNet50_CIFAR10", 2: "ResNet18_CIFAR10"}
 loss_dict  = {0: "Base Distillation", 1: "Jacobian", 2: "Feature Map", 3: "Attention Jacobian"}
 
-# Create a directory for your configuration files (if it doesn't already exist)
-if not os.path.exists("configs"):
-    os.makedirs("configs")
 # Define the filename for your configuration file
-filename = "configs/LeNet_exp_loss_configs.yml"
+filename = "LeNet_exp_loss_configs.yml"
 
 
 template = Template("""

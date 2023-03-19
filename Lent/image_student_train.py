@@ -24,36 +24,33 @@ warnings.filterwarnings("ignore")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # print(f"Using {device} device")
 
-## ARGPARSE ## ============================================================
-# Add boolean flag for whether to use config file and sweep
-parser = argparse.ArgumentParser()
-# # Default config
-# parser.add_argument("--config", type=bool, default=True)
-# Default sweep
-parser.add_argument("--config_name", type=str, default=None)
-parser.add_argument("--sweep", type=bool, default=True)
-args = parser.parse_args()
-
-## OPEN YAML CONFIGS ## ===================================================
-config_name = "Lenet_exp_loss_configs.yml"
-if args.config_name:
-    config_name = args.config_name
-# # Go up one level with messy os code
-# parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# file_name = os.path.join(os.path.join(parent_dir, 'configs'), filename)
-# Better code - using pathlib
-file_name = Path(__file__).resolve().parent.parent / "configs" / config_name
-
-# Load the config file
-with open(file_name, 'r') as f:
-    configs = yaml.safe_load(f)[0]
-print(configs)
-
 output_dir = "Image_Experiments/"   # Directory to store and load models from
 # Change directory to one this file is in
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
+
+## ARGPARSE ## ============================================================
+# Add boolean flag for whether to use config file and sweep
+parser = argparse.ArgumentParser()
+parser.add_argument("--config_name", type=str, default=None)
+# Indexes into list of dictionaries for config file
+parser.add_argument('--config_num', type=int, help='Index of the configuration to use')
+parser.add_argument("--sweep", type=bool, default=True)
+args = parser.parse_args()
+
+## OPEN YAML CONFIGS ## ===================================================
+config_name = "Lenet_exp_loss_configs.yml"
+# Load the config file - contains list of dictionaries
+with open(config_name, 'r') as f:
+    configs = yaml.safe_load(f)
+# # Iterate through each configuration and print its keys
+# for config in configs:
+#     print(config.keys())
+config_num = args.config_num
+if config_num is None:
+    config_num = 0
+config = configs[config_num]
 
 @torch.no_grad()
 def evaluate(model, dataset, batch_size, max_ex=0):
@@ -211,10 +208,10 @@ STUDENT_NUM = 0
 TEACH_NUM = 0
 LOSS_NUM = 1
 if args.config_name:
-    EXP_NUM = configs['experiment_num']
-    STUDENT_NUM = configs['student_num']
-    TEACH_NUM = configs['teacher_num']
-    LOSS_NUM = configs['loss_num']
+    EXP_NUM = config['experiment_num']
+    STUDENT_NUM = config['student_num']
+    TEACH_NUM = config['teacher_num']
+    LOSS_NUM = config['loss_num']
 project = exp_dict[EXP_NUM]+"_"+teacher_dict[TEACH_NUM]+"_"+student_dict[STUDENT_NUM] + "_" + loss_dict[LOSS_NUM]
 
 # SETUP PARAMS REQUIRING MANUAL INPUT
@@ -320,7 +317,7 @@ if __name__ == "__main__":
             spurious_corr = 0.5
     
     # Set wandb config for grouping
-    wandb.config.tags = 'alpha='+str(alpha) + ", spurious corr="+str(spurious_corr)
+    wandb.config.tags = "spurious_corr="+str(spurious_corr)
 
     train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
     test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)

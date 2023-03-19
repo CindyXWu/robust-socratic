@@ -80,14 +80,18 @@ CMD="$application $options"
 
 #! Additional commands to be run before the application:
 # Define the configurations to use
-config_file="configs.yaml"
+config_file="Lenet_exp_loss_configs.yml"
 config_data=$(python -c "import yaml; print(yaml.safe_load(open('$config_file')))")
 configs=($(python -c "import yaml; print(' '.join(yaml.safe_dump($config_data).splitlines()))"))
 
+# Define the number of configurations
+num_configs=${#configs[@]}
+
 # Loop through each configuration and run the Python script
-for config in "${configs[@]}"
+for ((i=0; i<$num_configs; i++))
 do
-  CMD="$application --config \"$config\""
+  echo "Running configuration $i"
+  CMD="$application --config_num $i"
   echo "Running command: $CMD"
   eval $CMD
 done
