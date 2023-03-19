@@ -12,7 +12,7 @@
 #! Name of the job:
 #SBATCH -J teacher-training
 #! Which project should be charged (NB Wilkes2 projects end in '-GPU'):
-#SBATCH -A KRUEGER-SL3-GPU
+#SBATCH -A KRUEGER-SL2-GPU
 #! How many whole nodes should be allocated?
 #SBATCH --nodes=1
 #! How many (MPI) tasks will there be in total?
@@ -22,7 +22,7 @@
 #! Note that the job submission script will enforce no more than 32 cpus per GPU.
 #SBATCH --gres=gpu:4
 #! How much wallclock time will be required?
-#SBATCH --time=12:00:00
+#SBATCH --time=36:00:00
 #! What types of email messages do you wish to receive?
 #SBATCH --mail-type=NONE
 #! Uncomment this to prevent the job from being requeued (e.g. if
@@ -82,8 +82,6 @@ CMD="$application $options"
 # Define the configurations to use
 config_file=$CONFIG_FILE
 i = $IDX
-config_data=$(python -c "import yaml; print(yaml.safe_load(open('$config_file')))")
-configs=($(python -c "import yaml; print(' '.join(yaml.safe_dump($config_data).splitlines()))"))
 CMD="$application --config_num $i --config_name $config_file"
 eval $CMD
 
