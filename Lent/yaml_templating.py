@@ -5,9 +5,9 @@ import yaml
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Define the filename for your configuration file
-filename = "teacher.yaml"
+filename = "cifar_teacher.yaml"
 experiment_nums = [0, 1, 2]
-teacher_num = 0
+teacher_nums = [2, 3, 4]
 
 # Templating for initial sweeps over loss function and teacher training type for teacher being LeNet5 only
 exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}
@@ -21,7 +21,8 @@ loss_num: {{ loss_num }}
 
 experiments = []
 for exp_num in experiment_nums:
-    experiments.append({'experiment_nu100m': exp_num,'teacher_num': teacher_num})
+    for t_num in teacher_nums:
+        experiments.append({'experiment_num': exp_num,'teacher_num': t_num})
 
 with open(filename, "w") as f:
     yaml.dump(experiments, f)
