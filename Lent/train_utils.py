@@ -10,7 +10,7 @@ from jacobian_srinivas import *
 from contrastive import *
 from feature_match import *
 from utils_ekdeep import *
-from info_dictionaries import * 
+from info_dicts import * 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # print(f"Using {device} device")
@@ -164,6 +164,6 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                     error = teacher_test_acc - test_acc[-1]
                     print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch, "Loss: ", train_loss[-1])
                     print("Project {}, LR {}, temp {}".format(project, lr, temp))
-                    wandb.log({"Student-teacher error": error, "Student train accuracy": train_acc[-1], "Student test accuracy": test_acc[-1], "Student plain test accuracy": plain_acc, "Student box test accuracy": box_acc, "student randomised box test acc": randbox_acc, "Student loss": train_loss[-1], 'Student LR': lr})
+                    wandb.log({"Student-teacher error": error, "Student train accuracy": train_acc[-1], "Student test accuracy": test_acc[-1], "Student plain test accuracy": plain_acc, "Student box test accuracy": box_acc, "Student randomised box test accuracy": randbox_acc, "Student loss": train_loss[-1], 'Student LR': lr})
                 it += 1
                 
