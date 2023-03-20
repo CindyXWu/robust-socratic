@@ -103,8 +103,8 @@ project = exp_dict[EXP_NUM]+"_"+teacher_dict[TEACH_NUM]+"_"+student_dict[STUDENT
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
 # ======================================================================================
-lr = 0.3
-final_lr = 0.05
+lr = 0.5
+final_lr = 0.1
 temp = 30
 epochs = 7
 alpha = 1 # Fraction of other distillation losses (1-alpha for distillation loss)

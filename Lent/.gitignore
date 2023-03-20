@@ -7,3 +7,7 @@ data/
 *.swp
 
 3dshapes.h5
+
+machine.*
+
+*.out
