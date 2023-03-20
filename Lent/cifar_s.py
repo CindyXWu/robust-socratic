@@ -106,14 +106,13 @@ project = exp_dict[EXP_NUM]+"_"+teacher_dict[TEACH_NUM]+"_"+student_dict[STUDENT
 lr = 0.5
 final_lr = 0.1
 temp = 30
-epochs = 7
+epochs = 10
 alpha = 1 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 sweep_method = 'grid'
 sweep_count = 7
 sweep_name = strftime("%m-%d %H:%M:%S", gmtime())
 e_dim = 50 # embedding size for contrastive loss
-repeats = 1 # I don't think I will use this - repeats will be done by calling this script multiple times
 spurious_corr = 1.0
 
 sweep_configuration = {
@@ -122,7 +121,7 @@ sweep_configuration = {
     'metric': {'goal': 'maximize', 'name': 'student test acc'},
     # CHANGE THESE
     'parameters': {
-        'spurious_corr': {'values': [0.5, 0.6, 0.7, 0.8, 0.9, 1]}, # For grid search
+        'spurious_corr': {'values': [0, 0.5, 0.6, 0.7, 0.8, 0.9, 1]}, # For grid search
         # 'alpha': {'distribution': 'uniform', 'min': 0, 'max': 1}, # For bayes search
     },
     # 'early_terminate': {'type': 'hyperband', 'min_iter': 5}
