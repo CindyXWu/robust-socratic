@@ -2,7 +2,7 @@
 
 #! sbatch directives begin here ###############################
 #! Name of the job:
-#SBATCH -J teacher-training
+#SBATCH -J t-shapes
 #! Which project should be charged (NB Wilkes2 projects end in '-GPU'):
 #SBATCH -A KRUEGER-SL2-GPU
 #! How many whole nodes should be allocated?
