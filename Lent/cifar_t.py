@@ -92,15 +92,15 @@ def sweep_teacher():
 #================================================================================
 #================================================================================
 is_sweep = False
-TEACH_NUM = 4
-EXP_NUM = 2
+TEACH_NUM = 3
+EXP_NUM = 1
 if args.config_name:
     EXP_NUM = config['experiment_num']
     TEACH_NUM = config['teacher_num']
 # Hyperparams
-lr = 0.3
-final_lr = 0.1
-epochs = 10
+lr = 0.1
+final_lr = 0.05
+epochs = 7
 batch_size = 64
 
 sweep_count = 10

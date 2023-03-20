@@ -61,7 +61,8 @@ def sweep():
     # alpha = wandb.config.alpha
     # wandb.config.tags = 'alpha='+str(alpha)
     spurious_corr = wandb.config.spurious_corr
-    wandb.config.tags = 'spurious_corr='+str(spurious_corr)
+    wandb.config.spurious_corr = 'spurious_corr='+str(spurious_corr)
+    wandb.config.s_exp = exp_dict[S_EXP_NUM]
 
     randomize_loc = False
     match EXP_NUM:
@@ -89,16 +90,17 @@ def sweep():
 
 # Semi-automated setup params
 is_sweep = args.sweep
-EXP_NUM = 1
+T_EXP_NUM = 1
+S_EXP_NUM = 1
 STUDENT_NUM = 0
 TEACH_NUM = 0
 LOSS_NUM = 1
 if args.config_name:
-    EXP_NUM = config['experiment_num']
+    T_EXP_NUM = config['t_exp_num']
     STUDENT_NUM = config['student_num']
     TEACH_NUM = config['teacher_num']
     LOSS_NUM = config['loss_num']
-project = exp_dict[EXP_NUM]+"_"+teacher_dict[TEACH_NUM]+"_"+student_dict[STUDENT_NUM] + "_" + loss_dict[LOSS_NUM]
+    S_EXP_NUM = config['s_exp_num']
 
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
@@ -127,14 +129,15 @@ sweep_configuration = {
     # 'early_terminate': {'type': 'hyperband', 'min_iter': 5}
 }
 #================================================================================
-
+project = "Student"
 # Student model setup (change only if adding to dicts above)
 match STUDENT_NUM:
     case 0:
         student = LeNet5(10).to(device)
     case 1:
-        student = ResNet50_CIFAR(10).to(device)
-
+        student = ResNet18_CIFAR(100).to(device)
+    case 2:
+        student = CustomResNet18(100).to(device)
 # Teacher model setup (change only if adding to dicts above)
 teacher_name = teacher_dict[TEACH_NUM]
 load_path = "Image_Experiments/teacher_"+teacher_name
@@ -183,7 +186,9 @@ if __name__ == "__main__":
                 "spurious type": exp_dict[EXP_NUM],
             }   
         )
-        wandb.config.tags = "spurious_corr="+str(spurious_corr)
+        wandb.config.student = student_dict[STUDENT_NUM]
+        wandb.config.teacher = teacher_dict[TEACHER_NUM]
+        wandb.config.teacher_dataset = 
         wandb.config.spurious_corr = 'spurious_corr' + str(spurious_corr)
 
     randomize_loc = False

@@ -77,7 +77,7 @@ def sweep_teacher():
 # Refer to dictionaries s_exp_num, aug_dict, s_teach_num in info_dictionaries.py
 #================================================================================
 is_sweep = False
-TEACH_NUM = 2
+TEACH_NUM = 0
 EXP_NUM = 0
 AUG_NUM = 0
 if args.config_name:
@@ -107,7 +107,7 @@ sweep_configuration = {
 }
 
 #==============================================================================
-
+project = "Teacher"
 # Teacher model setup (change only if adding to dicts above)
 match TEACH_NUM:
     case 0:
@@ -118,8 +118,6 @@ match TEACH_NUM:
         teacher = CustomResNet18(12).to(device)
     case 3:
         teacher = CustomResNet50(12).to(device)
-
-project = s_teacher_dict[TEACH_NUM]+"_"+s_exp_dict[EXP_NUM]
 
 if __name__ == "__main__":
     if is_sweep:
@@ -134,15 +132,19 @@ if __name__ == "__main__":
             project=project,
             # track hyperparameters and run metadata
             config={
-                "learning_rate": lr,
+                "LR": lr,
+                "final LR": final_lr,
                 "dataset": '3D shapes',
                 "epochs": epochs,
                 "batch_size": batch_size,
-                "spurious type": exp_dict[EXP_NUM],
+                "spurious type": s_exp_dict[EXP_NUM],
                 "Augmentation": aug_dict[AUG_NUM]
             }   
         )
-
+        wandb.config.base_dataset = "3D Shapes"
+        wandb.config.augmentation = aug_dict[AUG_NUM]
+        wandb.config.teacher = s_teacher_dict[TEACH_NUM]
+        wandb.config.teacher_mechanism = s_exp_dict[EXP_NUM]
         # match EXP_NUM:
         # Todo: add different spurious correlation experiments
 
