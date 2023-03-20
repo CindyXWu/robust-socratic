@@ -5,9 +5,9 @@ import yaml
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Define the filename for your configuration file
-filename = "cifar_teacher.yml"
-experiment_nums = [0, 1, 2]
-teacher_nums = [2, 3, 4]
+filename = "shapes_t.yml"
+experiment_nums = [0]
+teacher_nums = [0, 1, 2, 3]
 
 # Templating for initial sweeps over loss function and teacher training type for teacher being LeNet5 only
 exp_dict = {0: 'plain', 1: 'box', 2: 'box_random', 3: 'box_half', 4: 'box_random_half'}

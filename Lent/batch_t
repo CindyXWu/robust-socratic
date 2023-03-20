@@ -47,7 +47,7 @@ source .bashrc
 #! Insert additional module load commands after this line if needed:
 
 #! Full path to application executable: 
-application="python cifar_teacher_train.py"
+application="python cifar_t.py"
 
 #! Run options for the application:
 options=""

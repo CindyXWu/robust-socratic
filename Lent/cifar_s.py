@@ -12,7 +12,7 @@ from contrastive import *
 from feature_match import *
 from utils_ekdeep import *
 from image_utils import *
-from info_dictionaries import *
+from info_dicts import *
 from train_utils import *
 
 # Suppress warnings "divide by zero" produced by NaN gradients
@@ -109,7 +109,6 @@ temp = 30
 epochs = 7
 alpha = 1 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
-dims = [32, 32]
 sweep_method = 'grid'
 sweep_count = 7
 sweep_name = strftime("%m-%d %H:%M:%S", gmtime())
