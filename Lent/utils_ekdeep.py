@@ -306,7 +306,7 @@ def get_dataloader(load_type='train', base_dataset='CIFAR10', spurious_type='pla
     # define base dataset (pick train or test)
     dset_type = getattr(torchvision.datasets, base_dataset)
     dset = dset_type(root=f'{data_dir}/{base_dataset.lower()}', 
-                     train=is_train, download=True, transform=transform)
+                     train=is_train, download=False, transform=transform)
 
     # pick normal vs. spurious
     if (spurious_type == 'plain'):

@@ -56,12 +56,17 @@ def sweep_teacher():
             "dataset": "CIFAR-100",
             "batch_size": batch_size,
             "experiment": s_exp_dict[EXP_NUM],
-            }
+            },
+        name=run_name
     )
 
     lr = wandb.config.lr
     final_lr = wandb.config.final_lr
     epochs = wandb.config.epochs
+    wandb.config.base_dataset = "3D Shapes"
+    wandb.config.augmentation = aug_dict[AUG_NUM]
+    wandb.config.teacher = s_teacher_dict[TEACH_NUM]
+    wandb.config.teacher_mechanism = s_exp_dict[EXP_NUM]
 
     # match EXP_NUM:
 
@@ -70,7 +75,7 @@ def sweep_teacher():
     test_loader = dataloader_3D_shapes('test', batch_size)
 
     # Fine-tune or train teacher from scratch
-    train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, project, TEACH_NUM, EXP_NUM)
+    train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM)
 
 # SETUP PARAMS - CHANGE THESE
 #================================================================================
@@ -80,6 +85,7 @@ is_sweep = False
 TEACH_NUM = 0
 EXP_NUM = 0
 AUG_NUM = 0
+run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]
 if args.config_name:
     EXP_NUM = config['experiment_num']
     TEACH_NUM = config['teacher_num']
@@ -107,8 +113,9 @@ sweep_configuration = {
 }
 
 #==============================================================================
-project = "Teacher"
+#==============================================================================
 # Teacher model setup (change only if adding to dicts above)
+project = "Teacher"
 match TEACH_NUM:
     case 0:
         teacher = ResNet18_3Dshapes(12).to(device)
@@ -139,7 +146,8 @@ if __name__ == "__main__":
                 "batch_size": batch_size,
                 "spurious type": s_exp_dict[EXP_NUM],
                 "Augmentation": aug_dict[AUG_NUM]
-            }   
+            },
+            name = run_name
         )
         wandb.config.base_dataset = "3D Shapes"
         wandb.config.augmentation = aug_dict[AUG_NUM]
@@ -153,4 +161,4 @@ if __name__ == "__main__":
         test_loader = dataloader_3D_shapes('test', batch_size)
 
         # Fine-tune or train teacher from scratch
-        train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, project, TEACH_NUM, EXP_NUM, save=True)
+        train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM, save=True)

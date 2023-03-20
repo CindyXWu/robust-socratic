@@ -56,16 +56,22 @@ def sweep():
             "lr": lr,
             "final_lr": final_lr,
             "temp": temp,
-            }
+            },
+        name = run_name,
     )
     # alpha = wandb.config.alpha
     # wandb.config.tags = 'alpha='+str(alpha)
     spurious_corr = wandb.config.spurious_corr
+    wandb.config.base_dataset = base_dataset
     wandb.config.spurious_corr = 'spurious_corr='+str(spurious_corr)
-    wandb.config.s_exp = exp_dict[S_EXP_NUM]
+    wandb.config.student_mechanism = exp_dict[S_EXP_NUM]
+    wandb.config.teacher_mechanism = exp_dict[T_EXP_NUM]
+    wandb.config.teacher = teacher_dict[TEACH_NUM]
+    wandb.config.student = student_dict[STUDENT_NUM]
+    wandb.config.loss = loss_dict[LOSS_NUM]
 
     randomize_loc = False
-    match EXP_NUM:
+    match S_EXP_NUM:
         case 0:
             spurious_type = 'plain'
         case 1:
@@ -73,35 +79,31 @@ def sweep():
         case 2: 
             spurious_type = 'box'
             randomize_loc = True
-        case 3:
-            spurious_type = 'box'
-            spurious_corr = 0.5
-        case 4:
-            spurious_type = 'box'
-            randomize_loc = True
-            spurious_corr = 0.5
 
     # Dataloaders
     train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
     test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
     # Train
-    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, project, alpha=alpha)
+    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, run_name, alpha=alpha)
 
 # Semi-automated setup params
 is_sweep = args.sweep
-T_EXP_NUM = 1
-S_EXP_NUM = 1
-STUDENT_NUM = 0
-TEACH_NUM = 0
-LOSS_NUM = 1
+T_EXP_NUM = 0
+S_EXP_NUM = 0
+STUDENT_NUM = 2
+TEACH_NUM = 3
+LOSS_NUM = 0
+AUG_NUM = 0
 if args.config_name:
     T_EXP_NUM = config['t_exp_num']
     STUDENT_NUM = config['student_num']
     TEACH_NUM = config['teacher_num']
     LOSS_NUM = config['loss_num']
     S_EXP_NUM = config['s_exp_num']
-
+## WANDB PROJECT NAME
+project = "Student"
+run_name = "teacher: "+teacher_dict[TEACH_NUM]+', student: '+student_dict[STUDENT_NUM]+', student mechanism:'+exp_dict[S_EXP_NUM]+', teacher mechanism:'+exp_dict[T_EXP_NUM]+', loss: '+loss_dict[LOSS_NUM]+", aug: "+aug_dict[AUG_NUM]
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
 # ======================================================================================
@@ -111,11 +113,12 @@ temp = 30
 epochs = 10
 alpha = 1 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
+e_dim = 50 # embedding size for contrastive loss
+spurious_corr = 1.0
+
 sweep_method = 'grid'
 sweep_count = 7
 sweep_name = strftime("%m-%d %H:%M:%S", gmtime())
-e_dim = 50 # embedding size for contrastive loss
-spurious_corr = 1.0
 
 sweep_configuration = {
     'method': sweep_method,
@@ -129,7 +132,7 @@ sweep_configuration = {
     # 'early_terminate': {'type': 'hyperband', 'min_iter': 5}
 }
 #================================================================================
-project = "Student"
+
 # Student model setup (change only if adding to dicts above)
 match STUDENT_NUM:
     case 0:
@@ -157,10 +160,9 @@ match TEACH_NUM:
     case 4:
         teacher = ResNet50_CIFAR(100).to(device)
         base_dataset = 'CIFAR100'
-
         
 # Load saved teacher model (change only if changing file locations)
-load_name = "Image_Experiments/teacher_"+teacher_name+"_"+exp_dict[EXP_NUM]
+load_name = "Image_Experiments/teacher_"+teacher_name+"_"+exp_dict[T_EXP_NUM]
 checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
 
@@ -183,16 +185,12 @@ if __name__ == "__main__":
                 "epochs": epochs,
                 "temp": temp,
                 "batch_size": batch_size,
-                "spurious type": exp_dict[EXP_NUM],
-            }   
+            },
+            name = run_name
         )
-        wandb.config.student = student_dict[STUDENT_NUM]
-        wandb.config.teacher = teacher_dict[TEACHER_NUM]
-        wandb.config.teacher_dataset = 
-        wandb.config.spurious_corr = 'spurious_corr' + str(spurious_corr)
 
     randomize_loc = False
-    match EXP_NUM:
+    match S_EXP_NUM:
         case 0:
             spurious_type = 'plain'
         case 1:
@@ -200,19 +198,17 @@ if __name__ == "__main__":
         case 2: 
             spurious_type = 'box'
             randomize_loc = True
-        case 3:
-            spurious_type = 'box'
-            spurious_corr = 0.5
-        case 4:
-            spurious_type = 'box'
-            randomize_loc = True
-            spurious_corr = 0.5
-    
-    # Set wandb config for grouping
-    wandb.config.tags = "spurious_corr="+str(spurious_corr)
 
+    wandb.config.base_dataset = base_dataset
+    wandb.config.spurious_corr = 'spurious_corr='+str(spurious_corr)
+    wandb.config.student_mechanism = exp_dict[S_EXP_NUM]
+    wandb.config.teacher_mechanism = exp_dict[T_EXP_NUM]
+    wandb.config.teacher = teacher_dict[TEACH_NUM]
+    wandb.config.student = student_dict[STUDENT_NUM]
+    wandb.config.loss = loss_dict[LOSS_NUM]
+    
     train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
     test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
     # Train
-    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, project, alpha=alpha)
+    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, run_name, alpha=alpha)

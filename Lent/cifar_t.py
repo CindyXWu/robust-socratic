@@ -55,14 +55,14 @@ def sweep_teacher():
             "dataset": "CIFAR-100",
             "batch_size": batch_size,
             "experiment": exp_dict[EXP_NUM],
-            }
+            },
+        name=run_name
     )
 
     lr = wandb.config.lr
     final_lr = wandb.config.final_lr
     epochs = wandb.config.epochs
 
-    name = exp_dict[EXP_NUM]
     randomize_loc = False
     spurious_corr = 1
     match EXP_NUM:
@@ -73,30 +73,31 @@ def sweep_teacher():
         case 2: 
             spurious_type = 'box'
             randomize_loc = True
-        case 3:
-            spurious_type = 'box'
-            spurious_corr = 0.5
-        case 4:
-            spurious_type = 'box'
-            randomize_loc = True
-            spurious_corr = 0.5
 
+    wandb.config.base_dataset = base_dataset
+    wandb.config.augmentation = aug_dict[AUG_NUM]
+    wandb.config.teacher = teacher_dict[TEACH_NUM]
+    wandb.config.teacher_mechanism = exp_dict[EXP_NUM]
+    
     # Dataloaders
     train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
     test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
     # Fine-tune or train teacher from scratch
-    train_teacher(teacher, train_loader, test_loader, lr, final_lr, project, TEACH_NUM, EXP_NUM, epochs)
+    train_teacher(teacher, train_loader, test_loader, lr, final_lr, run_name, TEACH_NUM, EXP_NUM, epochs)
 
 # SETUP PARAMS - CHANGE THESE
 #================================================================================
+# Refer to dictionaries exp_num, aug_dict, teach_num in info_dictionaries.py
 #================================================================================
 is_sweep = False
-TEACH_NUM = 3
-EXP_NUM = 1
+TEACH_NUM = 0
+EXP_NUM = 0
+AUG_NUM = 0 # Define augmentation of distillation dataset
 if args.config_name:
     EXP_NUM = config['experiment_num']
     TEACH_NUM = config['teacher_num']
+run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]
 # Hyperparams
 lr = 0.1
 final_lr = 0.05
@@ -123,6 +124,7 @@ sweep_configuration = {
 #==============================================================================
 #==============================================================================
 # Teacher model setup (change only if adding to dicts above)
+project = "Teacher"
 teacher_name = teacher_dict[TEACH_NUM]
 match TEACH_NUM:
     case 0:
@@ -144,10 +146,8 @@ match TEACH_NUM:
         teacher = CustomResNet18(100).to(device)
         base_dataset = 'CIFAR100'
     case 6:
-        teacher = CustomResNet18(10).to(device)
-        base_dataset = 'CIFAR10'
-
-project = teacher_name+"_"+exp_dict[EXP_NUM]
+        teacher = CustomResNet50(100).to(device)
+        base_dataset = 'CIFAR100'
 
 if __name__ == "__main__":
     if is_sweep:
@@ -167,7 +167,8 @@ if __name__ == "__main__":
                 "epochs": epochs,
                 "batch_size": batch_size,
                 "spurious type": exp_dict[EXP_NUM]
-            }   
+            },
+            name=run_name
         )
 
         name = exp_dict[EXP_NUM]
@@ -181,17 +182,15 @@ if __name__ == "__main__":
             case 2: 
                 spurious_type = 'box'
                 randomize_loc = True
-            case 3:
-                spurious_type = 'box'
-                spurious_corr = 0.5
-            case 4:
-                spurious_type = 'box'
-                randomize_loc = True
-                spurious_corr = 0.5
+
+        wandb.config.base_dataset = base_dataset
+        wandb.config.augmentation = aug_dict[AUG_NUM]
+        wandb.config.teacher = teacher_dict[TEACH_NUM]
+        wandb.config.teacher_mechanism = exp_dict[EXP_NUM]
 
         # Dataloaders
         train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
         test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
         # Fine-tune or train teacher from scratch
-        train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, project, TEACH_NUM, EXP_NUM, save=True)
+        train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM, save=True)

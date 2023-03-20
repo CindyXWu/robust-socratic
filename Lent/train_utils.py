@@ -85,19 +85,21 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, projec
                 wandb.log({"teacher test acc": test_acc[-1], "teacher loss": train_loss[-1], "teacher lr": lr})
             it += 1
 
-    if save:
-        torch.save({'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'loss_hist': train_loss},
-                output_dir+"teacher_"+teacher_dict[teach_num]+"_"+exp_dict[exp_num])
+        # Checkpooint model
+        if save:
+            save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+exp_dict[exp_num]
+            torch.save({'epoch': epoch,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss_hist': train_loss},
+                    save_path)
 
 def base_distill_loss(scores, targets, temp):
     scores = scores/temp
     targets = F.softmax(targets/temp).argmax(dim=1)
     return ce_loss(scores, targets)
 
-def train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, ranbox_test_loader, lr, final_lr, temp, epochs, repeats, loss_num, project, alpha=None):
+def train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, ranbox_test_loader, lr, final_lr, temp, epochs, repeats, loss_num, run_name, alpha=None):
     """Train student model with distillation loss.
     
     Includes LR scheduling. Change loss function as required. 
@@ -163,7 +165,7 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                     teacher_test_acc = evaluate(teacher, test_loader, batch_size)
                     error = teacher_test_acc - test_acc[-1]
                     print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch, "Loss: ", train_loss[-1])
-                    print("Project {}, LR {}, temp {}".format(project, lr, temp))
+                    print("Project {}, LR {}, temp {}".format(run_name, lr, temp))
                     wandb.log({"Student-teacher error": error, "Student train accuracy": train_acc[-1], "Student test accuracy": test_acc[-1], "Student plain test accuracy": plain_acc, "Student box test accuracy": box_acc, "Student randomised box test accuracy": randbox_acc, "Student loss": train_loss[-1], 'Student LR': lr})
                 it += 1
                 
