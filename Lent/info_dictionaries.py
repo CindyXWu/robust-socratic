@@ -6,5 +6,5 @@ loss_dict  = {0: "Base Distillation", 1: "Jacobian", 2: "Feature Map", 3: "Atten
 aug_dict = {0: "None", 1: "Mixup et al", 2: "Union of datasets"}
 
 # For shapes dataset training
-s_teacher_dict = {0: "ResNet18_3DShapes", 1: "ResNet50_3DShapes", 2: "ResNet18_Flexi"}
+s_teacher_dict = {0: "ResNet18_3DShapes", 1: "ResNet50_3DShapes", 2: "ResNet18_Flexi", 3: "ResNet50_Flexi"}
 s_exp_dict = {0: "Plain", 1: "Floor", 2: "Wall", 3: "Scale", 4: "Orientation"}
