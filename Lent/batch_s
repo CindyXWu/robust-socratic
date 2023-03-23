@@ -3,7 +3,7 @@
 #! sbatch directives begin here ###############################
 #SBATCH -J s_cifar
 #SBATCH -A KRUEGER-SL2-GPU
-#SBATCH --nodes=1
+#SBATCH --nodes=2
 #SBATCH --ntasks=12
 #SBATCH --gres=gpu:4
 #SBATCH --time=36:00:00

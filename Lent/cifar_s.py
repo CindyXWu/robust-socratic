@@ -63,7 +63,6 @@ def sweep():
     # wandb.config.tags = 'alpha='+str(alpha)
     spurious_corr = wandb.config.spurious_corr
     wandb.config.base_dataset = base_dataset
-    wandb.config.spurious_corr = 'spurious_corr='+str(spurious_corr)
     wandb.config.student_mechanism = exp_dict[S_EXP_NUM]
     wandb.config.teacher_mechanism = exp_dict[T_EXP_NUM]
     wandb.config.teacher = teacher_dict[TEACH_NUM]
@@ -85,7 +84,7 @@ def sweep():
     test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
     # Train
-    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, run_name, alpha=alpha)
+    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha)
 
 #================================================================================================
 # Refer to dictionaries student_dict, exp_num, aug_dict, loss_dict, s_teach_dict in info_dicts.py
@@ -213,4 +212,4 @@ if __name__ == "__main__":
     test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
     # Train
-    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, run_name, alpha=alpha)
+    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha)

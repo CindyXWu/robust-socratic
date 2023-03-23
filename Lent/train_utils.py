@@ -107,73 +107,72 @@ def base_distill_loss(scores, targets, temp):
     targets = F.softmax(targets/temp).argmax(dim=1)
     return ce_loss(scores, targets)
 
-def train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, ranbox_test_loader, lr, final_lr, temp, epochs, repeats, loss_num, run_name, alpha=None):
+def train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, ranbox_test_loader, lr, final_lr, temp, epochs, loss_num, run_name, alpha=None):
     """Train student model with distillation loss.
     
     Includes LR scheduling. Change loss function as required. 
     N.B. I need to refator this at some point.
     """
-    for _ in range(repeats):
-        optimizer = optim.SGD(student.parameters(), lr=lr)
-        scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
-        it = 0
-        train_acc = []
-        test_acc = []
-        train_loss = []  # loss at iteration 0
-        weight_reset(student)
+    optimizer = optim.SGD(student.parameters(), lr=lr)
+    scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
+    it = 0
+    train_acc = []
+    test_acc = []
+    train_loss = []  # loss at iteration 0
+    weight_reset(student)
 
-        for epoch in range(epochs):
-            for inputs, labels in tqdm(train_loader):
-                inputs = inputs.to(device)
-                inputs.requires_grad = True
-                labels = labels.to(device)
-                scores = student(inputs)
-                targets = teacher(inputs)
+    for epoch in range(epochs):
+        for inputs, labels in tqdm(train_loader):
+            inputs = inputs.to(device)
+            inputs.requires_grad = True
+            labels = labels.to(device)
+            scores = student(inputs)
+            targets = teacher(inputs)
 
-                input_dim = 32*32*3
-                output_dim = scores.shape[1]
-                batch_size = inputs.shape[0]
+            input_dim = 32*32*3
+            output_dim = scores.shape[1]
+            batch_size = inputs.shape[0]
 
-                # for param in student.parameters():
-                #     assert param.requires_grad
-                match loss_num:
-                    case 0: # Base distillation loss
-                        loss = base_distill_loss(scores, targets, temp)
-                    case 1: # Jacobian loss
-                        input_dim = 32*32*3
-                        output_dim = scores.shape[1]
-                        batch_size = inputs.shape[0]
-                        loss = jacobian_loss(scores, targets, inputs, T=1, alpha=1, batch_size=batch_size, loss_fn=mse_loss, input_dim=input_dim, output_dim=output_dim)
-                    case 2: # Feature map loss - currently only for self-distillation
-                        layer = 'feature_extractor.10'
-                        s_map = student.attention_map(inputs, layer)
-                        t_map = teacher.attention_map(inputs, layer).detach()
-                        loss = feature_map_diff(scores, targets, s_map, t_map, T=1, alpha=0.2, loss_fn=mse_loss, aggregate_chan=False)
-                    case 3: # Attention Jacobian loss
-                        loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, T=1, alpha=0.8, loss_fn=kl_loss)
-
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                scheduler.step()
-                lr = scheduler.get_lr()
-                train_loss.append(loss.detach().cpu().numpy())
-
-                # if it == 0:
-                #     # Check that model is training correctly
-                #     for param in student.parameters():
-                #         assert param.grad is not None
-                if it % 100 == 0:
+            # for param in student.parameters():
+            #     assert param.requires_grad
+            match loss_num:
+                case 0: # Base distillation loss
+                    loss = base_distill_loss(scores, targets, temp)
+                case 1: # Jacobian loss
+                    input_dim = 32*32*3
+                    output_dim = scores.shape[1]
                     batch_size = inputs.shape[0]
-                    train_acc.append(evaluate(student, train_loader, batch_size, max_ex=100))
-                    test_acc.append(evaluate(student, test_loader, batch_size))
-                    plain_acc = evaluate(student, plain_test_loader, batch_size)
-                    box_acc = evaluate(student, box_test_loader, batch_size)
-                    randbox_acc = evaluate(student, ranbox_test_loader, batch_size)
-                    teacher_test_acc = evaluate(teacher, test_loader, batch_size)
-                    error = teacher_test_acc - test_acc[-1]
-                    print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch, "Loss: ", train_loss[-1])
-                    print("Project {}, LR {}, temp {}".format(run_name, lr, temp))
-                    wandb.log({"Student-teacher error": error, "Student train accuracy": train_acc[-1], "Student test accuracy": test_acc[-1], "Student plain test accuracy": plain_acc, "Student box test accuracy": box_acc, "Student randomised box test accuracy": randbox_acc, "Student loss": train_loss[-1], 'Student LR': lr})
-                it += 1
-                
+                    loss = jacobian_loss(scores, targets, inputs, T=1, alpha=alpha, batch_size=batch_size, loss_fn=mse_loss, input_dim=input_dim, output_dim=output_dim)
+                case 2: # Feature map loss - currently only for self-distillation
+                    layer = 'feature_extractor.10'
+                    s_map = student.attention_map(inputs, layer)
+                    t_map = teacher.attention_map(inputs, layer).detach()
+                    loss = feature_map_diff(scores, targets, s_map, t_map, T=1, alpha=0.2, loss_fn=mse_loss, aggregate_chan=False)
+                case 3: # Attention Jacobian loss
+                    loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, T=1, alpha=0.8, loss_fn=kl_loss)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+            lr = scheduler.get_lr()
+            train_loss.append(loss.detach().cpu().numpy())
+
+            # if it == 0:
+            #     # Check that model is training correctly
+            #     for param in student.parameters():
+            #         assert param.grad is not None
+            if it % 100 == 0:
+                batch_size = inputs.shape[0]
+                train_acc.append(evaluate(student, train_loader, batch_size, max_ex=100))
+                test_acc.append(evaluate(student, test_loader, batch_size))
+                plain_acc = evaluate(student, plain_test_loader, batch_size)
+                box_acc = evaluate(student, box_test_loader, batch_size)
+                randbox_acc = evaluate(student, ranbox_test_loader, batch_size)
+                teacher_test_acc = evaluate(teacher, test_loader, batch_size)
+                error = teacher_test_acc - test_acc[-1]
+                print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch, "Loss: ", train_loss[-1])
+                print("Project {}, LR {}, temp {}".format(run_name, lr, temp))
+                wandb.log({"Student-teacher error": error, "Student train accuracy": train_acc[-1], "Student test accuracy": test_acc[-1], "Student plain test accuracy": plain_acc, "Student box test accuracy": box_acc, "Student randomised box test accuracy": randbox_acc, "Student loss": train_loss[-1], 'Student LR': lr})
+            it += 1
+            
