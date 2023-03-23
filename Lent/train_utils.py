@@ -86,13 +86,21 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, projec
             it += 1
 
         # Checkpooint model
-        if save:
-            save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+exp_dict[exp_num]
+        if epoch % 3 == 0:
+            save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+exp_dict[exp_num]+"_epoch_"+str(epoch)
             torch.save({'epoch': epoch,
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss_hist': train_loss},
                     save_path)
+    
+    if save:
+        save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+exp_dict[exp_num]+"_final"
+        torch.save({'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss_hist': train_loss},
+                save_path)
 
 def base_distill_loss(scores, targets, temp):
     scores = scores/temp

@@ -18,7 +18,7 @@ class CIFAR100Instance(datasets.CIFAR100):
     """CIFAR100Instance Dataset.
     """
     def __getitem__(self, index):
-        # Edited from original code: new PyTorch versions get data and labels by .data and .tagrets, and do not store train and test separately but rather at initialisation
+        # Edited from original code: new PyTorch versions get data and labels by .data and .targets, and do not store train and test separately but rather at initialisation
         img, target = self.data[index], self.targets[index]
 
         # doing this so that it is consistent with all other datasets

@@ -1,4 +1,4 @@
-""">>>'Contrastive Representation Distillation (Tiang et al 2022)'. 
+""">>>'Contrastive Representation Distillation (Tiang et al 2020)'. 
 Code adapted from https://github.com/HobbitLong/RepDistiller/blob/master/crd/criterion.py to be used without memory buffer.
 """
 import torch.nn as nn
@@ -19,7 +19,7 @@ class ContrastiveRep(nn.Module):
         T: temperature
         n_data: number of samples in the training set, therefore the memory buffer is: n_data * e_dim
     """
-    def __init__(self, t_dim, s_dim, n_data, e_dim=50, k=10, T=1):
+    def __init__(self, t_dim, s_dim, n_data, e_dim=50, k=10):
         super(ContrastiveRep, self).__init__()
         self.embed_s = Embed(dim_in=s_dim, dim_out=e_dim)
         self.embed_t = Embed(dim_in=t_dim, dim_out=e_dim)
