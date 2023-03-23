@@ -87,10 +87,12 @@ def sweep():
     # Train
     train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, 1, LOSS_NUM, run_name, alpha=alpha)
 
-# Semi-automated setup params
+#================================================================================================
+# Refer to dictionaries student_dict, exp_num, aug_dict, loss_dict, s_teach_dict in info_dicts.py
+#================================================================================================
 is_sweep = args.sweep
-T_EXP_NUM = 0
-S_EXP_NUM = 0
+T_EXP_NUM = 2
+S_EXP_NUM = 2
 STUDENT_NUM = 2
 TEACH_NUM = 3
 LOSS_NUM = 0
@@ -102,15 +104,15 @@ if args.config_name:
     LOSS_NUM = config['loss_num']
     S_EXP_NUM = config['s_exp_num']
 ## WANDB PROJECT NAME
-project = "Student"
-run_name = "teacher: "+teacher_dict[TEACH_NUM]+', student: '+student_dict[STUDENT_NUM]+', student mechanism:'+exp_dict[S_EXP_NUM]+', teacher mechanism:'+exp_dict[T_EXP_NUM]+', loss: '+loss_dict[LOSS_NUM]+", aug: "+aug_dict[AUG_NUM]
+project = "Student (debug 23/03)"
+run_name = 'teacher :'+s_teacher_dict[TEACH_NUM]+student_dict[STUDENT_NUM]+', student mechanism:'+exp_dict[S_EXP_NUM]+', teacher mechanism:'+exp_dict[T_EXP_NUM]+', loss: '+loss_dict[LOSS_NUM]+', aug: '+aug_dict[AUG_NUM]
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
 # ======================================================================================
 lr = 0.5
 final_lr = 0.1
 temp = 30
-epochs = 10
+epochs = 25
 alpha = 1 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 e_dim = 50 # embedding size for contrastive loss
@@ -166,9 +168,9 @@ load_name = "Image_Experiments/teacher_"+teacher_name+"_"+exp_dict[T_EXP_NUM]
 checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
 
-plain_test_loader = get_dataloader(load_type ='test', spurious_type='plain', spurious_corr=1, randomize_loc=False)
-box_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=False)
-randbox_test_loader = get_dataloader(load_type ='test', spurious_type='box', spurious_corr=1, randomize_loc=True)
+plain_test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type='plain', spurious_corr=1, randomize_loc=False)
+box_test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type='box', spurious_corr=1, randomize_loc=False)
+randbox_test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type='box', spurious_corr=1, randomize_loc=True)
 
 if __name__ == "__main__":
     if is_sweep:
