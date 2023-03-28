@@ -7,7 +7,6 @@
 #SBATCH --ntasks=12
 #SBATCH --gres=gpu:4
 #SBATCH --time=36:00:00
-#SBATCH --array=0-$((num_configs-1))
 #SBATCH --mail-type=NONE
 #! Uncomment this to prevent the job from being requeued (e.g. if
 #! interrupted by node failure or system downtime):
