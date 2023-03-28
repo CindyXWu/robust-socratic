@@ -103,15 +103,15 @@ if args.config_name:
     LOSS_NUM = config['loss_num']
     S_EXP_NUM = config['s_exp_num']
 ## WANDB PROJECT NAME
-project = "Student (debug 23/03)"
-run_name = 'teacher :'+s_teacher_dict[TEACH_NUM]+student_dict[STUDENT_NUM]+', student mechanism:'+exp_dict[S_EXP_NUM]+', teacher mechanism:'+exp_dict[T_EXP_NUM]+', loss: '+loss_dict[LOSS_NUM]+', aug: '+aug_dict[AUG_NUM]
+project = "Student (debug)"
+run_name = 'teacher: '+teacher_dict[TEACH_NUM]+', student: '+student_dict[STUDENT_NUM]+', student mechanism: '+exp_dict[S_EXP_NUM]+', teacher mechanism: '+exp_dict[T_EXP_NUM]+', loss: '+loss_dict[LOSS_NUM]+', aug: '+aug_dict[AUG_NUM]
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
 # ======================================================================================
 lr = 0.5
 final_lr = 0.1
 temp = 30
-epochs = 25
+epochs = 15
 alpha = 1 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 e_dim = 50 # embedding size for contrastive loss
