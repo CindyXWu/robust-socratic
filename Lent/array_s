@@ -1,6 +1,4 @@
 #!/bin/bash
-config_file="CIFAR100_distill.yml"
-num_configs=$(python -c "import yaml; print(len(yaml.safe_load(open'$config_file')))")
 
 #! sbatch directives begin here ###############################
 #SBATCH -J s_cifar
@@ -40,6 +38,7 @@ source ~/.bashrc
 conda deactivate
 conda activate pytorch
 i=$SLURM_ARRAY_TASK_ID
+config_file=$CONFIG_FILE
 
 #! Full path to application executable: 
 application="python cifar_s.py"
