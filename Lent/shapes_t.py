@@ -52,7 +52,7 @@ def sweep_teacher():
         # track hyperparameters and run metadata
         config={
             "name": sweep_name,
-            "teacher": s_teacher_dict[TEACH_NUM],
+            "teacher": teacher_dict[TEACH_NUM],
             "dataset": "CIFAR-100",
             "batch_size": batch_size,
             "experiment": s_exp_dict[EXP_NUM],
@@ -65,7 +65,7 @@ def sweep_teacher():
     epochs = wandb.config.epochs
     wandb.config.base_dataset = "3D Shapes"
     wandb.config.augmentation = aug_dict[AUG_NUM]
-    wandb.config.teacher = s_teacher_dict[TEACH_NUM]
+    wandb.config.teacher = teacher_dict[TEACH_NUM]
     wandb.config.teacher_mechanism = s_exp_dict[EXP_NUM]
 
     # match EXP_NUM:
@@ -82,7 +82,7 @@ def sweep_teacher():
 # Refer to dictionaries s_exp_num, aug_dict, s_teach_num in info_dictionaries.py
 #================================================================================
 is_sweep = False
-TEACH_NUM = 0
+TEACH_NUM = 5
 EXP_NUM = 0
 AUG_NUM = 0
 run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]
@@ -92,7 +92,7 @@ if args.config_name:
 # Hyperparams
 lr = 0.1
 final_lr = 0.05
-epochs = 25
+epochs = 2
 batch_size = 64
 
 sweep_count = 10
@@ -117,13 +117,13 @@ sweep_configuration = {
 # Teacher model setup (change only if adding to dicts above)
 project = "Teacher"
 match TEACH_NUM:
-    case 0:
+    case 7:
         teacher = ResNet18_3Dshapes(12).to(device)
-    case 1:
-        teacher = ResNet18_3Dshapes(12).to(device)
-    case 2:
+    case 8:
+        teacher = ResNet50_3Dshapes(12).to(device)
+    case 5:
         teacher = CustomResNet18(12).to(device)
-    case 3:
+    case 6:
         teacher = CustomResNet50(12).to(device)
 
 if __name__ == "__main__":
@@ -151,7 +151,7 @@ if __name__ == "__main__":
         )
         wandb.config.base_dataset = "3D Shapes"
         wandb.config.augmentation = aug_dict[AUG_NUM]
-        wandb.config.teacher = s_teacher_dict[TEACH_NUM]
+        wandb.config.teacher = teacher_dict[TEACH_NUM]
         wandb.config.teacher_mechanism = s_exp_dict[EXP_NUM]
         # match EXP_NUM:
         # Todo: add different spurious correlation experiments

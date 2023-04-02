@@ -101,7 +101,7 @@ run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+exp_dict[E
 # Hyperparams
 lr = 0.08
 final_lr = 0.03
-epochs = 20
+epochs = 3
 batch_size = 64
 
 sweep_count = 10

@@ -8,14 +8,8 @@
 #SBATCH --gres=gpu:4
 #SBATCH --time=36:00:00
 #SBATCH --mail-type=NONE
-#! Uncomment this to prevent the job from being requeued (e.g. if
-#! interrupted by node failure or system downtime):
 ##SBATCH --no-requeue
-
-#! Do not change:
 #SBATCH -p ampere
-
-#! sbatch directives end here (put any additional directives above this line)
 
 #! Number of nodes and tasks per node allocated by SLURM (do not change):
 numnodes=$SLURM_JOB_NUM_NODES
@@ -37,7 +31,7 @@ source ~/.bashrc
 conda deactivate
 conda activate pytorch
 i=$SLURM_ARRAY_TASK_ID
-config_file=$CONFIG_FILE
+config_file=$config_file
 
 #! Full path to application executable: 
 application="python cifar_s.py"
