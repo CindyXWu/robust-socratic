@@ -2,11 +2,11 @@
 
 #! sbatch directives begin here ###############################
 #SBATCH -J s_cifar
-#SBATCH -A KRUEGER-SL3-GPU
+#SBATCH -A KRUEGER-SL2-GPU
 #SBATCH --nodes=1
 #SBATCH --ntasks=12
 #SBATCH --gres=gpu:4
-#SBATCH --time=12:00:00
+#SBATCH --time=36:00:00
 #SBATCH --mail-type=NONE
 #! Uncomment this to prevent the job from being requeued (e.g. if
 #! interrupted by node failure or system downtime):
