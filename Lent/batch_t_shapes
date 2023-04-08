@@ -4,9 +4,9 @@
 #! Name of the job:
 #SBATCH -J t-shapes
 #! Which project should be charged (NB Wilkes2 projects end in '-GPU'):
-#SBATCH -A KRUEGER-SL3-GPU
+#SBATCH -A KRUEGER-SL2-GPU
 #! How many whole nodes should be allocated?
-#SBATCH --nodes=3
+#SBATCH --nodes=4
 #! How many (MPI) tasks will there be in total?
 #! Note probably this should not exceed the total number of GPUs in use.
 #SBATCH --ntasks=12
@@ -14,7 +14,7 @@
 #! Note that the job submission script will enforce no more than 32 cpus per GPU.
 #SBATCH --gres=gpu:4
 #! How much wallclock time will be required?
-#SBATCH --time=12:00:00
+#SBATCH --time=36:00:00
 #! What types of email messages do you wish to receive?
 #SBATCH --mail-type=NONE
 #! Uncomment this to prevent the job from being requeued (e.g. if
@@ -45,11 +45,11 @@ module load rhel8/default-amp              # REQUIRED - loads the basic environm
 
 #! Insert additional module load commands after this line if needed:
 module load miniconda/3
-source ~./bashrc
+source ~/.bashrc
 conda deactivate
 conda activate pytorch
-config_file=$CONFIG_FILE
-i=$IDX
+#config_file=$CONFIG_FILE
+#i=$IDX
 
 #! Full path to application executable: 
 application="python shapes_t.py"

@@ -92,7 +92,7 @@ if args.config_name:
 # Hyperparams
 lr = 0.1
 final_lr = 0.05
-epochs = 2
+epochs = 3
 batch_size = 64
 
 sweep_count = 10

@@ -1,8 +1,6 @@
-- experiment_num: 0
-  teacher_num: 0
-- experiment_num: 0
+- t_exp_num: 0
   teacher_num: 1
-- experiment_num: 0
+- t_exp_num: 0
   teacher_num: 2
-- experiment_num: 0
+- t_exp_num: 0
   teacher_num: 3
