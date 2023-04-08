@@ -10,5 +10,5 @@ num_configs=$(python -c "import yaml; print(len(yaml.safe_load(open('$config_fil
 # Loop through each configuration and run the Python script
 for ((i=0; i<$num_configs; i++))
 do
-    sbatch --export=CONFIG_FILE=$config_file,IDX=$i --nice=0 batch_t
+    sbatch --export=CONFIG_FILE=$config_file,IDX=$i batch_t
 done

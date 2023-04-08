@@ -117,10 +117,12 @@ sweep_configuration = {
 # Teacher model setup (change only if adding to dicts above)
 project = "Teacher"
 match TEACH_NUM:
-    case 2:
+    case 1:
         teacher = CustomResNet18(12).to(device)
-    case 3:
+    case 2:
         teacher = CustomResNet50(12).to(device)
+    case 3:
+        teacher = wide_resnet_constructor(3, 12).to(device)
 
 if __name__ == "__main__":
     if is_sweep:

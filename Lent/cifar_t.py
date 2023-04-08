@@ -92,16 +92,16 @@ def sweep_teacher():
 #================================================================================
 is_sweep = False
 TEACH_NUM = 3
-EXP_NUM = 0
+EXP_NUM = 2
 AUG_NUM = 0 # Define augmentation of distillation dataset
 if args.config_name:
     EXP_NUM = config['experiment_num']
     TEACH_NUM = config['teacher_num']
 run_name = "teacher"+teacher_dict[TEACH_NUM]+"teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]
 # Hyperparams
-lr = 0.1
-final_lr = 0.03
-epochs = 3
+lr = 0.137
+final_lr = 0.112
+epochs = 12
 batch_size = 64
 
 sweep_count = 10
