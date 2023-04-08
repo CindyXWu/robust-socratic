@@ -148,6 +148,7 @@ class CustomResNet50(models.ResNet):
 
 def wide_resnet_constructor(
         blocks_per_stage: int,
+        num_classes: int,
         width_factor: int = 1,
         activation_constructor: Callable[[], nn.Module] = functools.partial(nn.ReLU, inplace=True),
         normalization_constructor: NormalizationConstructorType = nn.BatchNorm2d,
@@ -217,7 +218,7 @@ def wide_resnet_constructor(
         # Output
         nn.AdaptiveAvgPool2d((1, 1)),
         nn.Flatten(),
-        nn.Linear(64 * width_factor, 10),
+        nn.Linear(64 * width_factor, num_classes),
     )
 
     # Initialise

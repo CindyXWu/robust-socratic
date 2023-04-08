@@ -3,7 +3,7 @@ import torch
 from basic1_models import *
 import torch.nn.functional as F
 from torch_intermediate_layer_getter import IntermediateLayerGetter as MidGet
-from jacobian_srinivas import *
+from jacobian import *
 
 def feature_map_diff(scores, targets, s_map, t_map, T, alpha, loss_fn, aggregate_chan):
     """Compute the difference between the feature maps of the student and teacher models.

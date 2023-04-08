@@ -155,7 +155,8 @@ match TEACH_NUM:
         teacher = CustomResNet50(100).to(device)
         base_dataset = 'CIFAR100'
     case 3:
-        teacher = wide_resnet_constructor(18)
+        teacher = wide_resnet_constructor(3, 100).to(device)
+        base_dataset = 'CIFAR100'
 
 # Load saved teacher model (change only if changing file locations)
 # Clumsy try-except while I wrestle my codebase into sync
