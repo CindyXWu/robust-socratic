@@ -92,9 +92,9 @@ def sweep():
 is_sweep = args.sweep
 T_EXP_NUM = 2
 S_EXP_NUM = 2
-STUDENT_NUM = 2
-TEACH_NUM = 3
-LOSS_NUM = 0
+STUDENT_NUM = 0
+TEACH_NUM = 0
+LOSS_NUM = 1
 AUG_NUM = 0
 if args.config_name:
     T_EXP_NUM = config['t_exp_num']
@@ -141,7 +141,7 @@ match STUDENT_NUM:
     case 1:
         student = CustomResNet18(100).to(device)
     case 2:
-        student = wide_resnet_constructor(18).to(device)
+        student = wide_resnet_constructor(3, 100).to(device)
 
 # Teacher model setup (change only if adding to dicts above)
 match TEACH_NUM:
@@ -162,6 +162,7 @@ match TEACH_NUM:
 # Clumsy try-except while I wrestle my codebase into sync
 try:
     load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+exp_dict[T_EXP_NUM]
+    checkpoint = torch.load(load_name, map_location=device)
 except:
     load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+exp_dict[T_EXP_NUM]+"_final"
 checkpoint = torch.load(load_name, map_location=device)

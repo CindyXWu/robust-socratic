@@ -5,7 +5,10 @@ import torch.nn.functional as F
 import torch
 from image_models import *
 
-def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_dim, output_dim):
+
+# NOTE for later so I don't forget: automatically set to approximate Jacobian 
+# May want to change for smaller class number 
+def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_dim, output_dim, approx=True):
     """Eq 10, no hard targets used.
     Args:
         scores: logits of student [batch_size, num_classes]
@@ -17,8 +20,13 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
     """
     distill_loss = get_distill_loss(scores, targets, T, loss_fn)
 
-    t_jac = get_jacobian(targets, inputs, batch_size, input_dim, output_dim)
-    s_jac = get_jacobian(scores, inputs, batch_size, input_dim, output_dim)
+    if not approx:
+        t_jac = get_jacobian(targets, inputs, batch_size, input_dim, output_dim)
+        s_jac = get_jacobian(scores, inputs, batch_size, input_dim, output_dim)
+    else:
+        t_jac = get_approx_jacobian(targets, inputs, batch_size, output_dim)
+        # Make sure student loss is on teacher's top-1 class
+        s_jac = get_approx_jacobian(scores, inputs, batch_size, output_dim, torch.argmax(targets, dim=1))
     # t_jac = get_approx_jacobian(targets, inputs, batch_size, output_dim)
     # i = torch.argmax(targets, dim=1)
     # s_jac = get_approx_jacobian(scores, inputs, batch_size, output_dim, i)
@@ -55,6 +63,8 @@ def get_approx_jacobian(output, x, batch_size, output_dim, i=None):
     """
     assert x.requires_grad
     grad_output = torch.zeros(batch_size, output_dim, device=x.device)
+    # Needed to keep class same between teacher and student
+    # In this case, anchor teacher and compare student against top-1 class
     if i == None:
         i = torch.argmax(output, dim=1) # Index of most likely class
     grad_output[:, i] = 1
@@ -62,6 +72,17 @@ def get_approx_jacobian(output, x, batch_size, output_dim, i=None):
     output.backward(grad_output, create_graph=True)
     jacobian = x.grad.view(batch_size, -1)
     return jacobian
+
+def get_jacobian(output, x, batch_size, input_dim, output_dim):
+    """Autograd method. Need to keep grads, so set create_graph to True."""
+    assert output.requires_grad
+    jacobian = torch.zeros(batch_size, output_dim, input_dim, device=x.device)
+    for i in range(output_dim):
+        grad_output = torch.zeros(batch_size, output_dim, device=x.device)
+        grad_output[:, i] = 1
+        grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True)[0]
+        jacobian[:, i, :] = grad_input.view(batch_size, input_dim)
+    return jacobian.view(batch_size, -1) # Flatten
 
 # def get_jacobian(output, x, batch_size, input_dim, output_dim):
 #     """In order to keep grads, need to set create_graph to True, but computation very slow."""
@@ -75,18 +96,6 @@ def get_approx_jacobian(output, x, batch_size, output_dim, i=None):
 #         jacobian[:, i, :] = x.grad.view(batch_size, -1)
 #         x.grad.zero_()
 #     return jacobian.view(batch_size, -1) # Flatten
-
-def get_jacobian(output, x, batch_size, input_dim, output_dim):
-    """Autograd method. Need to keep grads, so set create_graph to True."""
-    assert output.requires_grad
-    jacobian = torch.zeros(batch_size, output_dim, input_dim, device=x.device)
-    for i in range(output_dim):
-        grad_output = torch.zeros(batch_size, output_dim, device=x.device)
-        grad_output[:, i] = 1
-        grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True)[0]
-        jacobian[:, i, :] = grad_input.view(batch_size, input_dim)
-    return jacobian.view(batch_size, -1) # Flatten
-
 #===================================================================================================
 
 def jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, T, alpha, loss_fn):
