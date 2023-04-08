@@ -140,8 +140,3 @@ def get_grads(model, inputs, batch_size, layer):
     grads.requires_grad = True
 
     return grads
-
-# TODO: implement
-def projection(s_map, t_map):
-    """Project feature maps from two models onto the same dimension for comparison."""
-    return

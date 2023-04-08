@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 from image_models import *
 from plotting import *
-from jacobian_srinivas import *
+from jacobian import *
 from contrastive import *
 from feature_match import *
 from utils_ekdeep import *
@@ -82,24 +82,28 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, projec
                 test_acc.append(evaluate(model, test_loader, batch_size))
                 print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch)
                 print("Project {}, LR {}".format(project, lr))
-                wandb.log({"teacher test acc": test_acc[-1], "teacher loss": train_loss[-1], "teacher lr": lr})
+                wandb.log({"Test Accuracy": test_acc[-1], "Loss": train_loss[-1], "LR": lr})
             it += 1
 
-        # Checkpooint model
-        if epoch % 3 == 0:
-            save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+exp_dict[exp_num]+"_epoch_"+str(epoch)
-            torch.save({'epoch': epoch,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'loss_hist': train_loss},
-                    save_path)
-    
-    if save:
-        save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+exp_dict[exp_num]+"_final"
+        # Checkpoint model at end of every epoch
+        # Have two models: working copy (this one) and final fetched model
+        # Save optimizer in case re-run, save test accuracy to compare models
+        save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+exp_dict[exp_num]+"_working"
         torch.save({'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
-                'loss_hist': train_loss},
+                'loss_hist': train_loss,
+                'test_acc': test_acc,
+                },
+                save_path)
+    
+    if save:
+        save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+exp_dict[exp_num]+"_final"
+        torch.save({'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss_hist': train_loss,
+                'test_acc': test_acc,
+                },
                 save_path)
 
 def base_distill_loss(scores, targets, temp):
@@ -128,6 +132,9 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
             labels = labels.to(device)
             scores = student(inputs)
             targets = teacher(inputs)
+            # Top 1 class
+            student_preds = torch.argmax(scores, dim=1)
+            teacher_preds = torch.argmax(targets, dim=1)     
 
             input_dim = 32*32*3
             output_dim = scores.shape[1]
@@ -171,8 +178,10 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                 randbox_acc = evaluate(student, ranbox_test_loader, batch_size)
                 teacher_test_acc = evaluate(teacher, test_loader, batch_size)
                 error = teacher_test_acc - test_acc[-1]
+                KL_diff = kl_loss(F.log_softmax(scores/temp, dim=1), F.log_softmax(targets/temp, dim=1))
+                top1_diff = torch.eq(student_preds, teacher_preds).float().mean()
                 print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch, "Loss: ", train_loss[-1])
                 print("Project {}, LR {}, temp {}".format(run_name, lr, temp))
-                wandb.log({"Student-teacher error": error, "Student train accuracy": train_acc[-1], "Student test accuracy": test_acc[-1], "Student plain test accuracy": plain_acc, "Student box test accuracy": box_acc, "Student randomised box test accuracy": randbox_acc, "Student loss": train_loss[-1], 'Student LR': lr})
+                wandb.log({"T-S Test Difference": error, "T-S KL": KL_diff, "T-S Top 1 Difference": top1_diff, "S Train": train_acc[-1], "S Test": test_acc[-1], "S P Test": plain_acc, "Student B Test": box_acc, "S RB Test": randbox_acc, "S Loss": train_loss[-1], 'S LR': lr, })
             it += 1
-            
+    

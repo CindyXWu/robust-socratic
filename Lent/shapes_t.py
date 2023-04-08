@@ -8,7 +8,7 @@ from time import gmtime, strftime
 
 from image_models import *
 from plotting import *
-from jacobian_srinivas import *
+from jacobian import *
 from contrastive import *
 from feature_match import *
 from utils_ekdeep import *
@@ -85,7 +85,7 @@ is_sweep = False
 TEACH_NUM = 5
 EXP_NUM = 0
 AUG_NUM = 0
-run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]
+run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" shapes"
 if args.config_name:
     EXP_NUM = config['experiment_num']
     TEACH_NUM = config['teacher_num']
@@ -117,13 +117,9 @@ sweep_configuration = {
 # Teacher model setup (change only if adding to dicts above)
 project = "Teacher"
 match TEACH_NUM:
-    case 7:
-        teacher = ResNet18_3Dshapes(12).to(device)
-    case 8:
-        teacher = ResNet50_3Dshapes(12).to(device)
-    case 5:
+    case 2:
         teacher = CustomResNet18(12).to(device)
-    case 6:
+    case 3:
         teacher = CustomResNet50(12).to(device)
 
 if __name__ == "__main__":

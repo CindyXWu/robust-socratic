@@ -7,7 +7,7 @@ import yaml
 
 from image_models import *
 from plotting import *
-from jacobian_srinivas import *
+from jacobian import *
 from contrastive import *
 from feature_match import *
 from utils_ekdeep import *
@@ -139,31 +139,30 @@ match STUDENT_NUM:
     case 0:
         student = LeNet5(10).to(device)
     case 1:
-        student = ResNet18_CIFAR(100).to(device)
-    case 2:
         student = CustomResNet18(100).to(device)
+    case 2:
+        student = wide_resnet_constructor(18).to(device)
+
 # Teacher model setup (change only if adding to dicts above)
-teacher_name = teacher_dict[TEACH_NUM]
-load_path = "Image_Experiments/teacher_"+teacher_name
 match TEACH_NUM:
     case 0:
         teacher = LeNet5(10).to(device)
         base_dataset = 'CIFAR10'
     case 1:
-        teacher = ResNet50_CIFAR(10).to(device)
-        base_dataset = 'CIFAR10'
+        teacher = CustomResNet18(100).to(device)
+        base_dataset = 'CIFAR100'
     case 2:
-        teacher = ResNet18_CIFAR(10).to(device)
-        base_dataset = 'CIFAR10'
+        teacher = CustomResNet50(100).to(device)
+        base_dataset = 'CIFAR100'
     case 3:
-        teacher = ResNet18_CIFAR(100).to(device)
-        base_dataset = 'CIFAR100'
-    case 4:
-        teacher = ResNet50_CIFAR(100).to(device)
-        base_dataset = 'CIFAR100'
-        
+        teacher = wide_resnet_constructor(18)
+
 # Load saved teacher model (change only if changing file locations)
-load_name = "Image_Experiments/teacher_"+teacher_name+"_"+exp_dict[T_EXP_NUM]
+# Clumsy try-except while I wrestle my codebase into sync
+try:
+    load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+exp_dict[T_EXP_NUM]
+except:
+    load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+exp_dict[T_EXP_NUM]+"_final"
 checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
 

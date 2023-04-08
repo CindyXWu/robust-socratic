@@ -1,7 +1,42 @@
 import torch.nn as nn
 import torch
 import torchvision.models as models
+import functools
+from typing import Callable, Protocol
 from torch_intermediate_layer_getter import IntermediateLayerGetter as MidGet
+from torch import Tensor
+
+
+class Identity(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return x
+
+
+class SplitAggregate(nn.Module):
+    """
+    Allows for specifying a "split" in a sequential model where the input passes through multiple paths and is
+    aggregated at the output (by default: added).
+    Useful for specifying a residual connection in a model.
+    """
+    def __init__(self, path1: nn.Module, path2: nn.Module, aggregate_func: Callable[[Tensor, Tensor], Tensor] = torch.add) -> None:
+        super().__init__()
+        self.path1 = path1
+        self.path2 = path2
+        self.aggregate_func = aggregate_func
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.aggregate_func(
+            self.path1(x),
+            self.path2(x),
+        )
+
+
+class NormalizationConstructorType(Protocol):
+    def __call__(self, num_features: int) -> nn.Module:
+        ...
 
 class LeNet5(nn.Module):
     """Changed input channels to 3 and added batchnorm."""
@@ -54,151 +89,6 @@ class LeNet5(nn.Module):
         logits = self.classifier(x)
         probs = nn.functional.softmax(logits, dim=1)
         return logits
-
-class ResNet50_CIFAR(models.ResNet):
-    def __init__(self, num_classes=10):
-        super(ResNet50_CIFAR, self).__init__(block=models.resnet.Bottleneck, layers=[3, 4, 6, 3], num_classes=num_classes)
-        # Modify the first convolution layer to accept 3-channel input with 32 x 32 dimensions
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.maxpool = nn.Identity()
-    
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-
-        return x
-
-class ResNet18_CIFAR(models.ResNet):
-    """10 layers in total.
-    Layers 4-7 inclusive are blocks. Each block has a two sub-block of BasicBlock() structure:
-    Sequential(
-    (0): BasicBlock(
-        (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-        (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (relu): ReLU(inplace=True)
-        (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-        (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    )
-    (1): BasicBlock(
-        (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-        (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (relu): ReLU(inplace=True)
-        (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-        (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    )
-    """
-    def __init__(self, num_classes=10):
-        super(ResNet18_CIFAR, self).__init__(block=models.resnet.BasicBlock, layers=[2, 2, 2, 2], num_classes=num_classes)
-        # Modify the first convolution layer to accept 3-channel input with 32 x 32 dimensions
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-
-    def attention_map(self, x, layer):
-        layer_index = None
-        # Check modules
-        # for module in self.modules():
-        #     print("==================================")
-        #     print(module)
-        for i, (name, _) in enumerate(self.named_modules()):
-            # For some reason first module is the entire model so skip it
-            if i == 0:
-                continue
-            if name == layer:
-                layer_index = i
-                break
-        if layer_index is None:
-            raise ValueError("Layer not found.")
-        submodel = nn.Sequential(*list(self.modules())[1:layer_index+1])
-        return submodel(x)  
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x1= self.relu(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-
-        return x
-
-class ResNet18_3Dshapes(models.ResNet):
-    """Edited first convolution and last FC layer, with adaptive average pooling.
-    More tailored to specific image size compared to flexi model.
-    """
-    def __init__(self, num_classes=12):
-        super(ResNet18_3Dshapes, self).__init__(block=models.resnet.BasicBlock, layers=[2, 2, 2, 2], num_classes=num_classes)
-        # Modify the first convolution layer to accept 3-channel input with 64 x 64 dimensions
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        self.bn1 = nn.BatchNorm2d(64)
-        self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        
-        # Change the average pooling layer to adapt to the 64x64 input size
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * models.resnet.BasicBlock.expansion, num_classes)
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-
-        return x
-
-class ResNet50_3Dshapes(models.ResNet):
-    def __init__(self, num_classes=12):
-        super(ResNet50_3Dshapes, self).__init__(block=models.resnet.Bottleneck, layers=[3, 4, 6, 3], num_classes=num_classes)
-        # Modify the first convolution layer to accept 3-channel input with 64 x 64 dimensions
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        self.bn1 = nn.BatchNorm2d(64)
-        self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        
-        # Change the average pooling layer to adapt to the 64x64 input size
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(2048 * models.resnet.Bottleneck.expansion, num_classes)
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-
-        return x
 
 class CustomResNet18(models.ResNet):
     """This model accepts images of any size using adaptive average pooling."""
@@ -255,7 +145,88 @@ class CustomResNet50(models.ResNet):
         x = self.fc(x)
 
         return x
+
+def wide_resnet_constructor(
+        blocks_per_stage: int,
+        width_factor: int = 1,
+        activation_constructor: Callable[[], nn.Module] = functools.partial(nn.ReLU, inplace=True),
+        normalization_constructor: NormalizationConstructorType = nn.BatchNorm2d,
+    ) -> nn.Sequential:
+    """
+    Construct a Wide ResNet model.
+    Follows the architecture described in Table 1 of the paper:
+        Wide Residual Networks
+        https://arxiv.org/pdf/1605.07146.pdf
+    This is a Wide-ResNet with the block structure following the variant (sometimes known as ResNetV2) described in:
+        Identity Mappings in Deep Residual Networks
+        https://arxiv.org/abs/1603.05027
+    Args:
+        blocks_per_stage: Number of blocks per stage.
+        width_factor: Width factor.
+    Returns:
+        The constructed model.
+    """
+    assert blocks_per_stage >= 1, f"blocks_per_stage must be >= 1, got {blocks_per_stage}"
+
+    def block_constructor(in_channels: int, out_channels: int) -> nn.Module:
+        return SplitAggregate(
+            # Skip connection
+            Identity(),
+            # Conv. block
+            nn.Sequential(
+                normalization_constructor(in_channels),
+                activation_constructor(),
+                nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
+                normalization_constructor(out_channels),
+                activation_constructor(),
+                nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
+            )
+        )
     
+    def downsample_block_constructor(in_channels: int, out_channels: int) -> nn.Module:
+        return SplitAggregate(
+            # Skip connection with 1x1 conv downsampling
+            nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=2, bias=False),
+            # Conv. block
+            nn.Sequential(
+                normalization_constructor(in_channels),
+                activation_constructor(),
+                nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=2, padding=1, bias=False),
+                normalization_constructor(out_channels),
+                activation_constructor(),
+                nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
+            )
+        )
+
+    model = nn.Sequential(
+        # The output width of the first conv. layer being 16 * width_factor is a slight
+        # deviation from the paper repository 
+        # https://github.com/szagoruyko/wide-residual-networks/blob/master/pytorch/resnet.py
+        nn.Conv2d(3, 16 * width_factor, kernel_size=3, stride=1, padding=1, bias=False),
+        normalization_constructor(16 * width_factor),
+        activation_constructor(),
+        # Stage 1
+        block_constructor(16 * width_factor, 16 * width_factor),
+        *(block_constructor(16 * width_factor, 16 * width_factor) for _ in range(blocks_per_stage - 1)),
+        # Stage 2
+        downsample_block_constructor(16 * width_factor, 32 * width_factor),
+        *(block_constructor(32 * width_factor, 32 * width_factor) for _ in range(blocks_per_stage - 1)),
+        # Stage 3
+        downsample_block_constructor(32 * width_factor, 64 * width_factor),
+        *(block_constructor(64 * width_factor, 64 * width_factor) for _ in range(blocks_per_stage - 1)),
+        # Output
+        nn.AdaptiveAvgPool2d((1, 1)),
+        nn.Flatten(),
+        nn.Linear(64 * width_factor, 10),
+    )
+
+    # Initialise
+    for module in model.modules():
+        if isinstance(module, nn.Conv2d):
+            nn.init.kaiming_normal_(module.weight, mode="fan_out", nonlinearity="relu")
+
+    return model
+
 def get_submodules(model):
     """ Get names of all submodules in model as dict."""
     submodules = {}
@@ -278,6 +249,63 @@ def show_model(model):
         print(list(model.children())[layer])
 
 if __name__ == "__main__":
-    resnet = ResNet18_CIFAR()
     lenet = LeNet5(10)
     lenet.attention_map(torch.randn(1, 3, 32, 32), "feature_extractor.8")
+
+# class ResNet18_CIFAR(models.ResNet):
+#     """10 layers in total.
+#     Layers 4-7 inclusive are blocks. Each block has a two sub-block of BasicBlock() structure:
+#     Sequential(
+#     (0): BasicBlock(
+#         (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+#         (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+#         (relu): ReLU(inplace=True)
+#         (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+#         (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+#     )
+#     (1): BasicBlock(
+#         (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+#         (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+#         (relu): ReLU(inplace=True)
+#         (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+#         (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+#     )
+#     """
+#     def __init__(self, num_classes=10):
+#         super(ResNet18_CIFAR, self).__init__(block=models.resnet.BasicBlock, layers=[2, 2, 2, 2], num_classes=num_classes)
+#         # Modify the first convolution layer to accept 3-channel input with 32 x 32 dimensions
+#         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+
+#     def attention_map(self, x, layer):
+#         layer_index = None
+#         # Check modules
+#         # for module in self.modules():
+#         #     print("==================================")
+#         #     print(module)
+#         for i, (name, _) in enumerate(self.named_modules()):
+#             # For some reason first module is the entire model so skip it
+#             if i == 0:
+#                 continue
+#             if name == layer:
+#                 layer_index = i
+#                 break
+#         if layer_index is None:
+#             raise ValueError("Layer not found.")
+#         submodel = nn.Sequential(*list(self.modules())[1:layer_index+1])
+#         return submodel(x)  
+
+#     def forward(self, x):
+#         x = self.conv1(x)
+#         x = self.bn1(x)
+#         x1= self.relu(x)
+
+#         x = self.layer1(x)
+#         x = self.layer2(x)
+#         x = self.layer3(x)
+#         x = self.layer4(x)
+
+#         x = self.avgpool(x)
+#         x = x.view(x.size(0), -1)
+#         x = self.fc(x)
+
+#         return x

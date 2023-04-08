@@ -8,7 +8,7 @@ from time import gmtime, strftime
 
 from image_models import *
 from plotting import *
-from jacobian_srinivas import *
+from jacobian import *
 from contrastive import *
 from feature_match import *
 from utils_ekdeep import *
@@ -97,7 +97,7 @@ AUG_NUM = 0 # Define augmentation of distillation dataset
 if args.config_name:
     EXP_NUM = config['experiment_num']
     TEACH_NUM = config['teacher_num']
-run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]
+run_name = "teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]
 # Hyperparams
 lr = 0.1
 final_lr = 0.03
@@ -131,23 +131,13 @@ match TEACH_NUM:
         teacher = LeNet5(10).to(device)
         base_dataset = 'CIFAR10'
     case 1:
-        teacher = ResNet50_CIFAR(10).to(device)
-        base_dataset = 'CIFAR10'
-    case 2:
-        teacher = ResNet18_CIFAR(10).to(device)
-        base_dataset = 'CIFAR10'
-    case 3:
-        teacher = ResNet18_CIFAR(100).to(device)
-        base_dataset = 'CIFAR100'
-    case 4:
-        teacher = ResNet50_CIFAR(100).to(device)
-        base_dataset = 'CIFAR100'
-    case 5:
         teacher = CustomResNet18(100).to(device)
         base_dataset = 'CIFAR100'
-    case 6:
+    case 2:
         teacher = CustomResNet50(100).to(device)
         base_dataset = 'CIFAR100'
+    case 3:
+        teacher = wide_resnet_constructor(18)
 
 if __name__ == "__main__":
     if is_sweep:
