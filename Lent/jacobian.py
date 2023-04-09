@@ -20,7 +20,7 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
     """
     distill_loss = get_distill_loss(scores, targets, T, loss_fn)
     # Number of classes to use for Jacobian approximation
-    k = 5
+    k = 20
 
     if not approx:
         t_jac = get_jacobian(targets, inputs, batch_size, input_dim, output_dim)
@@ -29,7 +29,7 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
         i = torch.topk(targets, k, dim=1)[1]
         t_jac = get_approx_jacobian(targets, inputs, batch_size, output_dim, i)
         s_jac = get_approx_jacobian(scores, inputs, batch_size, output_dim, i)
-        
+
     s_jac= torch.div(s_jac, torch.norm(s_jac, 2, dim=-1).unsqueeze(1))
     t_jac = torch.div(t_jac, torch.norm(t_jac, 2, dim=-1).unsqueeze(1))
     jacobian_loss = torch.norm(t_jac-s_jac, 2, dim=1)
@@ -82,13 +82,11 @@ def get_approx_jacobian(output, x, batch_size, output_dim, i):
     """
     assert x.requires_grad
     jacobian = torch.zeros(batch_size, output_dim, x.numel() // batch_size, device=x.device)
-
     for idx in range(i.shape[1]):
         grad_output = torch.zeros(batch_size, output_dim, device=x.device)
         grad_output.scatter_(1, i[:, idx].unsqueeze(1), 1)
         grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True, retain_graph=True)[0]
         jacobian[:, i[:, idx], :] = grad_input.view(batch_size, -1)
-
     return jacobian.view(batch_size, -1)
 
 def get_jacobian(output, x, batch_size, input_dim, output_dim):
