@@ -126,6 +126,10 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
     test_acc = []
     train_loss = []  # loss at iteration 0
     weight_reset(student)
+    # Initialise contrastive loss
+    num_classes = len(train_loader.dataset.classes)
+    # Start off by using output logits
+    contrastive_loss = CRDLoss(num_classes, num_classes, T=0.1)
 
     for epoch in range(epochs):
         for inputs, labels in tqdm(train_loader):
@@ -152,13 +156,13 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                     output_dim = scores.shape[1]
                     batch_size = inputs.shape[0]
                     loss = jacobian_loss(scores, targets, inputs, T=1, alpha=alpha, batch_size=batch_size, loss_fn=mse_loss, input_dim=input_dim, output_dim=output_dim)
-                case 2: # Feature map loss - currently only for self-distillation
+                case 3: # Feature map loss - currently only for self-distillation
                     layer = 'feature_extractor.10'
                     s_map = student.attention_map(inputs, layer)
                     t_map = teacher.attention_map(inputs, layer).detach()
                     loss = feature_map_diff(scores, targets, s_map, t_map, T=1, alpha=0.2, loss_fn=mse_loss, aggregate_chan=False)
-                case 3: # Attention Jacobian loss
-                    loss = jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_size, T=1, alpha=0.8, loss_fn=kl_loss)
+                case 2: # Contrastive distillation
+                    loss = contrastive_loss(scores, targets, labels)
 
             optimizer.zero_grad()
             loss.backward()

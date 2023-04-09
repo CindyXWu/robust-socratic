@@ -34,7 +34,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--config_name", type=str, default=None)
 # Indexes into list of dictionaries for config file
 parser.add_argument('--config_num', type=int, help='Index of the configuration to use')
-parser.add_argument("--sweep", type=bool, default=True)
+parser.add_argument("--sweep", type=bool, default=False)
 args = parser.parse_args()
 
 ## OPEN YAML CONFIGS ## ===================================================
@@ -90,11 +90,11 @@ def sweep():
 # Refer to dictionaries student_dict, exp_num, aug_dict, loss_dict, s_teach_dict in info_dicts.py
 #================================================================================================
 is_sweep = args.sweep
-T_EXP_NUM = 2
-S_EXP_NUM = 2
+T_EXP_NUM = 1
+S_EXP_NUM = 1
 STUDENT_NUM = 2
 TEACH_NUM = 3
-LOSS_NUM = 1
+LOSS_NUM = 2
 AUG_NUM = 0
 if args.config_name:
     T_EXP_NUM = config['t_exp_num']
@@ -108,6 +108,7 @@ run_name = 'teacher: '+teacher_dict[TEACH_NUM]+', student: '+student_dict[STUDEN
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
 # ======================================================================================
+wandb_run = True # Set to False to check loss functions
 lr = 0.5
 final_lr = 0.1
 temp = 30
@@ -117,21 +118,20 @@ batch_size = 64
 e_dim = 50 # embedding size for contrastive loss
 spurious_corr = 1.0
 
-sweep_method = 'grid'
-sweep_count = 7
-sweep_name = strftime("%m-%d %H:%M:%S", gmtime())
-
-sweep_configuration = {
-    'method': sweep_method,
-    'name': sweep_name,
-    'metric': {'goal': 'maximize', 'name': 'student test acc'},
-    # CHANGE THESE
-    'parameters': {
-        'spurious_corr': {'values': [0, 0.5, 0.6, 0.7, 0.8, 0.9, 1]}, # For grid search
-        # 'alpha': {'distribution': 'uniform', 'min': 0, 'max': 1}, # For bayes search
-    },
-    # 'early_terminate': {'type': 'hyperband', 'min_iter': 5}
-}
+# sweep_method = 'grid'
+# sweep_count = 7
+# sweep_name = strftime("%m-%d %H:%M:%S", gmtime())
+# sweep_configuration = {
+#     'method': sweep_method,
+#     'name': sweep_name,
+#     'metric': {'goal': 'maximize', 'name': 'student test acc'},
+#     # CHANGE THESE
+#     'parameters': {
+#         'spurious_corr': {'values': [0, 0.5, 0.6, 0.7, 0.8, 0.9, 1]}, # For grid search
+#         # 'alpha': {'distribution': 'uniform', 'min': 0, 'max': 1}, # For bayes search
+#     },
+#     # 'early_terminate': {'type': 'hyperband', 'min_iter': 5}
+# }
 #================================================================================
 
 # Student model setup (change only if adding to dicts above)
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     if is_sweep:
         sweep_id = wandb.sweep(sweep=sweep_configuration, project=project)
         wandb.agent(sweep_id, function=sweep, count=sweep_count)
-    else:
+    elif wandb_run:
         wandb.init(
             # Set the wandb project where this run will be logged
             project=project,
@@ -204,13 +204,14 @@ if __name__ == "__main__":
             spurious_type = 'box'
             randomize_loc = True
 
-    wandb.config.base_dataset = base_dataset
-    wandb.config.spurious_corr = 'spurious_corr='+str(spurious_corr)
-    wandb.config.student_mechanism = exp_dict[S_EXP_NUM]
-    wandb.config.teacher_mechanism = exp_dict[T_EXP_NUM]
-    wandb.config.teacher = teacher_dict[TEACH_NUM]
-    wandb.config.student = student_dict[STUDENT_NUM]
-    wandb.config.loss = loss_dict[LOSS_NUM]
+    if wandb_run:
+        wandb.config.base_dataset = base_dataset
+        wandb.config.spurious_corr = 'spurious_corr='+str(spurious_corr)
+        wandb.config.student_mechanism = exp_dict[S_EXP_NUM]
+        wandb.config.teacher_mechanism = exp_dict[T_EXP_NUM]
+        wandb.config.teacher = teacher_dict[TEACH_NUM]
+        wandb.config.student = student_dict[STUDENT_NUM]
+        wandb.config.loss = loss_dict[LOSS_NUM]
     
     train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
     test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)

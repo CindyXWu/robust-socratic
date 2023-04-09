@@ -139,7 +139,7 @@ match TEACH_NUM:
         teacher = wide_resnet_constructor(3, 100).to(device)
         base_dataset = 'CIFAR100'
 
-run_name = "T "+teacher_dict[TEACH_NUM]+", T mech "+", Data "+base_dataset+", Exp "+exp_dict[EXP_NUM]+", Aug "+aug_dict[AUG_NUM]
+run_name = "T "+teacher_dict[TEACH_NUM]+", Data "+base_dataset+", Exp "+exp_dict[EXP_NUM]+", Aug "+aug_dict[AUG_NUM]
 
 if __name__ == "__main__":
     if is_sweep:

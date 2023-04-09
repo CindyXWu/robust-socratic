@@ -1,74 +1,83 @@
 import torch
 from torch import nn
-from contrast_memory import *
 
-eps = 1e-7
+# Approximately N/M
+# 60/60k
+eps = 1e-3
 
 class CRDLoss(nn.Module):
-    """CRD Loss function
-    includes two symmetric parts:
-    (a) using teacher as anchor, choose positive and negatives over the student side
-    (b) using student as anchor, choose positive and negatives over the teacher side
+    """CRD Loss function for student model
     Args:
-        opt.s_dim: the dimension of student's feature
-        opt.t_dim: the dimension of teacher's feature
-        opt.feat_dim: the dimension of the projection space
-        opt.nce_k: number of negatives paired with each positive
-        opt.nce_t: the temperature
-        opt.nce_m: the momentum for updating the memory buffer
-        opt.n_data: the number of samples in the training set, therefore the memory buffer is: opt.n_data x opt.feat_dim
+        s_dim: the dimension of student's feature
+        t_dim: the dimension of teacher's feature
+        feat_dim: the dimension of the projection space
+        T: temperature
     """
-    def __init__(self, opt):
+    def __init__(self, s_dim, t_dim, T, feat_dim=128):
         super(CRDLoss, self).__init__()
-        self.embed_s = Embed(opt.s_dim, opt.feat_dim)
-        self.embed_t = Embed(opt.t_dim, opt.feat_dim)
-        self.contrast = ContrastMemory(opt.feat_dim, opt.n_data, opt.nce_k, opt.nce_t, opt.nce_m)
-        self.criterion_t = ContrastLoss(opt.n_data)
-        self.criterion_s = ContrastLoss(opt.n_data)
+        self.embed_s = Embed(s_dim, feat_dim)
+        self.embed_t = Embed(t_dim, feat_dim)
+        self.T = T
+        self.embed = s_dim != t_dim
+        self.criterion_s = ContrastLoss()
 
-    def forward(self, f_s, f_t, idx, contrast_idx=None):
+    def forward(self, f_s, f_t, y):
         """
         Args:
             f_s: the feature of student network, size [batch_size, s_dim]
             f_t: the feature of teacher network, size [batch_size, t_dim]
-            idx: the indices of these positive samples in the dataset, size [batch_size]
-            contrast_idx: the indices of negative samples, size [batch_size, nce_k]
+            y: the labels of the samples, size [batch_size]
         Returns:
-            The contrastive loss
+            The contrastive loss for the student model
         """
-        f_s = self.embed_s(f_s)
-        f_t = self.embed_t(f_t)
-        out_s, out_t = self.contrast(f_s, f_t, idx, contrast_idx)
-        s_loss = self.criterion_s(out_s)
-        t_loss = self.criterion_t(out_t)
-        loss = s_loss + t_loss
-        return loss
+        # Only embed if the dimensions are different
+        if self.embed:
+            f_s = self.embed_s(f_s)
+            f_t = self.embed_t(f_t)
+        # Numerator of equation 19
+        out_s = torch.exp(torch.div(torch.mm(f_s, f_t.t()),self.T))
+        assert out_s.shape[0] == f_s.shape[0]
+        s_loss = self.criterion_s(out_s, y)
+        return s_loss
 
 
 class ContrastLoss(nn.Module):
     """
-    contrastive loss, corresponding to Eq (18)
+    contrastive loss with in-batch negatives
     """
-    def __init__(self, n_data):
+    def __init__(self):
         super(ContrastLoss, self).__init__()
-        self.n_data = n_data
 
-    def forward(self, x):
+    def forward(self, x: float, y: int):
+        """
+        Args:
+            x: exponentiated dot product similarity, size [batch_size, batch_size]
+            y: labels, size [batch_size]
+        """
         bsz = x.shape[0]
-        m = x.size(1) - 1
+        # Ignore the image itself
+        x = x - torch.diag(torch.diag(x))
+        # Repeat y along second dimension
+        y_expand = y.unsqueeze(0).repeat(bsz, 1)
+        # Matrix of comparisons
+        pos_mask = torch.eq(y_expand, y_expand.t())
+        neg_mask = torch.logical_not(pos_mask)
+        # Loss for positive pairs - flatten for ease
+        P_pos = x[pos_mask].view(-1, 1)
+        log_D1 = torch.log(torch.div(P_pos, P_pos.add(eps)))
+        # Loss for negative pairs using in-batch negatives
+        P_neg = x[neg_mask].view(-1, 1)
+        log_D0 = torch.log(torch.div(eps, P_neg.add(eps)))
+        # Batch average loss (don't take into account variation in number of neg samples per image, is small overall)
+        loss = - (log_D1.sum(0) + log_D0.sum(0)) / bsz
 
-        # noise distribution
-        Pn = 1 / float(self.n_data)
-
-        # loss for positive pair
-        P_pos = x.select(1, 0)
-        log_D1 = torch.div(P_pos, P_pos.add(m * Pn + eps)).log_()
-
-        # loss for K negative pair
-        P_neg = x.narrow(1, 1, m)
-        log_D0 = torch.div(P_neg.clone().fill_(m * Pn), P_neg.add(m * Pn + eps)).log_()
-
-        loss = - (log_D1.sum(0) + log_D0.view(-1, 1).sum(0)) / bsz
+        # # IF NOT AGGREGATING OVER BATCH
+        # # Compute h for every sample
+        # h = torch.log(torch.div(x, x.add(eps)))
+        # # Everything not positive set to 0 - works because we sum over the batch
+        # P_pos = h*pos_mask
+        # P_neg = (1-h)*neg_mask
+        # loss = - (P_pos.sum(0) + P_neg.sum(0)) / bsz
 
         return loss
 
@@ -96,4 +105,4 @@ class Normalize(nn.Module):
     def forward(self, x):
         norm = x.pow(self.power).sum(1, keepdim=True).pow(1. / self.power)
         out = x.div(norm)
-        return 
+        return out
