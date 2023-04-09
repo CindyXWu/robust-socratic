@@ -48,8 +48,8 @@ module load miniconda/3
 source ~/.bashrc
 conda deactivate
 conda activate pytorch
-#config_file=$CONFIG_FILE
-#i=$IDX
+config_file=$CONFIG_FILE
+i=$IDX
 
 #! Full path to application executable: 
 application="python shapes_t.py"

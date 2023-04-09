@@ -92,8 +92,8 @@ def sweep():
 is_sweep = args.sweep
 T_EXP_NUM = 2
 S_EXP_NUM = 2
-STUDENT_NUM = 0
-TEACH_NUM = 0
+STUDENT_NUM = 2
+TEACH_NUM = 3
 LOSS_NUM = 1
 AUG_NUM = 0
 if args.config_name:

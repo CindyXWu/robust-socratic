@@ -85,10 +85,10 @@ is_sweep = False
 TEACH_NUM = 5
 EXP_NUM = 0
 AUG_NUM = 0
-run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" shapes"
 if args.config_name:
-    EXP_NUM = config['experiment_num']
+    EXP_NUM = config['exp_num']
     TEACH_NUM = config['teacher_num']
+run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" shapes"
 # Hyperparams
 lr = 0.1
 final_lr = 0.05
