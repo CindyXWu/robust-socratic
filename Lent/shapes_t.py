@@ -82,7 +82,7 @@ def sweep_teacher():
 # Refer to dictionaries s_exp_num, aug_dict, s_teach_num in info_dictionaries.py
 #================================================================================
 is_sweep = False
-TEACH_NUM = 5
+TEACH_NUM = 3
 EXP_NUM = 0
 AUG_NUM = 0
 if args.config_name:
@@ -90,9 +90,9 @@ if args.config_name:
     TEACH_NUM = config['teacher_num']
 run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" shapes"
 # Hyperparams
-lr = 0.1
-final_lr = 0.05
-epochs = 3
+lr = 0.5
+final_lr = 0.1
+epochs = 8
 batch_size = 64
 
 sweep_count = 10
