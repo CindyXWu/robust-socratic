@@ -50,7 +50,7 @@ def weight_reset(model):
         if hasattr(layer, 'reset_parameters'):
             layer.reset_parameters()
 
-def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, project, teach_num, exp_num, save=False):
+def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, project, teach_num, exp_num, dataset, save=True):
     """Fine tune a pre-trained teacher model for specific downstream task, or train from scratch."""
     optimizer = optim.SGD(model.parameters(), lr=lr)
     it = 0
@@ -88,7 +88,9 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, projec
         # Checkpoint model at end of every epoch
         # Have two models: working copy (this one) and final fetched model
         # Save optimizer in case re-run, save test accuracy to compare models
-        save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+exp_dict[exp_num]+"_working"
+        save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+dataset+"_"+exp_dict[exp_num]+"_working"
+        if dataset:
+            save_path += "_"+dataset
         torch.save({'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
@@ -98,7 +100,7 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, projec
                 save_path)
     
     if save:
-        save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+exp_dict[exp_num]+"_final"
+        save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+dataset+"_"+exp_dict[exp_num]+"_final"
         torch.save({'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss_hist': train_loss,

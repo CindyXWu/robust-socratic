@@ -161,10 +161,10 @@ match TEACH_NUM:
 # Load saved teacher model (change only if changing file locations)
 # Clumsy try-except while I wrestle my codebase into sync
 try:
-    load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+exp_dict[T_EXP_NUM]
+    load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+exp_dict[T_EXP_NUM]
     checkpoint = torch.load(load_name, map_location=device)
 except:
-    load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+exp_dict[T_EXP_NUM]+"_final"
+    load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+exp_dict[T_EXP_NUM]+"_final"
 checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
 

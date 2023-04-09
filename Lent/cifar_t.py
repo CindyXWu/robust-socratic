@@ -97,7 +97,6 @@ AUG_NUM = 0 # Define augmentation of distillation dataset
 if args.config_name:
     EXP_NUM = config['experiment_num']
     TEACH_NUM = config['teacher_num']
-run_name = "teacher"+teacher_dict[TEACH_NUM]+"teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]
 # Hyperparams
 lr = 0.15# 0.137
 final_lr = 0.01 #0.112
@@ -139,6 +138,8 @@ match TEACH_NUM:
     case 3:
         teacher = wide_resnet_constructor(3, 100).to(device)
         base_dataset = 'CIFAR100'
+
+run_name = "T "+teacher_dict[TEACH_NUM]+", T mech "+", Data "+base_dataset+", Exp "+exp_dict[EXP_NUM]+", Aug "+aug_dict[AUG_NUM]
 
 if __name__ == "__main__":
     if is_sweep:
@@ -184,4 +185,4 @@ if __name__ == "__main__":
         test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
         # Fine-tune or train teacher from scratch
-        train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM, save=True)
+        train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM, dataset=base_dataset)

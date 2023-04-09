@@ -119,10 +119,13 @@ project = "Teacher"
 match TEACH_NUM:
     case 1:
         teacher = CustomResNet18(12).to(device)
+        dataset = "Shapes"
     case 2:
         teacher = CustomResNet50(12).to(device)
+        dataset = "Shapes"
     case 3:
         teacher = wide_resnet_constructor(3, 12).to(device)
+        dataset = "Shapes"
 
 if __name__ == "__main__":
     if is_sweep:
@@ -159,4 +162,4 @@ if __name__ == "__main__":
         test_loader = dataloader_3D_shapes('test', batch_size)
 
         # Fine-tune or train teacher from scratch
-        train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM, save=True)
+        train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM, dataset=dataset)
