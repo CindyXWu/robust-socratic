@@ -167,6 +167,8 @@ except:
     load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+exp_dict[T_EXP_NUM]+"_final"
 checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
+test_acc = checkpoint['test_acc']
+print("Loaded teacher model with test accuracy: ", test_acc[-1])
 
 plain_test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type='plain', spurious_corr=1, randomize_loc=False)
 box_test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type='box', spurious_corr=1, randomize_loc=False)
@@ -187,6 +189,7 @@ if __name__ == "__main__":
                 "epochs": epochs,
                 "temp": temp,
                 "batch_size": batch_size,
+                "teacher_acc": test_acc[-1],
             },
             name = run_name
         )
