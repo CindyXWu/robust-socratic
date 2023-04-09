@@ -103,7 +103,7 @@ if args.config_name:
     LOSS_NUM = config['loss_num']
     S_EXP_NUM = config['s_exp_num']
 ## WANDB PROJECT NAME
-project = "Student (debug)"
+project = "Test"
 run_name = 'teacher: '+teacher_dict[TEACH_NUM]+', student: '+student_dict[STUDENT_NUM]+', student mechanism: '+exp_dict[S_EXP_NUM]+', teacher mechanism: '+exp_dict[T_EXP_NUM]+', loss: '+loss_dict[LOSS_NUM]+', aug: '+aug_dict[AUG_NUM]
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================

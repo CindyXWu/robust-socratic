@@ -228,6 +228,7 @@ def wide_resnet_constructor(
 
     return model
 
+# Use this to find the names of the layers in the model for feature extractor in feature_match.py
 def get_submodules(model):
     """ Get names of all submodules in model as dict."""
     submodules = {}
@@ -242,16 +243,16 @@ def get_submodules(model):
             submodules[name] = name
     print(submodules)
 
-
 def show_model(model):
     print("List of model layers:")
-    for layer in range(len(list(model.children()))):
-        print("LAYER {} +++++++++++++++++++++++++++++++".format(layer))
-        print(list(model.children())[layer])
+    for idx, module in enumerate(model.children()):
+        print(f"Layer {idx}: {module}")
 
 if __name__ == "__main__":
-    lenet = LeNet5(10)
-    lenet.attention_map(torch.randn(1, 3, 32, 32), "feature_extractor.8")
+    # lenet = LeNet5(10)
+    # lenet.attention_map(torch.randn(1, 3, 32, 32), "feature_extractor.8")
+    resnet = wide_resnet_constructor(3, 100)
+    get_submodules(resnet)
 
 # class ResNet18_CIFAR(models.ResNet):
 #     """10 layers in total.

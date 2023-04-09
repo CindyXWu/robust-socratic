@@ -46,9 +46,12 @@ def evaluate(model, dataset, batch_size, max_ex=0):
 
 def weight_reset(model):
     """Reset weights of model at start of training."""
-    for layer in model.modules():
-        if hasattr(layer, 'reset_parameters'):
-            layer.reset_parameters()
+    for module in model.modules():
+        if hasattr(module, 'reset_parameters'):
+            module.reset_parameters()
+        # Initialise
+        if isinstance(module, nn.Conv2d):
+            nn.init.kaiming_normal_(module.weight, mode="fan_out", nonlinearity="relu")
 
 def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, project, teach_num, exp_num, dataset, save=True):
     """Fine tune a pre-trained teacher model for specific downstream task, or train from scratch."""
@@ -115,9 +118,9 @@ def base_distill_loss(scores, targets, temp):
 
 def train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, ranbox_test_loader, lr, final_lr, temp, epochs, loss_num, run_name, alpha=None):
     """Train student model with distillation loss.
-    
     Includes LR scheduling. Change loss function as required. 
-    N.B. I need to refator this at some point.
+    N.B. I need to refactor this at some point.
+    Student model should be kaiming initialised and teacher model should be pre-trained.
     """
     optimizer = optim.SGD(student.parameters(), lr=lr)
     scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
@@ -125,11 +128,13 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
     train_acc = []
     test_acc = []
     train_loss = []  # loss at iteration 0
-    weight_reset(student)
-    # Initialise contrastive loss
-    num_classes = len(train_loader.dataset.classes)
-    # Start off by using output logits
+    output_dim = num_classes = len(train_loader.dataset.classes)
+    batch_size = train_loader.batch_size
+    # Initialise contrastive loss, temp=0.1 (as recommended in paper)
     contrastive_loss = CRDLoss(num_classes, num_classes, T=0.1)
+    teacher_test_acc = evaluate(teacher, test_loader, batch_size)
+    input_dim = 32*32*3
+    # weight_reset(student)
 
     for epoch in range(epochs):
         for inputs, labels in tqdm(train_loader):
@@ -137,32 +142,30 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
             inputs.requires_grad = True
             labels = labels.to(device)
             scores = student(inputs)
-            targets = teacher(inputs)
-            # Top 1 class
-            student_preds = torch.argmax(scores, dim=1)
-            teacher_preds = torch.argmax(targets, dim=1)     
-
-            input_dim = 32*32*3
-            output_dim = scores.shape[1]
-            batch_size = inputs.shape[0]
-
+            targets = teacher(inputs) 
+            student_preds = scores.argmax(dim=1)
+            teacher_preds = targets.argmax(dim=1)
+            
             # for param in student.parameters():
             #     assert param.requires_grad
             match loss_num:
                 case 0: # Base distillation loss
                     loss = base_distill_loss(scores, targets, temp)
-                case 1: # Jacobian loss
-                    input_dim = 32*32*3
+                case 1: # Jacobian loss   
                     output_dim = scores.shape[1]
-                    batch_size = inputs.shape[0]
                     loss = jacobian_loss(scores, targets, inputs, T=1, alpha=alpha, batch_size=batch_size, loss_fn=mse_loss, input_dim=input_dim, output_dim=output_dim)
-                case 3: # Feature map loss - currently only for self-distillation
-                    layer = 'feature_extractor.10'
-                    s_map = student.attention_map(inputs, layer)
-                    t_map = teacher.attention_map(inputs, layer).detach()
-                    loss = feature_map_diff(scores, targets, s_map, t_map, T=1, alpha=0.2, loss_fn=mse_loss, aggregate_chan=False)
+                # case 3: # Feature map loss - currently only for self-distillation
+                #     layer = 'feature_extractor.10'
+                # Format below only works if model has a feature extractor method
+                #     s_map = student.attention_map(inputs, layer)
+                #     t_map = teacher.attention_map(inputs, layer).detach() 
+                    # loss = feature_map_diff(scores, targets, s_map, t_map, T=1, alpha=0.2, loss_fn=mse_loss, aggregate_chan=False)
                 case 2: # Contrastive distillation
-                    loss = contrastive_loss(scores, targets, labels)
+                    layer = {"11.path2.5": "final_features"}
+                    s_map = feature_extractor(student, inputs, layer).view(batch_size, -1)
+                    t_map = feature_extractor(teacher, inputs, layer).view(batch_size, -1).detach()
+                    alpha = 0.3
+                    loss = alpha*contrastive_loss(s_map, t_map, labels)+(1-alpha)*base_distill_loss(scores, targets, temp)
 
             optimizer.zero_grad()
             loss.backward()
@@ -171,10 +174,10 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
             lr = scheduler.get_lr()
             train_loss.append(loss.detach().cpu().numpy())
 
-            # if it == 0:
-            #     # Check that model is training correctly
-            #     for param in student.parameters():
-            #         assert param.grad is not None
+            if it == 0:
+                # Check that model is training correctly
+                for param in student.parameters():
+                    assert param.grad is not None
             if it % 100 == 0:
                 batch_size = inputs.shape[0]
                 train_acc.append(evaluate(student, train_loader, batch_size, max_ex=100))
@@ -182,7 +185,6 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                 plain_acc = evaluate(student, plain_test_loader, batch_size)
                 box_acc = evaluate(student, box_test_loader, batch_size)
                 randbox_acc = evaluate(student, ranbox_test_loader, batch_size)
-                teacher_test_acc = evaluate(teacher, test_loader, batch_size)
                 error = teacher_test_acc - test_acc[-1]
                 KL_diff = kl_loss(F.log_softmax(scores/temp, dim=1), F.log_softmax(targets/temp, dim=1))
                 top1_diff = torch.eq(student_preds, teacher_preds).float().mean()

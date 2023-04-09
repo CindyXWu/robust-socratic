@@ -46,19 +46,18 @@ def feature_map_diff(scores, targets, s_map, t_map, T, alpha, loss_fn, aggregate
 #     features[0].retain_grad()
 #     return features[0]
 
-# def feature_extractor(model, inputs, return_layers, grad=True):
-#     """Extract feature maps from model.
-#     Args:
-#         model: torch model, model to extract feature maps from
-#         inputs: torch tensor, input to model
-#         return_layers: dictionary of layer names to return
-#     """
-#     assert inputs.requires_grad
-#     mid_getter = MidGet(model, return_layers, True)
-#     mid_outputs, model_outputs = mid_getter(inputs)
-#     features =  list(mid_outputs.items())[0][1]
-#     if grad == False:
-#         features = features.detach()
-#         return features
-#     assert features.requires_grad
-#     return features
+def feature_extractor(model, inputs, return_layers, grad=True):
+    """Extract feature maps from model.
+    Args:
+        model: torch model, model to extract feature maps from
+        inputs: torch tensor, input to model
+        return_layers: dictionary of layer names to return
+    """
+    mid_getter = MidGet(model, return_layers, True)
+    mid_outputs, model_outputs = mid_getter(inputs)
+    features =  list(mid_outputs.items())[0][1]
+    if grad == False:
+        features = features.detach()
+        return features
+    assert features.requires_grad
+    return features

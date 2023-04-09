@@ -1,9 +1,9 @@
+"""'Contrastive Representation Distillation' (Tian et al. 2019)"""
 import torch
 from torch import nn
 
 # Approximately N/M
-# 60/60k
-eps = 1e-3
+eps = 0.7
 
 class CRDLoss(nn.Module):
     """CRD Loss function for student model
@@ -35,11 +35,10 @@ class CRDLoss(nn.Module):
             f_s = self.embed_s(f_s)
             f_t = self.embed_t(f_t)
         # Numerator of equation 19
-        out_s = torch.exp(torch.div(torch.mm(f_s, f_t.t()),self.T))
-        assert out_s.shape[0] == f_s.shape[0]
+        dot_product = torch.mm(torch.div(f_s,torch.norm(f_s)), torch.div(f_t.t(),torch.norm(f_t)))
+        out_s = torch.exp(torch.div(dot_product, self.T))
         s_loss = self.criterion_s(out_s, y)
         return s_loss
-
 
 class ContrastLoss(nn.Module):
     """
@@ -55,32 +54,20 @@ class ContrastLoss(nn.Module):
             y: labels, size [batch_size]
         """
         bsz = x.shape[0]
-        # Ignore the image itself
-        x = x - torch.diag(torch.diag(x))
-        # Repeat y along second dimension
-        y_expand = y.unsqueeze(0).repeat(bsz, 1)
-        # Matrix of comparisons
-        pos_mask = torch.eq(y_expand, y_expand.t())
+        c = 1e-7 # Small constant for stability
+        x = x - torch.diag(torch.diag(x))   # Ignore the image itself
+        y_expand = y.unsqueeze(0).repeat(bsz, 1)         # Repeat y along second dimension
+        pos_mask = torch.eq(y_expand, y_expand.t())         # Matrix of comparisons
         neg_mask = torch.logical_not(pos_mask)
         # Loss for positive pairs - flatten for ease
         P_pos = x[pos_mask].view(-1, 1)
-        log_D1 = torch.log(torch.div(P_pos, P_pos.add(eps)))
+        log_D1 = torch.log(torch.div(P_pos.add(c), P_pos.add(eps)))
         # Loss for negative pairs using in-batch negatives
         P_neg = x[neg_mask].view(-1, 1)
         log_D0 = torch.log(torch.div(eps, P_neg.add(eps)))
         # Batch average loss (don't take into account variation in number of neg samples per image, is small overall)
         loss = - (log_D1.sum(0) + log_D0.sum(0)) / bsz
-
-        # # IF NOT AGGREGATING OVER BATCH
-        # # Compute h for every sample
-        # h = torch.log(torch.div(x, x.add(eps)))
-        # # Everything not positive set to 0 - works because we sum over the batch
-        # P_pos = h*pos_mask
-        # P_neg = (1-h)*neg_mask
-        # loss = - (P_pos.sum(0) + P_neg.sum(0)) / bsz
-
         return loss
-
 
 class Embed(nn.Module):
     """Embedding module"""
@@ -94,7 +81,6 @@ class Embed(nn.Module):
         x = self.linear(x)
         x = self.l2norm(x)
         return x
-
 
 class Normalize(nn.Module):
     """normalization layer"""

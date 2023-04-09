@@ -5,9 +5,7 @@ import torch.nn.functional as F
 import torch
 from image_models import *
 
-
 # NOTE for later so I don't forget: automatically set to approximate Jacobian 
-# May want to change for smaller class number 
 def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_dim, output_dim, approx=True):
     """Eq 10, no hard targets used.
     Args:
@@ -54,6 +52,33 @@ def get_distill_loss(scores, targets, T, loss_fn):
     distill_loss = T**2 * loss_fn(soft_pred, soft_targets)
     return distill_loss
 
+def get_approx_jacobian(output, x, batch_size, output_dim, i):
+    """Compute Jacobian for the top-k most probable classes instead of just the most probable class.
+    Args:
+        output: [batch_size, output_dim=num_classes]
+        x: input with requres_grad() True [batch_size, input_dim]
+        i: indices of top-k classes. If None, calculate (assume for teacher). If not None, assume for calculating for student (needs to match teacher).
+    """
+    assert x.requires_grad
+    jacobian = torch.zeros_like(x).unsqueeze(1).expand(-1, output_dim, -1)
+    for idx in range(i.shape[1]):
+        grad_output = torch.zeros(batch_size, output_dim, device=x.device)
+        grad_output.scatter_(1, i[:, idx].unsqueeze(1), 1)
+        grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True, retain_graph=True)[0]
+        jacobian[:, i[:, idx], :] = grad_input.view(batch_size, -1)
+    return jacobian.view(batch_size, -1)
+
+def get_jacobian(output, x, batch_size, input_dim, output_dim):
+    """Autograd method. Need to keep grads, so set create_graph to True."""
+    assert output.requires_grad
+    jacobian = torch.zeros(batch_size, output_dim, input_dim, device=x.device)
+    for i in range(output_dim):
+        grad_output = torch.zeros(batch_size, output_dim, device=x.device)
+        grad_output[:, i] = 1
+        grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True)[0]
+        jacobian[:, i, :] = grad_input.view(batch_size, input_dim)
+    return jacobian.view(batch_size, -1) # Flatten
+
 # def get_approx_jacobian(output, x, batch_size, output_dim, i=None):
 #     """Rather than computing Jacobian for all output classes, compute for most probable class.
 #     Args:
@@ -72,33 +97,6 @@ def get_distill_loss(scores, targets, T, loss_fn):
 #     output.backward(grad_output, create_graph=True)
 #     jacobian = x.grad.view(batch_size, -1)
 #     return jacobian
-
-def get_approx_jacobian(output, x, batch_size, output_dim, i):
-    """Compute Jacobian for the top-k most probable classes instead of just the most probable class.
-    Args:
-        output: [batch_size, output_dim=num_classes]
-        x: input with requres_grad() True [batch_size, input_dim]
-        i: indices of top-k classes. If None, calculate (assume for teacher). If not None, assume for calculating for student (needs to match teacher).
-    """
-    assert x.requires_grad
-    jacobian = torch.zeros(batch_size, output_dim, x.numel() // batch_size, device=x.device)
-    for idx in range(i.shape[1]):
-        grad_output = torch.zeros(batch_size, output_dim, device=x.device)
-        grad_output.scatter_(1, i[:, idx].unsqueeze(1), 1)
-        grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True, retain_graph=True)[0]
-        jacobian[:, i[:, idx], :] = grad_input.view(batch_size, -1)
-    return jacobian.view(batch_size, -1)
-
-def get_jacobian(output, x, batch_size, input_dim, output_dim):
-    """Autograd method. Need to keep grads, so set create_graph to True."""
-    assert output.requires_grad
-    jacobian = torch.zeros(batch_size, output_dim, input_dim, device=x.device)
-    for i in range(output_dim):
-        grad_output = torch.zeros(batch_size, output_dim, device=x.device)
-        grad_output[:, i] = 1
-        grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True)[0]
-        jacobian[:, i, :] = grad_input.view(batch_size, input_dim)
-    return jacobian.view(batch_size, -1) # Flatten
 
 # def get_jacobian(output, x, batch_size, input_dim, output_dim):
 #     """In order to keep grads, need to set create_graph to True, but computation very slow."""
