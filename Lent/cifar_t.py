@@ -92,7 +92,7 @@ def sweep_teacher():
 #================================================================================
 is_sweep = False
 TEACH_NUM = 3
-EXP_NUM = 2
+EXP_NUM = 0
 AUG_NUM = 0 # Define augmentation of distillation dataset
 if args.config_name:
     EXP_NUM = config['experiment_num']
