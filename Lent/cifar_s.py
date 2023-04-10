@@ -113,9 +113,9 @@ run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S me
 # ======================================================================================
 wandb_run = True # Set to False to check loss functions
 lr = 0.5
-final_lr = 0.1
+final_lr = 0.05
 temp = 30
-epochs = 15
+epochs = 20
 alpha = 1 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 spurious_corr = 1
