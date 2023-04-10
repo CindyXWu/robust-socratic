@@ -89,18 +89,18 @@ if args.config_name:
     EXP_NUM = config['exp_num']
     TEACH_NUM = config['teacher_num']
 run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" shapes"
-# Hyperparams
+
+# ======================================================================================
+# SETUP PARAMS REQUIRING MANUAL INPUT
+# ======================================================================================
 lr = 0.5
 final_lr = 0.1
 epochs = 8
 batch_size = 64
 
-sweep_count = 10
-sweep_method = 'bayes'
-sweep_name = strftime("%m-%d %H:%M:%S", gmtime())
 sweep_configuration = {
-    'method': sweep_method,
-    'name': sweep_name,
+    'method': 'bayes',
+    'name': strftime("%m-%d %H:%M:%S", gmtime()),
     'metric': {'goal': 'maximize', 'name': 'teacher test acc'},
     # CHANGE THESE 
     'parameters': {
@@ -131,7 +131,7 @@ if __name__ == "__main__":
     if is_sweep:
         # Set configuration and project for sweep and initialise agent
         sweep_id = wandb.sweep(sweep=sweep_configuration, project=project) 
-        wandb.agent(sweep_id, function=sweep_teacher, count=sweep_count)
+        wandb.agent(sweep_id, function=sweep_teacher, count=10)
     # Should be used for retraining once best model indentified from sweep
     else:
     # Save teacher model after run

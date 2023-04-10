@@ -13,7 +13,6 @@ from utils_ekdeep import *
 from info_dicts import * 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-# print(f"Using {device} device")
 
 # Instantiate losses
 kl_loss = nn.KLDivLoss(reduction='mean', log_target=True)
@@ -134,6 +133,7 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
     contrastive_loss = CRDLoss(num_classes, num_classes, T=0.1)
     teacher_test_acc = evaluate(teacher, test_loader, batch_size)
     input_dim = 32*32*3
+    it_per_epoch = len(train_loader)
     # weight_reset(student)
 
     for epoch in range(epochs):
@@ -145,7 +145,7 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
             targets = teacher(inputs) 
             student_preds = scores.argmax(dim=1)
             teacher_preds = targets.argmax(dim=1)
-            
+
             # for param in student.parameters():
             #     assert param.requires_grad
             match loss_num:
@@ -190,6 +190,18 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                 top1_diff = torch.eq(student_preds, teacher_preds).float().mean()
                 print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch, "Loss: ", train_loss[-1])
                 print("Project {}, LR {}, temp {}".format(run_name, lr, temp))
-                wandb.log({"T-S Test Difference": error, "T-S KL": KL_diff, "T-S Top 1 Difference": top1_diff, "S Train": train_acc[-1], "S Test": test_acc[-1], "S P Test": plain_acc, "Student B Test": box_acc, "S RB Test": randbox_acc, "S Loss": train_loss[-1], 'S LR': lr, })
+                wandb.log({
+                    "T-S Test Difference": error, 
+                    "T-S KL": KL_diff, 
+                    "T-S Top 1 Difference": top1_diff, 
+                    "S Train": train_acc[-1], 
+                    "S Test": test_acc[-1], 
+                    "S P Test": plain_acc, 
+                    "S B Test": box_acc, 
+                    "S RB Test": randbox_acc, 
+                    "S Loss": train_loss[-1], 
+                    "S LR": lr, },
+                    step = it//it_per_epoch
+                    )
             it += 1
     
