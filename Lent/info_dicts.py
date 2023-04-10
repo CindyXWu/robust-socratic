@@ -7,3 +7,4 @@ loss_dict  = {0: "Base Distillation", 1: "Jacobian", 2: "Contrastive"}
 aug_dict = {0: "None", 1: "Mixup et al", 2: "Union of datasets"}
 
 shapes_exp_dict = {0: "Shape_Colour", 1: "Floor", 2: "Scale"}
+dominoes_exp_dict = {0: "CIFAR10", 1: "MNIST", 2: "Box", 3: "MNIST+Box"}

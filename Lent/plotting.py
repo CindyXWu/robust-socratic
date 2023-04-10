@@ -1,5 +1,10 @@
 import matplotlib.pyplot as plt
 from torchvision.utils import make_grid
+import wandb
+from collections import defaultdict
+from info_dicts import *
+
+api = wandb.Api()
 
 def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
     fig = plt.figure(figsize=(8, 4), dpi=100)
@@ -70,3 +75,31 @@ def show_batch(dl):
         ax.set_xticks([]); ax.set_yticks([])
         ax.imshow(make_grid(images[:64], nrow=8).permute(1, 2, 0))
         break
+
+def wandb_plot_CIFAR100(project_name, t_num, s_num, exp_num):
+    runs = api.runs(project_name)
+    teacher = 'ResNet18_CIFAR100' #teacher_dict[t_num]
+    student = 'ResNet18_Flexi' #student_dict[s_num]
+    # grouped_runs = defaultdict(list)
+    t_mech = exp_dict[exp_num]
+    # Filter
+    runs = [run for run in runs if 
+            run.summary.get('Teacher') == teacher and 
+            run.summary.get('Student') == student and 
+            run.summary.get('Teacher mechanism') == t_mech
+            ]
+    run_histories = []
+    for run in runs:
+        history = run.history()
+        step_values = history['step'].values
+        BR_test = history['Student randomised box test accuracy']
+        train = history['Student train accuracy']
+        test = history['Student test accuracy']
+        B_test = history['Student box test accuracy']
+        P_test = history['Student plain test accuracy']
+        LR = history['LR']
+        error = history['Student-teacher error']
+        run_histories.append((step_values, train, test, B_test, P_test, BR_test, LR, error))
+
+if __name__ == "__main__":
+    wandb_plot_CIFAR100('Student (debug)', 1, 1, 0)
