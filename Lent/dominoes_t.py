@@ -54,7 +54,7 @@ def sweep_teacher():
             "teacher": teacher_dict[TEACH_NUM],
             "dataset": "CIFAR-100",
             "batch_size": batch_size,
-            "experiment": shapes_exp_dict[EXP_NUM],
+            "experiment": dominoes_exp_dict[EXP_NUM],
             },
         name=run_name
     )
@@ -62,19 +62,37 @@ def sweep_teacher():
     lr = wandb.config.lr
     final_lr = wandb.config.final_lr
     epochs = wandb.config.epochs
-    wandb.config.base_dataset = "3D Shapes"
+    wandb.config.base_dataset = "Dominoes"
     wandb.config.augmentation = aug_dict[AUG_NUM]
     wandb.config.teacher = teacher_dict[TEACH_NUM]
-    wandb.config.teacher_mechanism = shapes_exp_dict[EXP_NUM]
+    wandb.config.teacher_mechanism = dominoes_exp_dict[EXP_NUM]
 
-    # match EXP_NUM:
+    randomize_cues = [False, False]
+    randomize_img = False
+    match EXP_NUM:
+        case 0:
+            cue_proportions = [0.0, 0.0]
+        case 1:
+            cue_proportions = [mnist_frac, 0.0]
+            randomize_img = True
+        case 2:
+            cue_proportions = [0.0, box_frac]
+            randomize_img = True
+        case 3:
+            randomize_img = True
+            cue_proportions = [mnist_frac, box_frac]
+        case 4:
+            cue_proportions = [mnist_frac, 0.0]
+        case 5:
+            cue_proportions = [0.0, box_frac]
+        case 6:
+            cue_proportions = [mnist_frac, box_frac]
 
-    # Dataloaders
-    train_loader = dataloader_3D_shapes('train', batch_size)
-    test_loader = dataloader_3D_shapes('test', batch_size)
+    train_loader = get_dataloader(load_type='train', base_dataset='Dominoes Box', batch_size=64, randomize_img = randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+    test_loader = get_dataloader(load_type='test', base_dataset='Dominoes Box', batch_size=64, randomize_img = randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
 
-    # Fine-tune or train teacher from scratch
-    train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM)
+    train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM, dataset=dataset)
+
 
 # SETUP PARAMS - CHANGE THESE
 #================================================================================
@@ -87,7 +105,7 @@ AUG_NUM = 0
 if args.config_name:
     EXP_NUM = config['exp_num']
     TEACH_NUM = config['teacher_num']
-run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+shapes_exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" shapes"
+run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+dominoes_exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" shapes"
 
 # ======================================================================================
 # SETUP PARAMS REQUIRING MANUAL INPUT
@@ -114,7 +132,7 @@ sweep_configuration = {
 }
 
 #==============================================================================
-shapes_exp_dict = {0: "Shape_Color", 1: "Shape_Color_Floor", 2: "Shape_Color_Scale", 3: "Floor", 4: "Color", 5: "Floor_Color"}
+#dominoes_exp_dict = {0: "CIFAR10", 1: "MNIST", 2: "Box", 3: "MNIST_Box", 4: "CIFAR10_MNIST", 5: "CIFAR10_Box", 6: "CIFAR10_MNIST_Box"}
 #==============================================================================
 # Teacher model setup (change only if adding to dicts above)
 project = "Teacher Shapes"
@@ -147,15 +165,15 @@ if __name__ == "__main__":
                 "dataset": '3D shapes',
                 "epochs": epochs,
                 "batch_size": batch_size,
-                "spurious type": shapes_exp_dict[EXP_NUM],
+                "spurious type": dominoes_exp_dict[EXP_NUM],
                 "Augmentation": aug_dict[AUG_NUM]
             },
             name = run_name
         )
-        wandb.config.base_dataset = "3D Shapes"
+        wandb.config.base_dataset = "Dominoes"
         wandb.config.augmentation = aug_dict[AUG_NUM]
         wandb.config.teacher = teacher_dict[TEACH_NUM]
-        wandb.config.teacher_mechanism = shapes_exp_dict[EXP_NUM]
+        wandb.config.teacher_mechanism = dominoes_exp_dict[EXP_NUM]
         
         randomize_cues = [False, False]
         randomize_img = False
