@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set the argument to pass to myscript.sh
-config_file="CIFAR100_distill.yml"
+config_file="CIFAR100_distill_contrastive.yml"
 configs=$(python -c "import yaml; print(yaml.safe_load(open('$config_file')))")
 
 # Define the number of configurations

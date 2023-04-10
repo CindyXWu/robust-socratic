@@ -110,9 +110,9 @@ run_name = 'teacher: '+teacher_dict[TEACH_NUM]+', student: '+student_dict[STUDEN
 # ======================================================================================
 wandb_run = True # Set to False to check loss functions
 lr = 0.5
-final_lr = 0.1
+final_lr = 0.05
 temp = 30
-epochs = 15
+epochs = 20
 alpha = 1 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 e_dim = 50 # embedding size for contrastive loss
