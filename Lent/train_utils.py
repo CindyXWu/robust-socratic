@@ -199,8 +199,7 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                     "S B Test": box_acc, 
                     "S RB Test": randbox_acc, 
                     "S Loss": train_loss[-1], 
-                    "S LR": lr, },
-                    step = it
+                    "S LR": lr, }
                     )
             it += 1
     

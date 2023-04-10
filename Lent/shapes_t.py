@@ -93,7 +93,7 @@ run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+shapes_exp
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
 lr = 0.5
-final_lr = 0.1
+final_lr = 0.08
 epochs = 8
 batch_size = 64
 

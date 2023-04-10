@@ -5,7 +5,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Define the filename for your configuration file
 filename = "CIFAR100_distill.yml"
-s_exp_nums = [0, 1, 2]
+s_exp_nums = [0, 1]
 t_exp_nums = [0, 1, 2]
 teacher_nums = [3]
 student_nums = [2]
