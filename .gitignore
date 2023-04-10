@@ -5,3 +5,5 @@
 **wandb/*
 
 slurm_script.txt
+
+data/*

@@ -79,6 +79,7 @@ def show_batch(dl):
         ax.imshow(make_grid(images[:64], nrow=8).permute(1, 2, 0))
         break
 
+
 def wandb_get_data(project_name, t_num, s_num, exp_num, groupby_metrics):
     runs = api.runs(project_name)
     teacher = 'ResNet18_CIFAR100' #teacher_dict[t_num]
@@ -132,31 +133,24 @@ def wandb_get_data(project_name, t_num, s_num, exp_num, groupby_metrics):
         combined['name'] = [' '.join([str(k) for k in key])] * len(combined)
         histories.append(combined)
 
-    print(combined['name'])
-    print(len(histories))
     return histories
+
 
 def wandb_plot(histories, title):
     # Set seaborn styling
     sns.set(style='whitegrid', context='paper', font_scale=1.2)
-    # Set font to Times New Roman
-    plt.rcParams['font.family'] = 'Helvetica'
-
     palette = sns.color_palette("tab10")
-
     # Get the columns that end in '_mean'
     mean_cols = [col for col in histories[0].columns if col.endswith('_mean')]
-
     # Determine the number of rows and columns needed for the subplots
     n_metrics = len(mean_cols)
-    n_cols = min(2, n_metrics)
+    n_cols = min(2, len(mean_cols))
     n_rows = np.ceil(n_metrics / n_cols).astype(int)
 
     # Create a grid of subplots
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(12, 8 * n_rows), sharex=True)
     # Flatten the axs array so that we can iterate over it with a single loop
     axs = axs.flatten()
-
     # Remove any unused subplots
     if n_metrics < n_rows * n_cols:
         for i in range(n_metrics, n_rows * n_cols):
@@ -187,9 +181,8 @@ def wandb_plot(histories, title):
     # Add a legend to the right of each row
     for i in range(n_rows):
         handles, labels = axs[i*n_cols].get_legend_handles_labels()
-        fig.legend(handles, labels, loc='center right', fontsize=10)
+        fig.legend(handles, labels, loc='right', fontsize=10)
 
-    # Global x axis label
     axs[-1].set_xlabel('Step', fontsize=12)
     fig.suptitle(title, fontsize=15)
     # plt.savefig(name+'.png', dpi=300, bbox_inches='tight')
