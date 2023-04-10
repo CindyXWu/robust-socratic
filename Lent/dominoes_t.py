@@ -14,7 +14,6 @@ from feature_match import *
 from utils_ekdeep import *
 from info_dicts import * 
 from train_utils import *
-from shapes_3D import *
 
 # Suppress warnings "divide by zero" produced by NaN gradients
 import warnings
@@ -105,13 +104,13 @@ AUG_NUM = 0
 if args.config_name:
     EXP_NUM = config['exp_num']
     TEACH_NUM = config['teacher_num']
-run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+dominoes_exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" shapes"
+run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+dominoes_exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" dominoes"
 
 # ======================================================================================
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
-lr = 0.5
-final_lr = 0.08
+lr = 0.3
+final_lr = 0.05
 epochs = 8
 batch_size = 64
 mnist_frac = 1.0
@@ -135,17 +134,15 @@ sweep_configuration = {
 #dominoes_exp_dict = {0: "CIFAR10", 1: "MNIST", 2: "Box", 3: "MNIST_Box", 4: "CIFAR10_MNIST", 5: "CIFAR10_Box", 6: "CIFAR10_MNIST_Box"}
 #==============================================================================
 # Teacher model setup (change only if adding to dicts above)
-project = "Teacher Shapes"
+project = "Teacher Dominoes"
+dataset = "Dominoes"
 match TEACH_NUM:
     case 1:
-        teacher = CustomResNet18(12).to(device)
-        dataset = "Shapes"
+        teacher = CustomResNet18(10).to(device)
     case 2:
-        teacher = CustomResNet50(12).to(device)
-        dataset = "Shapes"
+        teacher = CustomResNet50(10).to(device)
     case 3:
-        teacher = wide_resnet_constructor(3, 12).to(device)
-        dataset = "Shapes"
+        teacher = wide_resnet_constructor(3, 10).to(device)
 
 if __name__ == "__main__":
     if is_sweep:
@@ -162,7 +159,7 @@ if __name__ == "__main__":
             config={
                 "LR": lr,
                 "final LR": final_lr,
-                "dataset": '3D shapes',
+                "dataset": 'Dominoes',
                 "epochs": epochs,
                 "batch_size": batch_size,
                 "spurious type": dominoes_exp_dict[EXP_NUM],
