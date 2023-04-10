@@ -311,7 +311,6 @@ def get_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocue', 
 
     if base_dataset == 'Dominoes Box':
         base_dataset = 'CIFAR10'
-        cue_proportions = [0.0, 0.0] if cue_type == 'nocue' else cue_proportions
         cue_type = 'domcues'
 
     # define base dataset (pick train or test)
