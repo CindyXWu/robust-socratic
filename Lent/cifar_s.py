@@ -34,6 +34,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--config_name", type=str, default=None)
 # Indexes into list of dictionaries for config file
 parser.add_argument('--config_num', type=int, help='Index of the configuration to use')
+# This time we only do sweeps for specific losses and datasets
+# (Jacobian, Contrastive and box spurious correlations)
 parser.add_argument("--sweep", type=bool, default=False)
 args = parser.parse_args()
 
@@ -103,10 +105,11 @@ if args.config_name:
     LOSS_NUM = config['loss_num']
     S_EXP_NUM = config['s_exp_num']
 ## WANDB PROJECT NAME
-project = "Test"
-run_name = 'teacher: '+teacher_dict[TEACH_NUM]+', student: '+student_dict[STUDENT_NUM]+', student mechanism: '+exp_dict[S_EXP_NUM]+', teacher mechanism: '+exp_dict[T_EXP_NUM]+', loss: '+loss_dict[LOSS_NUM]+', aug: '+aug_dict[AUG_NUM]
-# SETUP PARAMS REQUIRING MANUAL INPUT
+project = teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]
+run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S mech '+exp_dict[S_EXP_NUM]+', T mech '+exp_dict[T_EXP_NUM]+', Loss: '+loss_dict[LOSS_NUM]+', Aug: '+aug_dict[AUG_NUM]
+
 # ======================================================================================
+# SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
 wandb_run = True # Set to False to check loss functions
 lr = 0.5
@@ -115,23 +118,19 @@ temp = 30
 epochs = 20
 alpha = 1 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
-e_dim = 50 # embedding size for contrastive loss
-spurious_corr = 1.0
+spurious_corr = 1
 
-# sweep_method = 'grid'
-# sweep_count = 7
-# sweep_name = strftime("%m-%d %H:%M:%S", gmtime())
-# sweep_configuration = {
-#     'method': sweep_method,
-#     'name': sweep_name,
-#     'metric': {'goal': 'maximize', 'name': 'student test acc'},
-#     # CHANGE THESE
-#     'parameters': {
-#         'spurious_corr': {'values': [0, 0.5, 0.6, 0.7, 0.8, 0.9, 1]}, # For grid search
-#         # 'alpha': {'distribution': 'uniform', 'min': 0, 'max': 1}, # For bayes search
-#     },
-#     # 'early_terminate': {'type': 'hyperband', 'min_iter': 5}
-# }
+sweep_configuration = {
+    'method': 'grid',
+    'name': strftime("%m-%d %H:%M:%S", gmtime()),
+    'metric': {'goal': 'maximize', 'name': 'student test acc'},
+    # CHANGE THESE
+    'parameters': {
+        'spurious_corr': {'values': [0.5, 0.6, 0.7, 0.8, 0.9, 1]}, # For grid search
+        # 'alpha': {'distribution': 'uniform', 'min': 0, 'max': 1}, # For bayes search
+    },
+    # 'early_terminate': {'type': 'hyperband', 'min_iter': 5}
+}
 #================================================================================
 
 # Student model setup (change only if adding to dicts above)
@@ -177,18 +176,17 @@ randbox_test_loader = get_dataloader(load_type ='test', base_dataset=base_datase
 if __name__ == "__main__":
     if is_sweep:
         sweep_id = wandb.sweep(sweep=sweep_configuration, project=project)
-        wandb.agent(sweep_id, function=sweep, count=sweep_count)
+        wandb.agent(sweep_id, function=sweep, count=10)
     elif wandb_run:
         wandb.init(
             # Set the wandb project where this run will be logged
             project=project,
             config={
-                "learning_rate": lr,
-                "architecture": "CNN",
-                "dataset": "CIFAR-10",
+                "start LR": lr,
+                "final LR": final_lr,
+                "dataset": base_dataset,
                 "epochs": epochs,
                 "temp": temp,
-                "batch_size": batch_size,
                 "teacher_acc": test_acc[-1],
             },
             name = run_name
