@@ -91,8 +91,6 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, projec
         # Have two models: working copy (this one) and final fetched model
         # Save optimizer in case re-run, save test accuracy to compare models
         save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+dataset+"_"+exp_dict[exp_num]+"_working"
-        if dataset:
-            save_path += "_"+dataset
         torch.save({'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
