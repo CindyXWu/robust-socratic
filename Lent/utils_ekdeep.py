@@ -342,7 +342,7 @@ def get_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocue', 
     return dataloader
 
 
-def show_images_grid(imgs_, num_images=25):
+def show_images_grid(imgs_, class_labels, num_images=25):
     ncols = int(np.ceil(num_images**0.5))
     nrows = int(np.ceil(num_images / ncols))
     _, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
@@ -351,6 +351,7 @@ def show_images_grid(imgs_, num_images=25):
     for ax_i, ax in enumerate(axes):
         if ax_i < num_images:
             ax.imshow(imgs_[ax_i], cmap='Greys_r', interpolation='nearest')
+            ax.set_title(f'Class: {class_labels[ax_i]}')  # Display the class label as title
             ax.set_xticks([])
             ax.set_yticks([])
         else:
@@ -381,5 +382,5 @@ if __name__ == "__main__":
     train_loader = get_dataloader(load_type='train', base_dataset='Dominoes Box', batch_size=64, cue_type='domcues', cue_proportion=0.5, randomize_cue=True, cue_proportions=[1,1], randomize_cues=[False, False])
     for i, (x, y) in enumerate(train_loader):
         x = einops.rearrange(x, 'b c h w -> b h w c')
-        show_images_grid(x, num_images=64)
+        show_images_grid(x, y, num_images=64)
         break

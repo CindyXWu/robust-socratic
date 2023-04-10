@@ -98,7 +98,7 @@ def sweep_teacher():
 # Refer to dictionaries s_exp_num, aug_dict, s_teach_num in info_dictionaries.py
 #================================================================================
 is_sweep = False
-TEACH_NUM = 3
+TEACH_NUM = 1
 EXP_NUM = 6
 AUG_NUM = 0
 if args.config_name:
@@ -109,8 +109,8 @@ run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+dominoes_e
 # ======================================================================================
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
-lr = 0.3
-final_lr = 0.05
+lr = 0.1
+final_lr = 0.01
 epochs = 8
 batch_size = 64
 mnist_frac = 1.0
@@ -195,5 +195,10 @@ if __name__ == "__main__":
 
         train_loader = get_dataloader(load_type='train', base_dataset='Dominoes Box', batch_size=64, randomize_img = randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
         test_loader = get_dataloader(load_type='test', base_dataset='Dominoes Box', batch_size=64, randomize_img = randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+
+        for i, (x, y) in enumerate(train_loader):
+            x = einops.rearrange(x, 'b c h w -> b h w c')
+            show_images_grid(x, y, num_images=64)
+            break
 
         train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM, dataset=dataset)

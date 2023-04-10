@@ -6,8 +6,10 @@ import pandas as pd
 import numpy as np
 from info_dicts import *
 import seaborn as sns
+import matplotlib as mpl
 
 api = wandb.Api()
+mpl.rcParams['font.family'] = 'Helvetica'
 
 def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
     fig = plt.figure(figsize=(8, 4), dpi=100)
@@ -135,13 +137,16 @@ def wandb_get_data(project_name, t_num, s_num, exp_num, groupby_metrics):
 
     return histories
 
-
+# Order of subplots by metric name
+order_list = ['Student train accuracy', 'Student test accuracy', 'Student plain test accuracy', 'Student randomised box test accuracy', 'Student box test accuracy', 'Student-teacher error', 'Student lr', 'Student loss']
 def wandb_plot(histories, title):
-    # Set seaborn styling
-    sns.set(style='whitegrid', context='paper', font_scale=1.2)
-    palette = sns.color_palette("tab10")
+    sns.set(style='whitegrid', context='paper', font_scale=1.2)     # Set seaborn styling
+    num_groups = len(set([history['name'].iloc[0] for history in histories]))
+    palette = sns.color_palette("deep", num_groups)
+
     # Get the columns that end in '_mean'
-    mean_cols = [col for col in histories[0].columns if col.endswith('_mean')]
+    mean_cols = [col for col in histories[0].columns if col.endswith('_mean')] 
+    mean_cols.sort(key=custom_sort)
     # Determine the number of rows and columns needed for the subplots
     n_metrics = len(mean_cols)
     n_cols = min(2, len(mean_cols))
@@ -149,8 +154,7 @@ def wandb_plot(histories, title):
 
     # Create a grid of subplots
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(12, 8 * n_rows), sharex=True)
-    # Flatten the axs array so that we can iterate over it with a single loop
-    axs = axs.flatten()
+    axs = axs.flatten() # Flatten the array of subplots    # Flatten the axs array so that we can iterate over it with a single loop
     # Remove any unused subplots
     if n_metrics < n_rows * n_cols:
         for i in range(n_metrics, n_rows * n_cols):
@@ -171,24 +175,32 @@ def wandb_plot(histories, title):
         for history in histories:
             group_name = history['name'].iloc[0]
             if mean_col in history.columns and var_col in history.columns:
-                axs[i].plot(history['_step'], history[mean_col], linewidth=0.5, label=group_name)
+                axs[i].plot(history['_step'], history[mean_col], linewidth=1, label=group_name)
                 axs[i].fill_between(history['_step'], 
                                     history[mean_col] - 2 * history[var_col].apply(np.sqrt),
                                     history[mean_col] + 2 * history[var_col].apply(np.sqrt),
                                     alpha=0.2)
         axs[i].set_title(mean_col.replace('_mean', '').capitalize(), fontsize=12)
-    
-    # Add a legend to the right of each row
-    for i in range(n_rows):
-        handles, labels = axs[i*n_cols].get_legend_handles_labels()
-        fig.legend(handles, labels, loc='right', fontsize=10)
 
     axs[-1].set_xlabel('Step', fontsize=12)
+    # Create a legend in the middle right with extra space
+    # So far, nothing special except the managed prop_cycle. Now the trick:
+    lines, labels = axs[0].get_legend_handles_labels()
+    # Finally, the legend (that maybe you'll customize differently)
+    fig.legend(lines, labels, loc='lower center', ncol=4)
+
     fig.suptitle(title, fontsize=15)
     # plt.savefig(name+'.png', dpi=300, bbox_inches='tight')
     plt.show()
 
+def custom_sort(col):
+    metric_name = col.replace('_mean', '')
+    if metric_name in order_list:
+        return order_list.index(metric_name)
+    else:
+        return len(order_list) + 1
+
 if __name__ == "__main__":
-    title = 'ResNet18_CIFAR100 plain to ResNet18_Flexi'
+    title = 'ResNet18 CIFAR100 plain to ResNet18 Flexi'
     histories = wandb_get_data('Student (debug)', 1, 1, 0, ['spurious_corr', 'student_mechanism'])
     wandb_plot(histories, title)
