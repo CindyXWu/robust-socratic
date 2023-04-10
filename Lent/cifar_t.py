@@ -103,11 +103,9 @@ final_lr = 0.01 #0.112
 epochs = 20
 batch_size = 64
 
-sweep_count = 10
-sweep_method = 'bayes'
 sweep_name = strftime("%m-%d %H:%M:%S", gmtime())
 sweep_configuration = {
-    'method': sweep_method,
+    'method': 'bayes',
     'name': sweep_name,
     'metric': {'goal': 'maximize', 'name': 'teacher test acc'},
     # CHANGE THESE 
@@ -145,7 +143,7 @@ if __name__ == "__main__":
     if is_sweep:
         # Set configuration and project for sweep and initialise agent
         sweep_id = wandb.sweep(sweep=sweep_configuration, project=project) 
-        wandb.agent(sweep_id, function=sweep_teacher, count=sweep_count)
+        wandb.agent(sweep_id, function=sweep_teacher, count=20)
     # Should be used for retraining once best model indentified from sweep
     else:
     # Save teacher model after run

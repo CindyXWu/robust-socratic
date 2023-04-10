@@ -38,7 +38,6 @@ class AugShapes3D(Shapes3D):
         x, y = super().__getitem__(index)
         # Important - mixup needs to be implemented before other transforms
         x, y = self.mixup(x, y, self.alpha, self.beta)
-        x = x.div(255.0)
         x = self.crop(x)
         x = self.flip(x)
         # x = self.rotate(x)
@@ -60,11 +59,8 @@ class AugShapes3D(Shapes3D):
         index = random.randint(0, self.__len__()-1)
         # Lambda parameter, from beta distribution
         lam = random.betavariate(alpha, beta)
-        x2 = torch.from_numpy(self.images[index,:,:,:])
-        # Inherit number of image classes from parent class
-        y = F.one_hot(y, num_classes=self.num_classes)
-        # Labels have to be in long form for cross entropy loss
-        y2 = torch.from_numpy(self.oh_labels[index, :]).to(torch.long)
+        # Get random sample from dataset
+        x2, y2 = self.__getitem__(index)
         mixed_x = x.mul(lam).add(x2,alpha=1-lam)
         mixed_y = y.mul(lam).add(y2,alpha=1-lam)
         return mixed_x, mixed_y
@@ -134,7 +130,7 @@ class AugCIFAR(datasets.CIFAR10):
             # Lambda parameter, from beta distribution
             lam = random.betavariate(alpha, beta)
             # Return PIL.Image.Image, int
-            x2, y2 = self[index]
+            x2, y2 = self.__getitem__(index)
             mixed_x = x.mul(lam).add(x2,alpha=1-lam)
             mixed_y = y.mul(lam).add(F.one_hot(torch.tensor(y2), 10),alpha=1-lam)
             return mixed_x, mixed_y

@@ -12,7 +12,7 @@ import timeit
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 class Shapes3D(Dataset):
-    def __init__(self, randomise=False, mechanisms=None):
+    def __init__(self, randomise=False, mechanisms=[]):
         """Args:
             mechanisms: list indexing into _FACTORS_IN_ORDER that is predictive of label. Index of factor that is fixed in range(6).
         Labels returned one hot encoded.
@@ -28,97 +28,96 @@ class Shapes3D(Dataset):
         self._NUM_VALUES_PER_FACTOR = {'floor_hue': 10, 'wall_hue': 10, 'object_hue': 10, 
                                 'scale': 8, 'shape': 4, 'orientation': 15}
         self.randomise = randomise
-        self.mechanisms = mechanisms
+        self.mechanisms = mechanisms # Possibilities: 0, 3
 
         # Convert into scalar labels
         self.new_labels = np.empty([self.n_samples])
-        self.num_classes = 12
+        self.num_classes = 8
 
-        shape = self.labels[:,4]
-        hue = np.zeros_like(shape)
-        hue[np.logical_and(0.33 <= self.labels[:,2], self.labels[:,2] < 0.67)] = 1
-        hue[self.labels[:, 2] >= 0.67] = 2
-        self.new_labels = hue*4 + shape
-
-        if mechanisms and len(mechanisms)==1 and not randomise:
-            mechanism = mechanisms[0]
-            match mechanism:
-                case 1:
-                    wall_hue = self.labels[:,1]
-                    # Filter images and labels based on wall hue matching new_labels
-                    mask = np.array([True if int(wall_hue[i]*10) == self.new_labels[i]%10 else False for i in range(self.n_samples)])
-                case 0:
-                    floor_hue = self.labels[:,0]
-                    mask = np.array([True if int(floor_hue[i]*10) == self.new_labels[i]%10 else False for i in range(self.n_samples)])
-                case 3:
-                    scale = self.labels[:,3]
-                    # Hash maps to easy comparison - now idx contains values 0-7 for each image's scale
-                    # Didn't need to do for other cases because their values were nice numbers
-                    _, idx = np.unique(scale, return_inverse=True)
-                    # idx[i] is hashed scale value for image i
-                    mask = np.array([True if idx[i] == self.new_labels[i]%8 else False for i in range(self.n_samples)])
-            self.images = self.images[mask]
-            self.new_labels = self.new_labels[mask]
-            self.n_samples = self.new_labels.shape[0]
+        if not randomise:
+            shape = self.labels[:,4]
+            hue = np.zeros_like(shape)
+            hue[self.labels[:, 2] >= 0.5] = 1
+            self.new_labels = hue*4 + shape
+        else:
+            self.new_labels = np.random.randint(0, self.num_classes, size=self.n_samples)
+        
+        # There are two ways of designing this: I could apply reduction inside each mechanism if statement
+        # But if number of mechanisms is large, creates lots of boilerplate code
+        # Use 'logical and' on masks instead
+        if 0 in mechanisms:
+            floor_hue = self.labels[:,0]
+            mask_0 = np.array([True if (floor_hue[i]*10).astype(int) == self.new_labels[i] else False for i in range(self.n_samples)])
+        else:
+            mask_0 = np.ones(self.n_samples, dtype=bool)
+        if 3 in mechanisms:
+            scale = self.labels[:,3]
+            # Hash maps to integers - idx[i] is scale value for image i
+            _, idx = np.unique(scale, return_inverse=True)
+            mask_3 = np.array([True if idx[i] == self.new_labels[i] else False for i in range(self.n_samples)])
+        else:
+            mask_3 = np.ones(self.n_samples, dtype=bool)
+        mask = np.logical_and(mask_0, mask_3)
+        self.images = self.images[mask]
+        self.new_labels = self.new_labels[mask]
+        self.n_samples = self.new_labels.shape[0]
 
         # Get labels as one hot encodings for mixup
         self.one_hot_encode()
 
     def one_hot_encode(self):
-        """
-        Convert numerical class labels into one-hot encodings.
-        Args:
-            labels (torch.Tensor): tensor of numerical class labels
-            num_classes (int): total number of classes
-        Returns:
-            one_hot (torch.Tensor): tensor of one-hot encodings
-        """
+        """Convert numerical class labels into one-hot encodings."""
         self.oh_labels = F.one_hot(torch.tensor(self.new_labels).to(torch.int64), num_classes=self.num_classes)
 
     def __getitem__(self, idx):
         """Returns:
-        image: numpy array image of shape [3, 64, 64]
-        label: scalar torch tensor label in range 1-12
+            image: numpy array image of shape [3, 64, 64]
+            label: scalar torch tensor label in range 1-12
         """
-        # Rearrange format using einops
-        x = einops.rearrange(self.images[idx,:,:,:], 'h w c -> c h w')
-        x = torch.from_numpy(x).to(torch.float32)
-        y = int(self.new_labels[idx])
-        y = torch.tensor(y, dtype=torch.long)
+        x, y = self.process_img(self.images[idx,:,:,:], self.new_labels[idx])
         return x, y
 
+    def process_img(self, x, y):
+        """Convert from numpy array uint8 to torch float32 tensor. Convert y to torch long tensor."""
+        x = einops.rearrange(x, 'h w c -> c h w')
+        x = torch.div(torch.from_numpy(x).to(torch.float32),255)
+        y = torch.tensor(y).to(torch.long)
+        return x, y
+        
     def __len__(self):
         return self.n_samples
 
-def show_images_grid(imgs_, num_images=4):
-  """Now modified to show both [c h w] and [h w c] images."""
-  ncols = int(np.ceil(num_images**0.5))
-  nrows = int(np.ceil(num_images / ncols))
-  _, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
-  axes = axes.flatten()
+def show_images_grid(imgs_, class_labels, num_images):
+    """Now modified to show both [c h w] and [h w c] images."""
+    ncols = int(np.ceil(num_images**0.5))
+    nrows = int(np.ceil(num_images / ncols))
+    _, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
+    axes = axes.flatten()
 
-  for ax_i, ax in enumerate(axes):
-    if ax_i < num_images:
-      img = imgs_[ax_i]
-      if img.ndim == 3 and img.shape[0] == 3:
-        img = img.transpose(1, 2, 0)
-      ax.imshow(img, cmap='Greys_r', interpolation='nearest')
-      ax.set_xticks([])
-      ax.set_yticks([])
-    else:
-      ax.axis('off')
+    for ax_i, ax in enumerate(axes):
+        if ax_i < num_images:
+            img = imgs_[ax_i]
+            if img.ndim == 3 and img.shape[0] == 3:
+                img = img.transpose(1, 2, 0)
+            ax.imshow(img, cmap='Greys_r', interpolation='nearest')
+            ax.set_title(f'Class: {class_labels[ax_i]}')  # Display the class label as title
+            ax.set_xticks([])
+            ax.set_yticks([])
+        else:
+            ax.axis('off')
+    plt.show()
      
-def dataloader_3D_shapes(load_type, batch_size, randomise=False, mechanisms=None):
+def dataloader_3D_shapes(load_type, batch_size, randomise=False, mechanisms=[]):
     """Load dataset."""
     dataset = Shapes3D(randomise=randomise, mechanisms=mechanisms)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=(load_type=='train'), drop_last=True, num_workers=0)
     return dataloader
 
 if __name__ == "__main__":
-    bsize = 4
-    shapes_dataloader = dataloader_3D_shapes('train', bsize, mechanisms=[0])
+    bsize = 32
+    shapes_dataloader = dataloader_3D_shapes('train', bsize, mechanisms=[0, 3])
     for images, labels in shapes_dataloader:
         print(labels)
         images = einops.rearrange(images, 'b c h w -> b h w c')
-        show_images_grid(images, bsize)
+        show_images_grid(images, labels, bsize)
         break

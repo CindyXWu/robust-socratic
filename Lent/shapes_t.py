@@ -51,11 +51,10 @@ def sweep_teacher():
         project=project,
         # track hyperparameters and run metadata
         config={
-            "name": sweep_name,
             "teacher": teacher_dict[TEACH_NUM],
             "dataset": "CIFAR-100",
             "batch_size": batch_size,
-            "experiment": s_exp_dict[EXP_NUM],
+            "experiment": shapes_exp_dict[EXP_NUM],
             },
         name=run_name
     )
@@ -66,7 +65,7 @@ def sweep_teacher():
     wandb.config.base_dataset = "3D Shapes"
     wandb.config.augmentation = aug_dict[AUG_NUM]
     wandb.config.teacher = teacher_dict[TEACH_NUM]
-    wandb.config.teacher_mechanism = s_exp_dict[EXP_NUM]
+    wandb.config.teacher_mechanism = shapes_exp_dict[EXP_NUM]
 
     # match EXP_NUM:
 
@@ -88,7 +87,7 @@ AUG_NUM = 0
 if args.config_name:
     EXP_NUM = config['exp_num']
     TEACH_NUM = config['teacher_num']
-run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" shapes"
+run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+shapes_exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" shapes"
 
 # ======================================================================================
 # SETUP PARAMS REQUIRING MANUAL INPUT
@@ -115,7 +114,7 @@ sweep_configuration = {
 #==============================================================================
 #==============================================================================
 # Teacher model setup (change only if adding to dicts above)
-project = "Teacher"
+project = "Teacher Shapes"
 match TEACH_NUM:
     case 1:
         teacher = CustomResNet18(12).to(device)
