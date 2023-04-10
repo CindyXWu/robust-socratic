@@ -60,7 +60,7 @@ def get_approx_jacobian(output, x, batch_size, output_dim, i):
         i: indices of top-k classes. If None, calculate (assume for teacher). If not None, assume for calculating for student (needs to match teacher).
     """
     assert x.requires_grad
-    jacobian = torch.zeros_like(x).unsqueeze(1).expand(-1, output_dim, -1)
+    jacobian = torch.zeros(batch_size, output_dim, x.numel() // batch_size, device=x.device)
     for idx in range(i.shape[1]):
         grad_output = torch.zeros(batch_size, output_dim, device=x.device)
         grad_output.scatter_(1, i[:, idx].unsqueeze(1), 1)

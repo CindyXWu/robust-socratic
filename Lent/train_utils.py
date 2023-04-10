@@ -164,7 +164,7 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                     layer = {"11.path2.5": "final_features"}
                     s_map = feature_extractor(student, inputs, layer).view(batch_size, -1)
                     t_map = feature_extractor(teacher, inputs, layer).view(batch_size, -1).detach()
-                    alpha = 0.3
+                    alpha = 0.5
                     loss = alpha*contrastive_loss(s_map, t_map, labels)+(1-alpha)*base_distill_loss(scores, targets, temp)
 
             optimizer.zero_grad()
