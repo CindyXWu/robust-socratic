@@ -79,43 +79,20 @@ def show_batch(dl):
         ax.imshow(make_grid(images[:64], nrow=8).permute(1, 2, 0))
         break
 
-def wandb_get_data(project_name, t_num, s_num, exp_num):
-    runs = api.runs(project_name)
-    teacher = 'ResNet18_CIFAR100' #teacher_dict[t_num]
-    student = 'ResNet18_Flexi' #student_dict[s_num]
-    # grouped_runs = defaultdict(list)
-    t_mech = 'plain' #exp_dict[exp_num]
-    s_mech = 'plain' #exp_dict[exp_num]
-    # Filter
-    runs = [run for run in runs if 
-            run.config.get('teacher') == teacher and 
-            run.config.get('student') == student and 
-            run.config.get('teacher_mechanism') == t_mech
-            ]
-    histories = []
-    i = 0
-    for run in runs:
-        history = run.history()
-        histories.append(history)
-        i += 1
-        if i == 3:
-            break
-    return histories
-
 def wandb_get_data(project_name, t_num, s_num, exp_num, groupby_metrics):
     runs = api.runs(project_name)
     teacher = 'ResNet18_CIFAR100' #teacher_dict[t_num]
     student = 'ResNet18_Flexi' #student_dict[s_num]
     t_mech = 'plain' #exp_dict[exp_num]
     s_mech = 'plain' #exp_dict[exp_num]
-
-    # Filter
+    loss = 'Base Distillation'
     filtered_runs = []
+    # Filter by above settings and remove any crashed or incomplete runs
     for run in runs:
         if (run.config.get('teacher') == teacher and 
             run.config.get('student') == student and 
-            run.config.get('teacher_mechanism') == t_mech):
-            
+            run.config.get('teacher_mechanism') == t_mech and
+            run.config.get('loss') == loss):
             history = run.history()
             if '_step' in history.columns and history['_step'].max() >= 20:
                 filtered_runs.append(run)
@@ -124,7 +101,7 @@ def wandb_get_data(project_name, t_num, s_num, exp_num, groupby_metrics):
     # Group the runs by the values of specific metrics
     grouped_runs = defaultdict(list)
     for run in runs:
-        key = tuple([run.summary.get(m) for m in groupby_metrics])
+        key = tuple([run.config.get(m) for m in groupby_metrics])
         grouped_runs[key].append(run)
 
     # Compute the means and variances for all of the metrics for each group of runs
@@ -151,64 +128,32 @@ def wandb_get_data(project_name, t_num, s_num, exp_num, groupby_metrics):
         for metric in list(means_and_vars.keys())[1:]:
             combined = combined.merge(means_and_vars[metric], on='_step')
 
+        # Name each row of the dataframe with the values of the grouped metrics
         combined['name'] = [' '.join([str(k) for k in key])] * len(combined)
         histories.append(combined)
 
+    print(combined['name'])
+    print(len(histories))
     return histories
-
-# def wandb_plot(histories):
-#     # Get a list of all the metrics across all the history dataframes
-#     all_metrics = set()
-#     for history in histories:
-#         all_metrics.update([key for key in history.columns.tolist() if not key.startswith('_')])
-
-#     # Determine the number of rows and columns needed for the subplots
-#     n_metrics = len(all_metrics)
-#     n_cols = min(2, n_metrics)
-#     n_rows = np.ceil(n_metrics / n_cols).astype(int)
-
-#     # Create a grid of subplots
-#     fig, axs = plt.subplots(n_rows, n_cols, figsize=(12, 8 * n_rows), sharex=True)
-
-#     # Flatten the axs array so that we can iterate over it with a single loop
-#     axs = axs.flatten()
-
-#     # Remove any unused subplots
-#     if n_metrics < n_rows * n_cols:
-#         for i in range(n_metrics, n_rows * n_cols):
-#             fig.delaxes(axs[i])
-
-#     # Plot each metric on the corresponding subplot
-#     for i, metric in enumerate(all_metrics):
-#         for history in histories:
-#             if metric in history.columns:
-#                 axs[i].plot(history['_step'], history[metric])
-#         axs[i].set_title(metric)
-#         axs[i].legend()
-
-#     # Set the x-axis label on the last subplot
-#     axs[-1].set_xlabel('Step')
-
-#     # Show the plot
-#     plt.show()
 
 def wandb_plot(histories, title):
     # Set seaborn styling
     sns.set(style='whitegrid', context='paper', font_scale=1.2)
+    # Set font to Times New Roman
+    plt.rcParams['font.family'] = 'Helvetica'
 
-    # Get a list of all the metrics across all the history dataframes
-    all_metrics = set()
-    for history in histories:
-        all_metrics.update([key for key in history.columns.tolist() if not key.startswith('_')])
+    palette = sns.color_palette("tab10")
+
+    # Get the columns that end in '_mean'
+    mean_cols = [col for col in histories[0].columns if col.endswith('_mean')]
 
     # Determine the number of rows and columns needed for the subplots
-    n_metrics = len(all_metrics)
+    n_metrics = len(mean_cols)
     n_cols = min(2, n_metrics)
     n_rows = np.ceil(n_metrics / n_cols).astype(int)
 
     # Create a grid of subplots
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(12, 8 * n_rows), sharex=True)
-
     # Flatten the axs array so that we can iterate over it with a single loop
     axs = axs.flatten()
 
@@ -217,31 +162,40 @@ def wandb_plot(histories, title):
         for i in range(n_metrics, n_rows * n_cols):
             fig.delaxes(axs[i])
 
-    # Plot each metric on the corresponding subplot
-    for i, metric in enumerate(all_metrics):
+    # Set a consistent color cycle for all subplots
+    color_dict = {}
+    color_cycle = iter(palette)
+    for history in histories:
+        group_name = history['name'].iloc[0]
+        if group_name not in color_dict:
+            color_dict[group_name] = next(color_cycle)
+    for ax in axs:
+        ax.set_prop_cycle(color=[color_dict[group_name] for group_name in color_dict])
+
+    for i, mean_col in enumerate(mean_cols):
+        var_col = mean_col.replace('_mean', '_var')
         for history in histories:
-            if metric in history.columns:
-                axs[i].plot(history['_step'], history[metric], linewidth=2)
-        axs[i].set_title(metric.capitalize(), fontweight='bold')
-        axs[i].set_ylabel(metric)
-        axs[i].legend()
+            group_name = history['name'].iloc[0]
+            if mean_col in history.columns and var_col in history.columns:
+                axs[i].plot(history['_step'], history[mean_col], linewidth=0.5, label=group_name)
+                axs[i].fill_between(history['_step'], 
+                                    history[mean_col] - 2 * history[var_col].apply(np.sqrt),
+                                    history[mean_col] + 2 * history[var_col].apply(np.sqrt),
+                                    alpha=0.2)
+        axs[i].set_title(mean_col.replace('_mean', '').capitalize(), fontsize=12)
+    
+    # Add a legend to the right of each row
+    for i in range(n_rows):
+        handles, labels = axs[i*n_cols].get_legend_handles_labels()
+        fig.legend(handles, labels, loc='center right', fontsize=10)
 
-    # Set the x-axis label on the last subplot
-    axs[-1].set_xlabel('Step')
-
-    # Adjust the layout for better spacing between subplots
-    fig.tight_layout()
-
-    # Set the title
-    fig.suptitle(title, fontsize=16, fontweight='bold')
-
-    # Save the plot as a high-resolution image
-    plt.savefig('publication_quality_plot.png', dpi=300)
-
-    # Show the plot
+    # Global x axis label
+    axs[-1].set_xlabel('Step', fontsize=12)
+    fig.suptitle(title, fontsize=15)
+    # plt.savefig(name+'.png', dpi=300, bbox_inches='tight')
     plt.show()
 
 if __name__ == "__main__":
     title = 'ResNet18_CIFAR100 plain to ResNet18_Flexi'
-    histories = wandb_get_data('Student (debug)', 1, 1, 0, ['spurious_corr'])
+    histories = wandb_get_data('Student (debug)', 1, 1, 0, ['spurious_corr', 'student_mechanism'])
     wandb_plot(histories, title)

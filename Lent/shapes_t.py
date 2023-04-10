@@ -82,7 +82,7 @@ def sweep_teacher():
 #================================================================================
 is_sweep = False
 TEACH_NUM = 3
-EXP_NUM = 0
+EXP_NUM = 1
 AUG_NUM = 0
 if args.config_name:
     EXP_NUM = config['exp_num']

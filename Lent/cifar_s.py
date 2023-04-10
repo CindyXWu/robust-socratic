@@ -71,19 +71,19 @@ def sweep():
     wandb.config.student = student_dict[STUDENT_NUM]
     wandb.config.loss = loss_dict[LOSS_NUM]
 
-    randomize_loc = False
+    randomize_cue = False
     match S_EXP_NUM:
         case 0:
-            spurious_type = 'plain'
+            cue_type = 'plain'
         case 1:
-            spurious_type = 'box'
+            cue_type = 'box'
         case 2: 
-            spurious_type = 'box'
-            randomize_loc = True
+            cue_type = 'box'
+            randomize_cue = True
 
     # Dataloaders
-    train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
-    test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+    train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, spurious_corr=spurious_corr, randomize_cue=randomize_cue)
+    test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, spurious_corr=spurious_corr, randomize_cue=randomize_cue)
 
     # Train
     train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha)
@@ -169,9 +169,9 @@ teacher.load_state_dict(checkpoint['model_state_dict'])
 test_acc = checkpoint['test_acc']
 print("Loaded teacher model with test accuracy: ", test_acc[-1])
 
-plain_test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type='plain', spurious_corr=1, randomize_loc=False)
-box_test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type='box', spurious_corr=1, randomize_loc=False)
-randbox_test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type='box', spurious_corr=1, randomize_loc=True)
+plain_test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type='nocue')
+box_test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type='box')
+randbox_test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type='box', randomize_cue=True)
 
 if __name__ == "__main__":
     if is_sweep:
@@ -192,15 +192,15 @@ if __name__ == "__main__":
             name = run_name
         )
 
-    randomize_loc = False
+    randomize_cue = False
     match S_EXP_NUM:
         case 0:
-            spurious_type = 'plain'
+            cue_type = 'nocue'
         case 1:
-            spurious_type = 'box'
+            cue_type = 'box'
         case 2: 
-            spurious_type = 'box'
-            randomize_loc = True
+            cue_type = 'box'
+            randomize_cue = True
 
     if wandb_run:
         wandb.config.base_dataset = base_dataset
@@ -211,8 +211,8 @@ if __name__ == "__main__":
         wandb.config.student = student_dict[STUDENT_NUM]
         wandb.config.loss = loss_dict[LOSS_NUM]
     
-    train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
-    test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+    train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
+    test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
 
     # Train
     train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha)
