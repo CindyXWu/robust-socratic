@@ -105,7 +105,7 @@ if args.config_name:
     LOSS_NUM = config['loss_num']
     S_EXP_NUM = config['s_exp_num']
 ## WANDB PROJECT NAME
-project = teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]
+project = "Distill "+teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]
 run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S mech '+exp_dict[S_EXP_NUM]+', T mech '+exp_dict[T_EXP_NUM]+', Loss: '+loss_dict[LOSS_NUM]+', Aug: '+aug_dict[AUG_NUM]
 
 # ======================================================================================
@@ -115,7 +115,7 @@ wandb_run = True # Set to False to check loss functions
 lr = 0.5
 final_lr = 0.05
 temp = 30
-epochs = 20
+epochs = 30
 alpha = 1 # Fraction of other distillation losses (1-alpha for distillation loss)
 batch_size = 64
 spurious_corr = 1

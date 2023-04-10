@@ -201,7 +201,7 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                     "S RB Test": randbox_acc, 
                     "S Loss": train_loss[-1], 
                     "S LR": lr, },
-                    step = it//it_per_epoch
+                    step = it/it_per_epoch
                     )
             it += 1
     
