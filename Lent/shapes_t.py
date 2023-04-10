@@ -112,6 +112,7 @@ sweep_configuration = {
 }
 
 #==============================================================================
+shapes_exp_dict = {0: "Shape_Color", 1: "Shape_Color_Floor", 2: "Shape_Color_Scale", 3: "Floor", 4: "Color", 5: "Floor_Color"}
 #==============================================================================
 # Teacher model setup (change only if adding to dicts above)
 project = "Teacher Shapes"
@@ -144,7 +145,7 @@ if __name__ == "__main__":
                 "dataset": '3D shapes',
                 "epochs": epochs,
                 "batch_size": batch_size,
-                "spurious type": s_exp_dict[EXP_NUM],
+                "spurious type": shapes_exp_dict[EXP_NUM],
                 "Augmentation": aug_dict[AUG_NUM]
             },
             name = run_name
@@ -152,13 +153,25 @@ if __name__ == "__main__":
         wandb.config.base_dataset = "3D Shapes"
         wandb.config.augmentation = aug_dict[AUG_NUM]
         wandb.config.teacher = teacher_dict[TEACH_NUM]
-        wandb.config.teacher_mechanism = s_exp_dict[EXP_NUM]
-        # match EXP_NUM:
-        # Todo: add different spurious correlation experiments
+        wandb.config.teacher_mechanism = shapes_exp_dict[EXP_NUM]
+        
+        randomise = False
+        match EXP_NUM:
+            case 1:
+                mechanisms = [0]
+            case 2:
+                mechanisms = [3]
+            case 3:
+                randomise = True
+                mechanisms = [0]
+            case 4:
+                randomise = True
+                mechanisms = [3]
+            case 5:
+                randomise = True
+                mechanisms = [0, 3]
 
-        # Dataloaders
-        train_loader = dataloader_3D_shapes('train', batch_size)
-        test_loader = dataloader_3D_shapes('test', batch_size)
+        train_loader = dataloader_3D_shapes('train', batch_size, randomise=randomise, mechanisms=mechanisms)
+        test_loader = dataloader_3D_shapes('test', batch_size, randomise=randomise, mechanisms=mechanisms)
 
-        # Fine-tune or train teacher from scratch
         train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM, dataset=dataset)
