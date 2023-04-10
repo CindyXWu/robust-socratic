@@ -99,7 +99,7 @@ def sweep_teacher():
 #================================================================================
 is_sweep = False
 TEACH_NUM = 1
-EXP_NUM = 6
+EXP_NUM = 5
 AUG_NUM = 0
 if args.config_name:
     EXP_NUM = config['exp_num']
@@ -111,7 +111,7 @@ run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+dominoes_e
 # ======================================================================================
 lr = 0.1
 final_lr = 0.01
-epochs = 8
+epochs = 1
 batch_size = 64
 mnist_frac = 1.0
 box_frac = 1.0
@@ -195,10 +195,10 @@ if __name__ == "__main__":
 
         train_loader = get_dataloader(load_type='train', base_dataset='Dominoes Box', batch_size=64, randomize_img = randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
         test_loader = get_dataloader(load_type='test', base_dataset='Dominoes Box', batch_size=64, randomize_img = randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+        base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+dataset+"_"+dominoes_exp_dict[EXP_NUM]
+        # for i, (x, y) in enumerate(train_loader):
+        #     x = einops.rearrange(x, 'b c h w -> b h w c')
+        #     show_images_grid(x, y, num_images=64)
+        #     break
 
-        for i, (x, y) in enumerate(train_loader):
-            x = einops.rearrange(x, 'b c h w -> b h w c')
-            show_images_grid(x, y, num_images=64)
-            break
-
-        train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM, dataset=dataset)
+        train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)

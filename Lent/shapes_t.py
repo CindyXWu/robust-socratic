@@ -189,5 +189,5 @@ if __name__ == "__main__":
 
         train_loader = dataloader_3D_shapes('train', batch_size, randomise=randomise, mechanisms=mechanisms)
         test_loader = dataloader_3D_shapes('test', batch_size, randomise=randomise, mechanisms=mechanisms)
-
-        train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM, dataset=dataset)
+        base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+dataset+"_"+shapes_exp_dict[EXP_NUM]
+        train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)

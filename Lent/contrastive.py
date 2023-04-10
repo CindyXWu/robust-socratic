@@ -35,7 +35,7 @@ class CRDLoss(nn.Module):
             f_s = self.embed_s(f_s)
             f_t = self.embed_t(f_t)
         # Numerator of equation 19
-        dot_product = torch.mm(torch.div(f_s,torch.norm(f_s)), torch.div(f_t.t(),torch.norm(f_t)))
+        dot_product = torch.mm(torch.div(f_s,torch.norm(f_s, dim=1)), torch.div(f_t.t(),torch.norm(f_t, dim=1)))
         out_s = torch.exp(torch.div(dot_product, self.T))
         s_loss = self.criterion_s(out_s, y)
         return s_loss
@@ -57,14 +57,14 @@ class ContrastLoss(nn.Module):
         c = 1e-7 # Small constant for stability
         x = x - torch.diag(torch.diag(x))   # Ignore the image itself
         y_expand = y.unsqueeze(0).repeat(bsz, 1)         # Repeat y along second dimension
-        pos_mask = torch.eq(y_expand, y_expand.t())         # Matrix of comparisons
-        neg_mask = torch.logical_not(pos_mask)
+        pos_mask = torch.eq(y_expand, y_expand.t()).detach()         # Matrix of comparisons
+        neg_mask = torch.logical_not(pos_mask).detach()
         # Loss for positive pairs - flatten for ease
         P_pos = x[pos_mask].view(-1, 1)
         log_D1 = torch.log(torch.div(P_pos.add(c), P_pos.add(eps)))
         # Loss for negative pairs using in-batch negatives
         P_neg = x[neg_mask].view(-1, 1)
-        log_D0 = torch.log(torch.div(eps, P_neg.add(eps)))
+        log_D0 = torch.log(torch.div(eps, P_neg.add(eps+c)))
         # Batch average loss (don't take into account variation in number of neg samples per image, is small overall)
         loss = - (log_D1.sum(0) + log_D0.sum(0)) / bsz
         return loss

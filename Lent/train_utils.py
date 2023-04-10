@@ -52,7 +52,7 @@ def weight_reset(model):
         if isinstance(module, nn.Conv2d):
             nn.init.kaiming_normal_(module.weight, mode="fan_out", nonlinearity="relu")
 
-def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, project, teach_num, exp_num, dataset, save=True):
+def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, project, base_path):
     """Fine tune a pre-trained teacher model for specific downstream task, or train from scratch."""
     optimizer = optim.SGD(model.parameters(), lr=lr)
     it = 0
@@ -63,8 +63,8 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, projec
         train_acc = []
         test_acc = []
         train_loss = []
-        
         model.train()
+        
         for inputs, labels in tqdm(train_loader):
             inputs = inputs.to(device)
             labels = labels.to(device)
@@ -90,7 +90,7 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, projec
         # Checkpoint model at end of every epoch
         # Have two models: working copy (this one) and final fetched model
         # Save optimizer in case re-run, save test accuracy to compare models
-        save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+dataset+"_"+exp_dict[exp_num]+"_working"
+        save_path = base_path+"_working"
         torch.save({'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
@@ -99,14 +99,13 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, projec
                 },
                 save_path)
     
-    if save:
-        save_path = output_dir+"teacher_"+teacher_dict[teach_num]+"_"+dataset+"_"+exp_dict[exp_num]+"_final"
-        torch.save({'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'loss_hist': train_loss,
-                'test_acc': test_acc,
-                },
-                save_path)
+    save_path = base_path+"_final"
+    torch.save({'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss_hist': train_loss,
+            'test_acc': test_acc,
+            },
+            save_path)
 
 def base_distill_loss(scores, targets, temp):
     scores = scores/temp

@@ -70,23 +70,13 @@ def sweep():
     wandb.config.teacher = teacher_dict[TEACH_NUM]
     wandb.config.student = student_dict[STUDENT_NUM]
     wandb.config.loss = loss_dict[LOSS_NUM]
-
-    randomize_cue = False
-    match S_EXP_NUM:
-        case 0:
-            cue_type = 'plain'
-        case 1:
-            cue_type = 'box'
-        case 2: 
-            cue_type = 'box'
-            randomize_cue = True
-
-    # Dataloaders
-    train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, spurious_corr=spurious_corr, randomize_cue=randomize_cue)
-    test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, spurious_corr=spurious_corr, randomize_cue=randomize_cue)
+    
+    train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
+    test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
 
     # Train
     train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha)
+
 
 #================================================================================================
 # Refer to dictionaries student_dict, exp_num, aug_dict, loss_dict, s_teach_dict in info_dicts.py
@@ -112,8 +102,8 @@ run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S me
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
 wandb_run = True # Set to False to check loss functions
-lr = 0.5
-final_lr = 0.05
+lr = 0.1
+final_lr = 0.01
 temp = 30
 epochs = 30
 alpha = 1 # Fraction of other distillation losses (1-alpha for distillation loss)
@@ -126,10 +116,13 @@ sweep_configuration = {
     'metric': {'goal': 'maximize', 'name': 'student test acc'},
     # CHANGE THESE
     'parameters': {
-        'spurious_corr': {'values': [0.5, 0.6, 0.7, 0.8, 0.9, 1]}, # For grid search
+        #'spurious_corr': {'values': [0.5, 0.6, 0.7, 0.8, 0.9, 1]}, # For grid search
         # 'alpha': {'distribution': 'uniform', 'min': 0, 'max': 1}, # For bayes search
+        'lr': {'distribution': 'uniform', 'min': 0.01, 'max': 0.5},
+        'final_lr': {'distribution': 'uniform', 'min': 0.001, 'max': 0.1},
+        'temp': {'distribution': 'log_uniform', 'min': -5, 'max': 2.3},
     },
-    # 'early_terminate': {'type': 'hyperband', 'min_iter': 5}
+    'early_terminate': {'type': 'hyperband', 'min_iter': 5}
 }
 #================================================================================
 
