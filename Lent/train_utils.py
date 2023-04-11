@@ -112,15 +112,16 @@ def base_distill_loss(scores, targets, temp):
     targets = F.softmax(targets/temp).argmax(dim=1)
     return ce_loss(scores, targets)
 
-def train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, ranbox_test_loader, lr, final_lr, temp, epochs, loss_num, run_name, alpha=None, tau=None, layer_name=None):
+def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr, final_lr, temp, epochs, loss_num, run_name, alpha=None, tau=None, s_layer=None, t_layer=None):
     """Train student model with distillation loss.
     Includes LR scheduling. Change loss function as required. 
     Args:
         tau: contrastive loss temperature
         temp: base distillation loss temperature
         alpha: contrastive and Jacobian loss weight
-        layer_name: layer to extract features from for contrastive loss
+        s_layer, t_layer: layer to extract features from for contrastive loss
         loss_num: index of loss dictionary (in info_dicts.py) describing which loss fn to use
+        base_dataset: tells us which dataset out of CIFAR10, CIFAR100, Dominoes and Shapes to use
     """
     optimizer = optim.SGD(student.parameters(), lr=lr)
     scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
@@ -132,6 +133,36 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
     input_dim = c*w*h
     teacher_test_acc = evaluate(teacher, test_loader, batch_size)
 
+    # Format: {'Mechanism name as string': dataloader}
+    dataloaders = {}
+    if base_dataset in ["CIFAR10", "CIFAR100"]:
+        dataloaders[exp_dict[0]] = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type='nocue') # Plain
+        dataloaders[exp_dict[1]] = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type='box') # Box
+        dataloaders[exp_dict[2]] = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type='box', randomize_cue=True) # Box random
+    if base_dataset == "Dominoes":
+        randomize_cues = [False, False]
+        randomize_img = False
+        for i in range(7):
+            match i:
+                case 0:
+                    cue_proportions = [0.0, 0.0]
+                case 1:
+                    cue_proportions = [1.0, 0.0]
+                    randomize_img = True
+                case 2:
+                    cue_proportions = [0.0, 1.0]
+                    randomize_img = True
+                case 3:
+                    randomize_img = True
+                    cue_proportions = [1.0, 1.0]
+                case 4:
+                    cue_proportions = [1.0, 0.0]
+                case 5:
+                    cue_proportions = [0.0, 1.0]
+                case 6:
+                    cue_proportions = [1.0, 1.0]
+            dataloaders[dominoes_exp_dict[i]] = get_dataloader(load_type='test', base_dataset=base_dataset, batch_size=batch_size, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+    print(dataloaders)
     for epoch in range(epochs):
         for inputs, labels in tqdm(train_loader):
             inputs = inputs.to(device)
@@ -151,8 +182,8 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                     output_dim = scores.shape[1]
                     loss = jacobian_loss(scores, targets, inputs, T=1, alpha=alpha, batch_size=batch_size, loss_fn=mse_loss, input_dim=input_dim, output_dim=output_dim)
                 case 2: # Contrastive distillation
-                    s_map = feature_extractor(student, inputs, layer_name).view(batch_size, -1)
-                    t_map = feature_extractor(teacher, inputs, layer_name).view(batch_size, -1).detach()
+                    s_map = feature_extractor(student, inputs, s_layer).view(batch_size, -1)
+                    t_map = feature_extractor(teacher, inputs, t_layer).view(batch_size, -1).detach()
                     # Initialise contrastive loss, temp=0.1 (as recommended in paper)
                     contrastive_loss = CRDLoss(s_map.shape[1], t_map.shape[1], T=tau)
                     loss = alpha*contrastive_loss(s_map, t_map, labels)+(1-alpha)*base_distill_loss(scores, targets, temp)
@@ -174,27 +205,23 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                 # Check that model is training correctly
                 for param in student.parameters():
                     assert param.grad is not None
-            if it % 100 == 0:
+            if it % 200 == 0:
                 batch_size = inputs.shape[0]
                 train_acc = evaluate(student, train_loader, batch_size, max_ex=100)
                 test_acc = evaluate(student, test_loader, batch_size)
-                plain_acc = evaluate(student, plain_test_loader, batch_size)
-                box_acc = evaluate(student, box_test_loader, batch_size)
-                randbox_acc = evaluate(student, ranbox_test_loader, batch_size)
+                for key in dataloaders:
+                    wandb.log({key: evaluate(student, dataloaders[key], batch_size)})
                 error = teacher_test_acc - test_acc
                 KL_diff = kl_loss(F.log_softmax(scores/temp, dim=1), F.log_softmax(targets/temp, dim=1))
                 top1_diff = torch.eq(student_preds, teacher_preds).float().mean()
                 print('Iteration: %i, %.2f%%' % (it, test_acc), "Epoch: ", epoch, "Loss: ", train_loss)
                 print("Project {}, LR {}, temp {}".format(run_name, lr, temp))
                 wandb.log({
-                    "T-S Test Difference": error, 
                     "T-S KL": KL_diff, 
-                    "T-S Top 1 Difference": top1_diff, 
+                    "T-S Top 1 Fidelity": top1_diff, 
                     "S Train": train_acc, 
                     "S Test": test_acc, 
-                    "S P Test": plain_acc, 
-                    "S B Test": box_acc, 
-                    "S RB Test": randbox_acc, 
+                    "T-S Test Difference": error, 
                     "S Loss": train_loss, 
                     "S LR": lr, }
                     )

@@ -249,10 +249,11 @@ def show_model(model):
         print(f"Layer {idx}: {module}")
 
 if __name__ == "__main__":
-    # lenet = LeNet5(10)
-    # lenet.attention_map(torch.randn(1, 3, 32, 32), "feature_extractor.8")
+    resnet_ap = CustomResNet18(8)
+    resnet50_ap = CustomResNet50(8)
     resnet = wide_resnet_constructor(3, 100)
-    get_submodules(resnet)
+    lenet = LeNet5(10)
+    get_submodules(lenet)
 
 # class ResNet18_CIFAR(models.ResNet):
 #     """10 layers in total.

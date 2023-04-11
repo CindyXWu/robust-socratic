@@ -303,20 +303,22 @@ def get_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocue', 
         cue_type: 'nocue', 'box', 'dominoes', 'domcues'
         cue_proportion: used only for domcues
         randomize_cues: used only for domcues
+    Datasets default download=False. Set download=True to download for first time.
     """
-    if base_dataset == 'Dominoes':
-        base_dataset = 'CIFAR10'
-        cue_proportion = 0.0 if cue_type == 'nocue' else cue_proportion
-        cue_type = 'dominoes'
+    ## I GOT RID OF THIS FOR NOW, so 'Dominoes' BASE DATASET AUTOMATICALLY MEANS CUED DOMINOES: CAN ADD BACK LATER
+    # if base_dataset == 'Dominoes':
+    #     base_dataset = 'CIFAR10'
+    #     cue_proportion = 0.0 if cue_type == 'nocue' else cue_proportion
+    #     cue_type = 'dominoes'
 
-    if base_dataset == 'Dominoes Box':
+    if base_dataset == 'Dominoes':
         base_dataset = 'CIFAR10'
         cue_type = 'domcues'
 
     # define base dataset (pick train or test)
     dset_type = getattr(torchvision.datasets, base_dataset)
     dset = dset_type(root=f'{data_dir}/{base_dataset.lower()}/', 
-                     train=(load_type == 'train'), download=True, transform=get_transform('nocue'))
+                     train=(load_type == 'train'), download=False, transform=get_transform('nocue'))
 
     # pick cue
     if (cue_type == 'nocue'):
@@ -326,12 +328,12 @@ def get_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocue', 
     elif (cue_type == 'dominoes'):
         dset_type = getattr(torchvision.datasets, 'FashionMNIST')
         dset_simple = dset_type(root=f'{data_dir}/FashionMNIST/', 
-                        train=(load_type == 'train'), download=True, transform=get_transform('dominoes'))
+                        train=(load_type == 'train'), download=False, transform=get_transform('dominoes'))
         dset = domDataset(dset, dset_simple, cue_proportion=cue_proportion, randomize_cue=randomize_cue, randomize_img=randomize_img)
     elif (cue_type == 'domcues'):
         dset_type = getattr(torchvision.datasets, 'FashionMNIST')
         dset_simple = dset_type(root=f'{data_dir}/FashionMNIST/', 
-                        train=(load_type == 'train'), download=True, transform=get_transform('dominoes'))
+                        train=(load_type == 'train'), download=False, transform=get_transform('dominoes'))
         dset = domCueDataset(dset, dset_simple, cue_proportions=cue_proportions, randomize_cues=randomize_cues, randomize_img=randomize_img)
 
     if isinstance(subset_ids, np.ndarray):

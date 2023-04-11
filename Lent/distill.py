@@ -86,7 +86,7 @@ def sweep():
     test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
 
     # Train
-    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha, tau=tau, layer_name=layer)
+    train_distill(teacher, student, train_loader, test_loader, base_dataset, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha, tau=tau, s_layer=s_layer, t_layer=t_layer)
 
 
 #================================================================================================
@@ -95,19 +95,35 @@ def sweep():
 is_sweep = args.sweep
 T_EXP_NUM = 1
 S_EXP_NUM = 1
-STUDENT_NUM = 2
-TEACH_NUM = 3
+STUDENT_NUM = 1
+TEACH_NUM = 1
 LOSS_NUM = 2
 AUG_NUM = 0
+base_dataset = 'Dominoes'
 if args.config_name:
     T_EXP_NUM = config['t_exp_num']
     STUDENT_NUM = config['student_num']
     TEACH_NUM = config['teacher_num']
     LOSS_NUM = config['loss_num']
     S_EXP_NUM = config['s_exp_num']
+    # Needs to be one of: 'CIFAR100', 'Dominoes', 'CIFAR10', 'Shapes'
+    base_dataset = config['dataset']
+# Necessary to make 'exp_dict' refer to correct dictionary from 'info_dicts.py'
+match base_dataset:
+    case 'CIFAR100':
+        class_num = 100
+    case 'CIFAR10':
+        class_num = 10
+    case 'Dominoes':
+        exp_dict = dominoes_exp_dict
+        class_num = 10
+    case 'Shapes':
+        exp_dict = shapes_exp_dict
+        class_num = 8
 ## WANDB PROJECT NAME
-project = "Distill "+teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]
-run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S mech '+exp_dict[S_EXP_NUM]+', T mech '+exp_dict[T_EXP_NUM]+', Loss: '+loss_dict[LOSS_NUM]+', Aug: '+aug_dict[AUG_NUM]
+project = "Distill "+teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]+"_"+base_dataset
+run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S mech '+exp_dict[S_EXP_NUM]+', T mech '+exp_dict[T_EXP_NUM]+', Loss: '+loss_dict[LOSS_NUM]
+print('project:', project)
 
 # ======================================================================================
 # SETUP PARAMS REQUIRING MANUAL INPUT
@@ -122,50 +138,49 @@ match LOSS_NUM:
         alpha = 1
     case 2:
         alpha = 0.3
-layer = {"11.path2.5": "final_features"} # Contrastive feature layer
 tau = 0.1 # Contrastive loss temperature
 batch_size = 64
 spurious_corr = 1
 
-sweep_configuration = {
-    'method': 'bayes',
-    'name': strftime("%m-%d %H:%M:%S", gmtime()),
-    'metric': {'goal': 'maximize', 'name': 'student test acc'},
-    # CHANGE THESE
-    'parameters': {
-        #'spurious_corr': {'values': [0.5, 0.6, 0.7, 0.8, 0.9, 1]}, # For grid search
-        # 'alpha': {'distribution': 'uniform', 'min': 0, 'max': 1}, # For bayes search
-        'lr': {'distribution': 'uniform', 'min': 0.01, 'max': 0.5},
-        'final_lr': {'distribution': 'uniform', 'min': 0.001, 'max': 0.1},
-        'tau': {'distribution': 'log_uniform', 'min': -5, 'max': 2.3},
-    },
-    'early_terminate': {'type': 'hyperband', 'min_iter': 5}
-}
+# sweep_configuration = {
+#     'method': 'bayes',
+#     'name': strftime("%m-%d %H:%M:%S", gmtime()),
+#     'metric': {'goal': 'maximize', 'name': 'student test acc'},
+#     # CHANGE THESE
+#     'parameters': {
+#         #'spurious_corr': {'values': [0.5, 0.6, 0.7, 0.8, 0.9, 1]}, # For grid search
+#         # 'alpha': {'distribution': 'uniform', 'min': 0, 'max': 1}, # For bayes search
+#         'lr': {'distribution': 'uniform', 'min': 0.01, 'max': 0.5},
+#         'final_lr': {'distribution': 'uniform', 'min': 0.001, 'max': 0.1},
+#         'tau': {'distribution': 'log_uniform', 'min': -5, 'max': 2.3},
+#     },
+#     'early_terminate': {'type': 'hyperband', 'min_iter': 5}
+# }
 #================================================================================
 
 # Student model setup (change only if adding to dicts above)
 match STUDENT_NUM:
     case 0:
-        student = LeNet5(10).to(device)
+        student = LeNet5(class_num).to(device)
+        s_layer = {'feature_extractor.10': 'feature_extractor.10'}
     case 1:
-        student = CustomResNet18(100).to(device)
+        student = CustomResNet18(class_num).to(device)
+        s_layer = {'layer4.1.bn2': 'bn_bn2'}
     case 2:
-        student = wide_resnet_constructor(3, 100).to(device)
+        student = wide_resnet_constructor(3, class_num).to(device)
+        s_layer = {"11.path2.5": "final_features"} # Contrastive feature layer
 
 # Teacher model setup (change only if adding to dicts above)
 match TEACH_NUM:
-    case 0:
-        teacher = LeNet5(10).to(device)
-        base_dataset = 'CIFAR10'
     case 1:
-        teacher = CustomResNet18(100).to(device)
-        base_dataset = 'CIFAR100'
+        teacher = CustomResNet18(class_num).to(device)
+        t_layer = {'layer4.1.bn2': 'bn_bn2'}
     case 2:
-        teacher = CustomResNet50(100).to(device)
-        base_dataset = 'CIFAR100'
+        teacher = CustomResNet50(class_num).to(device)
+        t_layer = {'layer4.2.bn3': 'bn_bn3'}
     case 3:
-        teacher = wide_resnet_constructor(3, 100).to(device)
-        base_dataset = 'CIFAR100'
+        teacher = wide_resnet_constructor(3, class_num).to(device)
+        t_layer = {"11.path2.5": "final_features"} # Contrastive feature layer
 
 # Load saved teacher model (change only if changing file locations)
 # Clumsy try-except while I wrestle my codebase into sync
@@ -178,10 +193,6 @@ checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
 test_acc = checkpoint['test_acc']
 print("Loaded teacher model with test accuracy: ", test_acc[-1])
-
-plain_test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type='nocue')
-box_test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type='box')
-randbox_test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type='box', randomize_cue=True)
 
 if __name__ == "__main__":
     if is_sweep:
@@ -224,4 +235,4 @@ if __name__ == "__main__":
     test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
 
     # Train
-    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha, tau=tau, layer_name=layer)
+    train_distill(teacher, student, train_loader, test_loader, base_dataset, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha, tau=tau, s_layer=s_layer, t_layer=t_layer)
