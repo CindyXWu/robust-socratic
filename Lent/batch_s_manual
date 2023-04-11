@@ -36,11 +36,9 @@ module load miniconda/3
 source ~/.bashrc
 conda deactivate
 conda activate pytorch
-config_file=$CONFIG_FILE
-i=$IDX
 
 #! Full path to application executable: 
-application="python distill.py"
+application="python cifar_s.py"
 
 #! Run options for the application:
 options=""
@@ -59,7 +57,7 @@ np=$[${numnodes}*${mpi_tasks_per_node}]
 #! Choose this for a pure shared-memory OpenMP parallel program on a single node:
 #! (OMP_NUM_THREADS threads will be created):
 #CMD="$application $options"
-CMD="$application --config_num $i --config_name $config_file"
+CMD="$application"
 
 #! Choose this for a MPI code using OpenMPI:
 #CMD="mpirun -npernode $mpi_tasks_per_node -np $np $application $options"
