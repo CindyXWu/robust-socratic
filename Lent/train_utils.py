@@ -112,26 +112,25 @@ def base_distill_loss(scores, targets, temp):
     targets = F.softmax(targets/temp).argmax(dim=1)
     return ce_loss(scores, targets)
 
-def train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, ranbox_test_loader, lr, final_lr, temp, epochs, loss_num, run_name, alpha=None):
+def train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, ranbox_test_loader, lr, final_lr, temp, epochs, loss_num, run_name, alpha=None, tau=None, layer_name=None):
     """Train student model with distillation loss.
     Includes LR scheduling. Change loss function as required. 
-    N.B. I need to refactor this at some point.
-    Student model should be kaiming initialised and teacher model should be pre-trained.
+    Args:
+        tau: contrastive loss temperature
+        temp: base distillation loss temperature
+        alpha: contrastive and Jacobian loss weight
+        layer_name: layer to extract features from for contrastive loss
+        loss_num: index of loss dictionary (in info_dicts.py) describing which loss fn to use
     """
     optimizer = optim.SGD(student.parameters(), lr=lr)
     scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
     it = 0
-    train_acc = []
-    test_acc = []
-    train_loss = []  # loss at iteration 0
-    output_dim = num_classes = len(train_loader.dataset.classes)
-    batch_size = train_loader.batch_size
-    # Initialise contrastive loss, temp=0.1 (as recommended in paper)
-    contrastive_loss = CRDLoss(num_classes, num_classes, T=0.1)
-    teacher_test_acc = evaluate(teacher, test_loader, batch_size)
-    input_dim = 32*32*3
-    it_per_epoch = len(train_loader)
+    output_dim = len(train_loader.dataset.classes)
     # weight_reset(student)
+    sample = next(iter(train_loader))
+    batch_size, c, w, h = sample[0].shape
+    input_dim = c*w*h
+    teacher_test_acc = evaluate(teacher, test_loader, batch_size)
 
     for epoch in range(epochs):
         for inputs, labels in tqdm(train_loader):
@@ -151,24 +150,25 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                 case 1: # Jacobian loss   
                     output_dim = scores.shape[1]
                     loss = jacobian_loss(scores, targets, inputs, T=1, alpha=alpha, batch_size=batch_size, loss_fn=mse_loss, input_dim=input_dim, output_dim=output_dim)
+                case 2: # Contrastive distillation
+                    s_map = feature_extractor(student, inputs, layer_name).view(batch_size, -1)
+                    t_map = feature_extractor(teacher, inputs, layer_name).view(batch_size, -1).detach()
+                    # Initialise contrastive loss, temp=0.1 (as recommended in paper)
+                    contrastive_loss = CRDLoss(s_map.shape[1], t_map.shape[1], T=tau)
+                    loss = alpha*contrastive_loss(s_map, t_map, labels)+(1-alpha)*base_distill_loss(scores, targets, temp)
                 # case 3: # Feature map loss - currently only for self-distillation
                 #     layer = 'feature_extractor.10'
                 # Format below only works if model has a feature extractor method
                 #     s_map = student.attention_map(inputs, layer)
                 #     t_map = teacher.attention_map(inputs, layer).detach() 
                     # loss = feature_map_diff(scores, targets, s_map, t_map, T=1, alpha=0.2, loss_fn=mse_loss, aggregate_chan=False)
-                case 2: # Contrastive distillation
-                    layer = {"11.path2.5": "final_features"}
-                    s_map = feature_extractor(student, inputs, layer).view(batch_size, -1)
-                    t_map = feature_extractor(teacher, inputs, layer).view(batch_size, -1).detach()
-                    loss = alpha*contrastive_loss(s_map, t_map, labels)+(1-alpha)*base_distill_loss(scores, targets, temp)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             scheduler.step()
             lr = scheduler.get_lr()
-            train_loss.append(loss.detach().cpu().numpy())
+            train_loss = loss.detach().cpu().numpy()
 
             if it == 0:
                 # Check that model is training correctly
@@ -176,26 +176,26 @@ def train_distill(teacher, student, train_loader, test_loader, plain_test_loader
                     assert param.grad is not None
             if it % 100 == 0:
                 batch_size = inputs.shape[0]
-                train_acc.append(evaluate(student, train_loader, batch_size, max_ex=100))
-                test_acc.append(evaluate(student, test_loader, batch_size))
+                train_acc = evaluate(student, train_loader, batch_size, max_ex=100)
+                test_acc = evaluate(student, test_loader, batch_size)
                 plain_acc = evaluate(student, plain_test_loader, batch_size)
                 box_acc = evaluate(student, box_test_loader, batch_size)
                 randbox_acc = evaluate(student, ranbox_test_loader, batch_size)
-                error = teacher_test_acc - test_acc[-1]
+                error = teacher_test_acc - test_acc
                 KL_diff = kl_loss(F.log_softmax(scores/temp, dim=1), F.log_softmax(targets/temp, dim=1))
                 top1_diff = torch.eq(student_preds, teacher_preds).float().mean()
-                print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch, "Loss: ", train_loss[-1])
+                print('Iteration: %i, %.2f%%' % (it, test_acc), "Epoch: ", epoch, "Loss: ", train_loss)
                 print("Project {}, LR {}, temp {}".format(run_name, lr, temp))
                 wandb.log({
                     "T-S Test Difference": error, 
                     "T-S KL": KL_diff, 
                     "T-S Top 1 Difference": top1_diff, 
-                    "S Train": train_acc[-1], 
-                    "S Test": test_acc[-1], 
+                    "S Train": train_acc, 
+                    "S Test": test_acc, 
                     "S P Test": plain_acc, 
                     "S B Test": box_acc, 
                     "S RB Test": randbox_acc, 
-                    "S Loss": train_loss[-1], 
+                    "S Loss": train_loss, 
                     "S LR": lr, }
                     )
             it += 1

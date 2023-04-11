@@ -52,30 +52,41 @@ def sweep():
         # Set wandb project where this run will be logged
         project=project,
         config={
-            "dataset": "CIFAR-10",
-            "batch_size": batch_size,
+            "dataset": base_dataset,
+            "teacher": teacher_dict[TEACH_NUM],
+            "student": student_dict[STUDENT_NUM],
             "epochs": epochs,
-            "lr": lr,
-            "final_lr": final_lr,
             "temp": temp,
             },
         name = run_name,
     )
-    # alpha = wandb.config.alpha
-    # wandb.config.tags = 'alpha='+str(alpha)
-    spurious_corr = wandb.config.spurious_corr
+    # spurious_corr = wandb.config.spurious_corr
+    wandb.config.spurious_corr = spurious_corr
     wandb.config.base_dataset = base_dataset
     wandb.config.student_mechanism = exp_dict[S_EXP_NUM]
     wandb.config.teacher_mechanism = exp_dict[T_EXP_NUM]
     wandb.config.teacher = teacher_dict[TEACH_NUM]
     wandb.config.student = student_dict[STUDENT_NUM]
     wandb.config.loss = loss_dict[LOSS_NUM]
+    tau = wandb.config.tau
+    lr = wandb.config.lr
+    final_lr = wandb.config.final_lr
+
+    randomize_cue = False
+    match S_EXP_NUM:
+        case 0:
+            cue_type = 'nocue'
+        case 1:
+            cue_type = 'box'
+        case 2: 
+            cue_type = 'box'
+            randomize_cue = True
     
     train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
     test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
 
     # Train
-    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha)
+    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha, tau=tau, layer_name=layer)
 
 
 #================================================================================================
@@ -102,16 +113,22 @@ run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S me
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
 wandb_run = True # Set to False to check loss functions
-lr = 0.1
-final_lr = 0.01
+lr = 1
+final_lr = 0.3
 temp = 30
 epochs = 30
-alpha = 1 # Fraction of other distillation losses (1-alpha for distillation loss)
+match LOSS_NUM:
+    case 1:
+        alpha = 1
+    case 2:
+        alpha = 0.3
+layer = {"11.path2.5": "final_features"} # Contrastive feature layer
+tau = 0.1 # Contrastive loss temperature
 batch_size = 64
 spurious_corr = 1
 
 sweep_configuration = {
-    'method': 'grid',
+    'method': 'bayes',
     'name': strftime("%m-%d %H:%M:%S", gmtime()),
     'metric': {'goal': 'maximize', 'name': 'student test acc'},
     # CHANGE THESE
@@ -120,7 +137,7 @@ sweep_configuration = {
         # 'alpha': {'distribution': 'uniform', 'min': 0, 'max': 1}, # For bayes search
         'lr': {'distribution': 'uniform', 'min': 0.01, 'max': 0.5},
         'final_lr': {'distribution': 'uniform', 'min': 0.001, 'max': 0.1},
-        'temp': {'distribution': 'log_uniform', 'min': -5, 'max': 2.3},
+        'tau': {'distribution': 'log_uniform', 'min': -5, 'max': 2.3},
     },
     'early_terminate': {'type': 'hyperband', 'min_iter': 5}
 }
@@ -170,7 +187,7 @@ if __name__ == "__main__":
     if is_sweep:
         sweep_id = wandb.sweep(sweep=sweep_configuration, project=project)
         wandb.agent(sweep_id, function=sweep, count=10)
-    elif wandb_run:
+    else:
         wandb.init(
             # Set the wandb project where this run will be logged
             project=project,
@@ -195,17 +212,16 @@ if __name__ == "__main__":
             cue_type = 'box'
             randomize_cue = True
 
-    if wandb_run:
-        wandb.config.base_dataset = base_dataset
-        wandb.config.spurious_corr = 'spurious_corr='+str(spurious_corr)
-        wandb.config.student_mechanism = exp_dict[S_EXP_NUM]
-        wandb.config.teacher_mechanism = exp_dict[T_EXP_NUM]
-        wandb.config.teacher = teacher_dict[TEACH_NUM]
-        wandb.config.student = student_dict[STUDENT_NUM]
-        wandb.config.loss = loss_dict[LOSS_NUM]
+    wandb.config.base_dataset = base_dataset
+    wandb.config.spurious_corr = spurious_corr
+    wandb.config.student_mechanism = exp_dict[S_EXP_NUM]
+    wandb.config.teacher_mechanism = exp_dict[T_EXP_NUM]
+    wandb.config.teacher = teacher_dict[TEACH_NUM]
+    wandb.config.student = student_dict[STUDENT_NUM]
+    wandb.config.loss = loss_dict[LOSS_NUM]
     
     train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
     test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
 
     # Train
-    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha)
+    train_distill(teacher, student, train_loader, test_loader, plain_test_loader, box_test_loader, randbox_test_loader, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha, tau=tau, layer_name=layer)
