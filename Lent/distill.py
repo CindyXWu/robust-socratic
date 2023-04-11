@@ -93,11 +93,11 @@ def sweep():
 # Refer to dictionaries student_dict, exp_num, aug_dict, loss_dict, s_teach_dict in info_dicts.py
 #================================================================================================
 is_sweep = args.sweep
-T_EXP_NUM = 1
-S_EXP_NUM = 1
-STUDENT_NUM = 1
-TEACH_NUM = 1
-LOSS_NUM = 0
+T_EXP_NUM = 0
+S_EXP_NUM = 0
+STUDENT_NUM = 0
+TEACH_NUM = 0
+LOSS_NUM = 1
 AUG_NUM = 0
 base_dataset = 'Dominoes'
 if args.config_name:
@@ -139,7 +139,9 @@ match LOSS_NUM:
     case 1:
         alpha = 1
     case 2:
-        alpha = 0.03
+        # Adjust for relative size of contrastive loss to distillation loss
+        # E.g. 0.03 for contrastive ~60, distillation ~1
+        alpha = 0.01
 tau = 0.1 # Contrastive loss temperature
 batch_size = 64
 spurious_corr = 1
@@ -174,6 +176,9 @@ match STUDENT_NUM:
 
 # Teacher model setup (change only if adding to dicts above)
 match TEACH_NUM:
+    case 0:
+        teacher = LeNet5(class_num).to(device)
+        t_layer = {'feature_extractor.10': 'feature_extractor.10'}
     case 1:
         teacher = CustomResNet18(class_num).to(device)
         t_layer = {'layer4.1.bn2': 'bn_bn2'}
@@ -193,8 +198,11 @@ except:
     load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+exp_dict[T_EXP_NUM]+"_final"
 checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
-test_acc = checkpoint['test_acc']
-print("Loaded teacher model with test accuracy: ", test_acc[-1])
+try:
+    test_acc = checkpoint['test_acc']
+    print("Loaded teacher model with test accuracy: ", test_acc[-1])
+except:
+    test_acc = [0]
 
 if __name__ == "__main__":
     if is_sweep:

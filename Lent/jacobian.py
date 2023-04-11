@@ -5,7 +5,6 @@ import torch.nn.functional as F
 import torch
 from image_models import *
 
-# NOTE for later so I don't forget: automatically set to approximate Jacobian 
 def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_dim, output_dim, approx=True):
     """Eq 10, no hard targets used.
     Args:
@@ -20,11 +19,12 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
     # Number of classes to use for Jacobian approximation
     k = 20
 
-    if not approx:
+    # If the number of classes is less than k, use exact Jacobian regardless of approx flag
+    if not approx or output_dim <= k:
         t_jac = get_jacobian(targets, inputs, batch_size, input_dim, output_dim)
         s_jac = get_jacobian(scores, inputs, batch_size, input_dim, output_dim)
     else:
-        i = torch.topk(targets, k, dim=1)[1] if output_dim > k else torch.arange(output_dim).unsqueeze(0).repeat(batch_size, 1)
+        i = torch.topk(targets, k, dim=1)[1]
         t_jac = get_approx_jacobian(targets, inputs, batch_size, output_dim, i)
         s_jac = get_approx_jacobian(scores, inputs, batch_size, output_dim, i)
 
