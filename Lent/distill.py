@@ -97,7 +97,7 @@ T_EXP_NUM = 1
 S_EXP_NUM = 1
 STUDENT_NUM = 1
 TEACH_NUM = 1
-LOSS_NUM = 2
+LOSS_NUM = 0
 AUG_NUM = 0
 base_dataset = 'Dominoes'
 if args.config_name:
@@ -129,15 +129,17 @@ print('project:', project)
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
 wandb_run = True # Set to False to check loss functions
-lr = 1
-final_lr = 0.3
-temp = 30
-epochs = 30
+lr = 0.1
+final_lr = 0.01
+temp = 30 # Fix this at about 20-30 (result of hyperparam sweeps)
+epochs = 5
 match LOSS_NUM:
+    case 0:
+        alpha = 1
     case 1:
         alpha = 1
     case 2:
-        alpha = 0.3
+        alpha = 0.03
 tau = 0.1 # Contrastive loss temperature
 batch_size = 64
 spurious_corr = 1

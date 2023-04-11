@@ -137,7 +137,7 @@ def wandb_get_data(project_name, t_num, s_num, exp_num, groupby_metrics):
 
     return histories
 
-# Order of subplots by metric name
+# Order of subplots by metric name - used to make grouped plots make sense
 order_list = ['Student train accuracy', 'Student test accuracy', 'Student plain test accuracy', 'Student randomised box test accuracy', 'Student box test accuracy', 'Student-teacher error', 'Student lr', 'Student loss']
 def wandb_plot(histories, title):
     sns.set(style='whitegrid', context='paper', font_scale=1.2)     # Set seaborn styling
@@ -183,10 +183,7 @@ def wandb_plot(histories, title):
         axs[i].set_title(mean_col.replace('_mean', '').capitalize(), fontsize=12)
 
     axs[-1].set_xlabel('Step', fontsize=12)
-    # Create a legend in the middle right with extra space
-    # So far, nothing special except the managed prop_cycle. Now the trick:
     lines, labels = axs[0].get_legend_handles_labels()
-    # Finally, the legend (that maybe you'll customize differently)
     fig.legend(lines, labels, loc='lower center', ncol=4)
 
     fig.suptitle(title, fontsize=15)

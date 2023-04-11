@@ -24,7 +24,7 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
         t_jac = get_jacobian(targets, inputs, batch_size, input_dim, output_dim)
         s_jac = get_jacobian(scores, inputs, batch_size, input_dim, output_dim)
     else:
-        i = torch.topk(targets, k, dim=1)[1]
+        i = torch.topk(targets, k, dim=1)[1] if output_dim > k else torch.arange(output_dim).unsqueeze(0).repeat(batch_size, 1)
         t_jac = get_approx_jacobian(targets, inputs, batch_size, output_dim, i)
         s_jac = get_approx_jacobian(scores, inputs, batch_size, output_dim, i)
 
