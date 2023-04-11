@@ -162,7 +162,7 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
                 case 6:
                     cue_proportions = [1.0, 1.0]
             dataloaders[dominoes_exp_dict[i]] = get_dataloader(load_type='test', base_dataset=base_dataset, batch_size=batch_size, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
-    print(dataloaders)
+
     for epoch in range(epochs):
         for inputs, labels in tqdm(train_loader):
             inputs = inputs.to(device)
@@ -205,7 +205,7 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
                 # Check that model is training correctly
                 for param in student.parameters():
                     assert param.grad is not None
-            if it % 200 == 0:
+            if it % 100 == 0:
                 batch_size = inputs.shape[0]
                 train_acc = evaluate(student, train_loader, batch_size, max_ex=100)
                 test_acc = evaluate(student, test_loader, batch_size)
