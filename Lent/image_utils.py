@@ -34,8 +34,13 @@ class AugShapes3D(Shapes3D):
         self.crop_size = crop_size
 
     def __getitem__(self, index):
-        """Turn x into torch tensor and permute to [c h w] format."""
+        """
+        Returns:
+            x: c w h tensor
+            y: 8*1 tensor of soft labels
+        """
         x, y = super().__getitem__(index)
+        y = F.one_hot(torch.tensor(y).to(torch.int64), num_classes=self.num_classes)
         # Important - mixup needs to be implemented before other transforms
         x, y = self.mixup(x, y, self.alpha, self.beta)
         x = self.crop(x)
@@ -61,6 +66,7 @@ class AugShapes3D(Shapes3D):
         lam = random.betavariate(alpha, beta)
         # Get random sample from dataset
         x2, y2 = self.__getitem__(index)
+        y2 = F.one_hot(torch.tensor(y2).to(torch.int64), num_classes=self.num_classes)
         mixed_x = x.mul(lam).add(x2,alpha=1-lam)
         mixed_y = y.mul(lam).add(y2,alpha=1-lam)
         return mixed_x, mixed_y
@@ -186,23 +192,3 @@ if __name__ == "__main__":
     # Need to rearrange to [b h w c] for show_images_grid
     x = einops.rearrange(x, 'b c h w -> b h w c')
     show_images_grid(x, batch_size)
-
-## Deprecated: batch mixup method. Superseded by mixup method that acts on individual images (ABOVE)
-# def mixup(self, x, y, alpha, beta):
-#     """Mixup function using beta distribution for mixing.
-#     If alpha = beta = 1, distribution uniform.
-#     If alpha > beta, distribution skewed towards 0.
-#     If alpha < beta, distribution skewed towards 1.
-#     When alpha > 1 and beta > 1, distribution is concentrated around 0 and 1 - more likely to interpolate samples with similar features.
-#     When alpha < 1 and beta < 1, distribution is concentrated around 0.5, = more likely to interpolate samples with dissimilar features.
-#     """
-#     if random.uniform(0,1) > self.mix_prob:
-#         return x, y
-#     batch_size = x.shape[0]
-#     # Lambda parameter, from beta distribution
-#     lam = torch.tensor([random.betavariate(alpha, beta) for _ in range(batch_size)])
-#     index = torch.randperm(batch_size)
-#     # Broadcast dimensions of lam to match x - which has shape [batch_size, channels, height, width]
-#     mixed_x = lam.view(batch_size, 1, 1, 1) * x + (1 - lam.view(batch_size, 1, 1, 1)) * x[index, :]
-#     mixed_y = lam.view(batch_size, 1) * y + (1 - lam.view(batch_size, 1)) * y[index, :]
-#     return mixed_x, mixed_y
