@@ -99,7 +99,7 @@ def sweep_teacher():
 #================================================================================
 is_sweep = False
 TEACH_NUM = 3
-EXP_NUM = 2
+EXP_NUM = 0
 AUG_NUM = 0
 if args.config_name:
     EXP_NUM = config['exp_num']
@@ -109,7 +109,7 @@ run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+dominoes_e
 # ======================================================================================
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
-lr = 0.1
+lr = 0.2
 final_lr = 0.01
 epochs = 4
 batch_size = 64
@@ -193,9 +193,11 @@ if __name__ == "__main__":
             case 6:
                 cue_proportions = [mnist_frac, box_frac]
 
-        train_loader = get_dataloader(load_type='train', base_dataset='Dominoes Box', batch_size=64, randomize_img = randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
-        test_loader = get_dataloader(load_type='test', base_dataset='Dominoes Box', batch_size=64, randomize_img = randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+        train_loader = get_dataloader(load_type='train', base_dataset='Dominoes', batch_size=64, randomize_img = randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+        test_loader = get_dataloader(load_type='test', base_dataset='Dominoes', batch_size=64, randomize_img = randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
         base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+dataset+"_"+dominoes_exp_dict[EXP_NUM]
+
+        ## Plot images
         # for i, (x, y) in enumerate(train_loader):
         #     x = einops.rearrange(x, 'b c h w -> b h w c')
         #     show_images_grid(x, y, num_images=64)
