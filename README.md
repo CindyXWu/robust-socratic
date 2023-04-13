@@ -52,7 +52,7 @@ I evaluate distillation on counterfactual datasets for image experiments. The sh
 ### Training:
 The files cifar_t, dominoes_t and shapes_t handle training of teacher models for the different datasets. They are in separate files for historical reasons.
 - distill.py: distillation training for all datasets. Does not contain the functions used for training and evaluation, but rather configuration setups. Distillation training takes in 3 optional arguments: 
-  - sweep: whether to use a sweep or not. Default True.
+  - sweep: whether to use a sweep or not. Default False.
   - config_name: name of configuration file to load. Default None, which means no config file is loaded.
   - config_num: index of dictionary in configuarion file to use.
   - All configurations are handled as keys to a dictionary, entries of form [int key: str descriptive value]. The dictionary values are in info_dictionaries.
