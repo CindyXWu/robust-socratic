@@ -340,7 +340,7 @@ def get_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocue', 
         dset = torch.utils.data.Subset(dset, subset_ids)
 
     # define dataloader
-    dataloader = DataLoader(dset, batch_size=batch_size, shuffle=(load_type=='train'))
+    dataloader = DataLoader(dset, batch_size=batch_size, shuffle=(load_type=='train'), drop_last=True)
     return dataloader
 
 

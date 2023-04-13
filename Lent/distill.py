@@ -93,7 +93,7 @@ def sweep():
 # Refer to dictionaries student_dict, exp_num, aug_dict, loss_dict, s_teach_dict in info_dicts.py
 #================================================================================================
 is_sweep = args.sweep
-T_EXP_NUM = 1
+T_EXP_NUM = 0
 S_EXP_NUM = 1
 STUDENT_NUM = 1
 TEACH_NUM = 1
@@ -129,8 +129,8 @@ print('project:', project)
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
 wandb_run = True # Set to False to check loss functions
-lr = 0.3
-final_lr = 0.01
+lr = 0.01
+final_lr = 0.005
 temp = 30 # Fix this at about 20-30 (result of hyperparam sweeps)
 epochs = 10
 match LOSS_NUM:
