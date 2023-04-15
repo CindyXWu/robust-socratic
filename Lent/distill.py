@@ -130,7 +130,7 @@ print('project:', project)
 # ======================================================================================
 wandb_run = True # Set to False to check loss functions
 lr = 0.01
-final_lr = 0.005
+final_lr = 0.05
 temp = 30 # Fix this at about 20-30 (result of hyperparam sweeps)
 epochs = 10
 match LOSS_NUM:
@@ -138,10 +138,12 @@ match LOSS_NUM:
         alpha, lr, final_lr = 1, 0.1, 0.01
     case 1:
         alpha, lr, final_lr = 1, 0.5, 0.1
+        epochs = 20
     case 2:
         # Adjust for relative size of contrastive loss to distillation loss
         # E.g. 0.03 for contrastive ~60, distillation ~1
         alpha, lr, final_lr = 0.01, 0.3, 0.05
+        epochs = 20
 tau = 0.1 # Contrastive loss temperature
 batch_size = 64
 spurious_corr = 1

@@ -2,13 +2,12 @@
 
 #! sbatch directives begin here ###############################
 #SBATCH -J s_cifar
-#SBATCH -A KRUEGER-SL3-GPU
-#SBATCH --nodes=2
+#SBATCH -A KRUEGER-SL2-GPU
+#SBATCH --nodes=4
 #SBATCH --ntasks=12
 #SBATCH --gres=gpu:4
-#SBATCH --time=12:00:00
+#SBATCH --time=36:00:00
 #SBATCH --mail-type=NONE
-##SBATCH --no-requeue
 #SBATCH -p ampere
 
 #! Number of nodes and tasks per node allocated by SLURM (do not change):
@@ -34,7 +33,7 @@ i=$SLURM_ARRAY_TASK_ID
 config_file=$config_file
 
 #! Full path to application executable: 
-application="python cifar_s.py"
+application="python distill.py"
 
 #! Run options for the application:
 options=""
