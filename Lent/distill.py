@@ -47,7 +47,7 @@ if args.config_name:
     config = configs[args.config_num]
 
 def sweep():
-    """Function needed for wanb sweep. Boilerplate repeated code from main()."""
+    """Function needed for wandb sweep. Boilerplate repeated code from main()."""
     wandb.init(
         # Set wandb project where this run will be logged
         project=project,
@@ -107,8 +107,8 @@ def sweep():
                 cue_proportions = [0.0, 1.0]
             case 6:
                 cue_proportions = [1.0, 1.0]
-        train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_proportion=spurious_corr, randomize_cue=randomize_cue, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
-        test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_proportion=spurious_corr, randomize_cue=randomize_cue, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+        train_loader = get_dataloader(load_type='train', base_dataset='Dominoes', batch_size=64, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+        test_loader = get_dataloader(load_type='test', base_dataset='Dominoes', batch_size=64, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
     
     if base_dataset == 'Shapes':
         randomise = False
@@ -316,8 +316,8 @@ if __name__ == "__main__":
                 cue_proportions = [0.0, 1.0]
             case 6:
                 cue_proportions = [1.0, 1.0]
-        train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_proportion=spurious_corr, randomize_cue=randomize_cue, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
-        test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_proportion=spurious_corr, randomize_cue=randomize_cue, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+        train_loader = get_dataloader(load_type='train', base_dataset='Dominoes', batch_size=64, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+        test_loader = get_dataloader(load_type='test', base_dataset='Dominoes', batch_size=64, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
     
     if base_dataset == 'Shapes':
         randomise = False
