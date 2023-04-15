@@ -98,7 +98,7 @@ def sweep_teacher():
 # Refer to dictionaries s_exp_num, aug_dict, s_teach_num in info_dictionaries.py
 #================================================================================
 is_sweep = False
-TEACH_NUM = 3
+TEACH_NUM = 1
 EXP_NUM = 0
 AUG_NUM = 0
 if args.config_name:
@@ -110,8 +110,8 @@ run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+dominoes_e
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
 lr = 0.2
-final_lr = 0.01
-epochs = 4
+final_lr = 0.1
+epochs = 20
 batch_size = 64
 mnist_frac = 1.0
 box_frac = 1.0

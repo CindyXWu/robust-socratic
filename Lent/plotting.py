@@ -97,7 +97,7 @@ def wandb_get_data(project_name, t_num, s_num, exp_num, groupby_metrics):
             run.config.get('teacher_mechanism') == t_mech and
             run.config.get('loss') == loss):
             history = run.history()
-            if '_step' in history.columns and history['_step'].max() >= 20:
+            if '_step' in history.columns and history['_step'].max() >= 100:
                 filtered_runs.append(run)
     runs = filtered_runs
 
