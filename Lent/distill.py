@@ -47,7 +47,7 @@ if args.config_name:
     config = configs[args.config_num]
 
 def sweep():
-    """Main function for sweep."""
+    """Function needed for wanb sweep. Boilerplate repeated code from main()."""
     wandb.init(
         # Set wandb project where this run will be logged
         project=project,
@@ -135,7 +135,8 @@ def sweep():
 
 
 #================================================================================================
-# Refer to dictionaries student_dict, exp_num, aug_dict, loss_dict, s_teach_dict in info_dicts.py
+# For the following values, manual input or read from config file if one is provided
+# Refer to dictionaries in info_dicts.py for what the numbers mean
 #================================================================================================
 is_sweep = args.sweep
 T_EXP_NUM = 0
@@ -181,21 +182,12 @@ lr = 0.01
 final_lr = 0.05
 temp = 30 # Fix this at about 20-30 (result of hyperparam sweeps)
 epochs = 10
-match LOSS_NUM:
-    case 0:
-        alpha, lr, final_lr = 1, 0.1, 0.01
-    case 1:
-        alpha, lr, final_lr = 1, 0.5, 0.1
-        epochs = 20
-    case 2:
-        # Adjust for relative size of contrastive loss to distillation loss
-        # E.g. 0.03 for contrastive ~60, distillation ~1
-        alpha, lr, final_lr = 0.01, 0.3, 0.05
-        epochs = 20
 tau = 0.1 # Contrastive loss temperature
 batch_size = 64
 spurious_corr = 1
 
+## Uncomment and change values for sweep
+# Note I have an early stop criteria but this is optional
 # sweep_configuration = {
 #     'method': 'bayes',
 #     'name': strftime("%m-%d %H:%M:%S", gmtime()),
@@ -210,7 +202,20 @@ spurious_corr = 1
 #     },
 #     'early_terminate': {'type': 'hyperband', 'min_iter': 5}
 # }
+
 #================================================================================
+# Training dynamics settings depending on loss function
+match LOSS_NUM:
+    case 0:
+        alpha, lr, final_lr = 1, 0.1, 0.01
+    case 1:
+        alpha, lr, final_lr = 1, 0.5, 0.1
+        epochs = 20
+    case 2:
+        # Adjust for relative size of contrastive loss to distillation loss
+        # E.g. 0.03 for contrastive ~60, distillation ~1
+        alpha, lr, final_lr = 0.01, 0.3, 0.05
+        epochs = 20
 
 # Student model setup (change only if adding to dicts above)
 match STUDENT_NUM:
@@ -239,6 +244,8 @@ match TEACH_NUM:
         teacher = wide_resnet_constructor(3, class_num).to(device)
         t_layer = {"11.path2.5": "final_features"} # Contrastive feature layer
 
+#================================================================================
+
 # Load saved teacher model (change only if changing file locations)
 # Clumsy try-except while I wrestle my codebase into sync
 try:
@@ -253,6 +260,7 @@ try:
     print("Loaded teacher model with test accuracy: ", test_acc[-1])
 except:
     test_acc = [0]
+
 
 if __name__ == "__main__":
     if is_sweep:
