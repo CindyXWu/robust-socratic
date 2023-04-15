@@ -72,20 +72,65 @@ def sweep():
     lr = wandb.config.lr
     final_lr = wandb.config.final_lr
 
-    randomize_cue = False
-    match S_EXP_NUM:
-        case 0:
-            cue_type = 'nocue'
-        case 1:
-            cue_type = 'box'
-        case 2: 
-            cue_type = 'box'
-            randomize_cue = True
-    
-    train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
-    test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
+    ## Set train and test loaders based on dataset and experiment ##
+    if base_dataset in ["CIFAR10", "CIFAR100"]:
+        randomize_cue = False
+        match S_EXP_NUM:
+            case 0:
+                cue_type = 'nocue'
+            case 1:
+                cue_type = 'box'
+            case 2: 
+                cue_type = 'box'
+                randomize_cue = True
+        train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
+        test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
 
-    # Train
+    if base_dataset == "Dominoes":
+        randomize_cues = [False, False]
+        randomize_img = False
+        match S_EXP_NUM:
+            case 0:
+                cue_proportions = [0.0, 0.0]
+            case 1:
+                cue_proportions = [1.0, 0.0]
+                randomize_img = True
+            case 2:
+                cue_proportions = [0.0, 1.0]
+                randomize_img = True
+            case 3:
+                randomize_img = True
+                cue_proportions = [1.0, 1.0]
+            case 4:
+                cue_proportions = [1.0, 0.0]
+            case 5:
+                cue_proportions = [0.0, 1.0]
+            case 6:
+                cue_proportions = [1.0, 1.0]
+        train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_proportion=spurious_corr, randomize_cue=randomize_cue, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+        test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_proportion=spurious_corr, randomize_cue=randomize_cue, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+    
+    if base_dataset == 'Shapes':
+        randomise = False
+        match S_EXP_NUM:
+            case 1:
+                mechanisms = [0]
+                randomise = True
+            case 2:
+                mechanisms = [3]
+                randomise = True
+            case 3:
+                randomise = True
+                mechanisms = [0, 3]
+            case 4:
+                mechanisms = [0]
+            case 5:
+                mechanisms = [3]
+            case 6:
+                mechanisms = [0, 3]
+        train_loader = dataloader_3D_shapes('train', batch_size, randomise=randomise, mechanisms=mechanisms)
+        test_loader = dataloader_3D_shapes('test', batch_size, randomise=randomise, mechanisms=mechanisms)
+
     train_distill(teacher, student, train_loader, test_loader, base_dataset, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha, tau=tau, s_layer=s_layer, t_layer=t_layer)
 
 
@@ -100,6 +145,7 @@ TEACH_NUM = 1
 LOSS_NUM = 1
 AUG_NUM = 0
 base_dataset = 'Dominoes'
+
 if args.config_name:
     T_EXP_NUM = config['t_exp_num']
     STUDENT_NUM = config['student_num']
@@ -108,6 +154,7 @@ if args.config_name:
     S_EXP_NUM = config['s_exp_num']
     # Needs to be one of: 'CIFAR100', 'Dominoes', 'CIFAR10', 'Shapes'
     base_dataset = config['dataset']
+
 # Necessary to make 'exp_dict' refer to correct dictionary from 'info_dicts.py'
 match base_dataset:
     case 'CIFAR100':
@@ -120,6 +167,7 @@ match base_dataset:
     case 'Shapes':
         exp_dict = shapes_exp_dict
         class_num = 8
+
 ## WANDB PROJECT NAME
 project = "Distill "+teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]+"_"+base_dataset
 run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S mech '+exp_dict[S_EXP_NUM]+', T mech '+exp_dict[T_EXP_NUM]+', Loss: '+loss_dict[LOSS_NUM]
@@ -224,16 +272,65 @@ if __name__ == "__main__":
             },
             name = run_name
         )
+    
+    ## Set train and test loaders based on dataset and experiment ##
+    if base_dataset in ["CIFAR10", "CIFAR100"]:
+        randomize_cue = False
+        match S_EXP_NUM:
+            case 0:
+                cue_type = 'nocue'
+            case 1:
+                cue_type = 'box'
+            case 2: 
+                cue_type = 'box'
+                randomize_cue = True
+        train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
+        test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
 
-    randomize_cue = False
-    match S_EXP_NUM:
-        case 0:
-            cue_type = 'nocue'
-        case 1:
-            cue_type = 'box'
-        case 2: 
-            cue_type = 'box'
-            randomize_cue = True
+    if base_dataset == "Dominoes":
+        randomize_cues = [False, False]
+        randomize_img = False
+        match S_EXP_NUM:
+            case 0:
+                cue_proportions = [0.0, 0.0]
+            case 1:
+                cue_proportions = [1.0, 0.0]
+                randomize_img = True
+            case 2:
+                cue_proportions = [0.0, 1.0]
+                randomize_img = True
+            case 3:
+                randomize_img = True
+                cue_proportions = [1.0, 1.0]
+            case 4:
+                cue_proportions = [1.0, 0.0]
+            case 5:
+                cue_proportions = [0.0, 1.0]
+            case 6:
+                cue_proportions = [1.0, 1.0]
+        train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_proportion=spurious_corr, randomize_cue=randomize_cue, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+        test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_proportion=spurious_corr, randomize_cue=randomize_cue, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+    
+    if base_dataset == 'Shapes':
+        randomise = False
+        match S_EXP_NUM:
+            case 1:
+                mechanisms = [0]
+                randomise = True
+            case 2:
+                mechanisms = [3]
+                randomise = True
+            case 3:
+                randomise = True
+                mechanisms = [0, 3]
+            case 4:
+                mechanisms = [0]
+            case 5:
+                mechanisms = [3]
+            case 6:
+                mechanisms = [0, 3]
+        train_loader = dataloader_3D_shapes('train', batch_size, randomise=randomise, mechanisms=mechanisms)
+        test_loader = dataloader_3D_shapes('test', batch_size, randomise=randomise, mechanisms=mechanisms)
 
     wandb.config.base_dataset = base_dataset
     wandb.config.spurious_corr = spurious_corr
@@ -242,9 +339,5 @@ if __name__ == "__main__":
     wandb.config.teacher = teacher_dict[TEACH_NUM]
     wandb.config.student = student_dict[STUDENT_NUM]
     wandb.config.loss = loss_dict[LOSS_NUM]
-    
-    train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
-    test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
 
-    # Train
     train_distill(teacher, student, train_loader, test_loader, base_dataset, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha, tau=tau, s_layer=s_layer, t_layer=t_layer)

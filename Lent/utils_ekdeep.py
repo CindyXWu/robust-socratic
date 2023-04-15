@@ -304,6 +304,8 @@ def get_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocue', 
         cue_proportion: used only for domcues
         randomize_cues: used only for domcues
     Datasets default download=False. Set download=True to download for first time.
+    It does not matter what you set cue_type to if base_dataset is 'Dominoes' - the proportion of cues/presence is controlled by 'cue_proportions'.
+    E.g. if you want plain dominoes (CIFAR only predictive of label), use cue_proportions = [0, 0].
     """
     ## I GOT RID OF THIS FOR NOW, so 'Dominoes' BASE DATASET AUTOMATICALLY MEANS CUED DOMINOES: CAN ADD BACK LATER
     # if base_dataset == 'Dominoes':
