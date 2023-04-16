@@ -1,17 +1,19 @@
 import os
 import yaml
+from info_dicts import *
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-# Define the filename for your configuration file
-dataset = "Dominoes"
-filename = dataset+"_s.yml"
+dataset_num = 3 # Defines filename for yaml file
 s_exp_nums = [0, 1, 2, 3, 4, 5, 6]
 t_exp_nums = [0, 1, 2, 3, 4, 5, 6]
 teacher_nums = [1]
 student_nums = [1]
 loss_nums = [0, 1, 2]
 aug_nums = [0]
+
+dataset = dataset_dict[dataset_num]
+filename = dataset+"_s.yml"
 
 # Todo: add augmentation
 experiments = []

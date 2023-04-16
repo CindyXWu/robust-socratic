@@ -141,7 +141,7 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
     elif base_dataset == 'Dominoes':
         dict_name = dominoes_exp_dict
     for key in dict_name:
-        dataloaders[key] = create_dataloader(base_dataset=base_dataset, S_EXP_NUM=key, batch_size=batch_size, mode='test')
+        dataloaders[key] = create_dataloader(base_dataset=base_dataset, EXP_NUM=key, batch_size=batch_size, mode='test')
 
     for epoch in range(epochs):
         for inputs, labels in tqdm(train_loader):
@@ -267,6 +267,6 @@ def create_dataloader(base_dataset, EXP_NUM, batch_size, spurious_corr=1.0, mode
         train_loader = dataloader_3D_shapes('train', batch_size=batch_size, randomise=randomise, mechanisms=mechanisms)
         test_loader = dataloader_3D_shapes('test', batch_size=batch_size, randomise=randomise, mechanisms=mechanisms)
 
-        if mode == 'test':
-            return test_loader
-        return train_loader, test_loader
+    if mode == 'test':
+        return test_loader
+    return train_loader, test_loader

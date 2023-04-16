@@ -1,12 +1,15 @@
 import os
 import yaml
+from info_dicts import *
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-# Define the filename for your configuration file
-filename = "shapes_t.yml"
+dataset_num = 3 # Defines filename for yaml file
 t_exp_nums = [0, 1, 2, 3, 4, 5, 6]
 teacher_nums = [3]
+
+dataset = dataset_dict[dataset_num]
+filename = dataset+"_t.yml"
 
 experiments = []
 for t_exp_num in t_exp_nums:

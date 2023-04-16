@@ -28,7 +28,9 @@ if not os.path.exists(output_dir):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # print(f"Using {device} device")
 
-## ARGPARSE ## ============================================================
+# ======================================================================================
+# ARGPARSE
+# ======================================================================================
 # Add boolean flag for whether to use config file and sweep
 parser = argparse.ArgumentParser()
 parser.add_argument("--config_name", type=str, default=None)
@@ -37,7 +39,9 @@ parser.add_argument('--config_num', type=int, help='Index of the configuration t
 parser.add_argument("--sweep", type=bool, default=False)
 args = parser.parse_args()
 
-## OPEN YAML CONFIGS ## ===================================================
+# ======================================================================================
+# YAML CONFIGS
+# ======================================================================================
 if args.config_name:
     # Load the config file - contains list of dictionaries
     with open(args.config_name, 'r') as f:
@@ -68,11 +72,12 @@ def sweep_teacher():
     wandb.config.teacher_mechanism = cifar_exp_dict[EXP_NUM]
 
     train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
-    train_teacher(teacher, train_loader, test_loader, lr, final_lr, run_name, TEACH_NUM, EXP_NUM, epochs)
+    base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+cifar_exp_dict[EXP_NUM]
+    train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)
 
-# SETUP PARAMS - CHANGE THESE
 #================================================================================
-# Refer to dictionaries exp_num, aug_dict, teach_dict in info_dicts.py
+# SETUP PARAMS - CHANGE THESE
+# Refer to dictionaries in info_dicts.py
 #================================================================================
 is_sweep = False
 TEACH_NUM = 3
@@ -81,9 +86,12 @@ AUG_NUM = 0 # Define augmentation of distillation dataset
 if args.config_name:
     EXP_NUM = config['experiment_num']
     TEACH_NUM = config['teacher_num']
-# Hyperparams
-lr = 0.15# 0.137
-final_lr = 0.01 #0.112
+
+#==============================================================================
+# SETUP PARAMS REQUIRING MANUAL INPUT
+#==============================================================================
+lr = 0.15
+final_lr = 0.01
 epochs = 20
 batch_size = 64
 spurious_corr = 1
@@ -104,10 +112,10 @@ sweep_configuration = {
 }
 
 #==============================================================================
+# Stuff depending on setup params - change less often
 #==============================================================================
 # Teacher model setup (change only if adding to dicts above)
 project = "Teacher"
-teacher_name = teacher_dict[TEACH_NUM]
 match TEACH_NUM:
     case 0:
         teacher = LeNet5(10).to(device)
@@ -121,8 +129,8 @@ match TEACH_NUM:
     case 3:
         teacher = wide_resnet_constructor(3, 100).to(device)
         base_dataset = 'CIFAR100'
+run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+shapes_exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" "+base_dataset
 
-run_name = "T "+teacher_dict[TEACH_NUM]+", Data "+base_dataset+", Exp "+cifar_exp_dict[EXP_NUM]+", Aug "+aug_dict[AUG_NUM]
 
 if __name__ == "__main__":
     if is_sweep:

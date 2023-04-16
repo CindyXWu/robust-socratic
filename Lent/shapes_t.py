@@ -29,7 +29,9 @@ if not os.path.exists(output_dir):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # print(f"Using {device} device")
 
-## ARGPARSE ## ============================================================
+# ======================================================================================
+# ARGPARSE
+# ======================================================================================
 # Add boolean flag for whether to use config file and sweep
 parser = argparse.ArgumentParser()
 parser.add_argument("--config_name", type=str, default=None)
@@ -38,7 +40,9 @@ parser.add_argument('--config_num', type=int, help='Index of the configuration t
 parser.add_argument("--sweep", type=bool, default=False)
 args = parser.parse_args()
 
-## OPEN YAML CONFIGS ## ===================================================
+# ======================================================================================
+# YAML CONFIGS
+# ======================================================================================
 if args.config_name:
     # Load the config file - contains list of dictionaries
     with open(args.config_name, 'r') as f:
@@ -52,7 +56,7 @@ def sweep_teacher():
         # track hyperparameters and run metadata
         config={
             "teacher": teacher_dict[TEACH_NUM],
-            "dataset": "CIFAR-100",
+            "dataset": base_dataset,
             "batch_size": batch_size,
             "experiment": shapes_exp_dict[EXP_NUM],
             },
@@ -62,18 +66,18 @@ def sweep_teacher():
     lr = wandb.config.lr
     final_lr = wandb.config.final_lr
     epochs = wandb.config.epochs
-    wandb.config.base_dataset = "3D Shapes"
+    wandb.config.base_dataset = base_dataset
     wandb.config.augmentation = aug_dict[AUG_NUM]
     wandb.config.teacher = teacher_dict[TEACH_NUM]
     wandb.config.teacher_mechanism = shapes_exp_dict[EXP_NUM]
 
     train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
-    
-    train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM, dataset=dataset)
 
-# SETUP PARAMS - CHANGE THESE
+    train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)
+
 #================================================================================
-# Refer to dictionaries s_exp_num, aug_dict, s_teach_num in info_dictionaries.py
+# SETUP PARAMS - CHANGE THESE
+# Refer to dictionaries in info_dicts.py
 #================================================================================
 is_sweep = False
 TEACH_NUM = 3
@@ -82,7 +86,6 @@ AUG_NUM = 0
 if args.config_name:
     EXP_NUM = config['exp_num']
     TEACH_NUM = config['teacher_num']
-run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+shapes_exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" shapes"
 
 # ======================================================================================
 # SETUP PARAMS REQUIRING MANUAL INPUT
@@ -107,20 +110,19 @@ sweep_configuration = {
 }
 
 #==============================================================================
-#shapes_exp_dict = {0: "Shape_Color", 1: "Floor", 2: "Scale", 3: "Floor_Scale", 4: "Shape_Color_Floor", 5: "Shape_Color_Scale", 6: "Shape_Color_Floor_Scale"}
+# Stuff depending on setup params - change less often
 #==============================================================================
 # Teacher model setup (change only if adding to dicts above)
 project = "Teacher Shapes"
 match TEACH_NUM:
     case 1:
         teacher = CustomResNet18(12).to(device)
-        dataset = "Shapes"
     case 2:
         teacher = CustomResNet50(12).to(device)
-        dataset = "Shapes"
     case 3:
         teacher = wide_resnet_constructor(3, 12).to(device)
-        dataset = "Shapes"
+run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+shapes_exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" "+base_dataset
+
 
 if __name__ == "__main__":
     if is_sweep:
@@ -137,7 +139,7 @@ if __name__ == "__main__":
             config={
                 "LR": lr,
                 "final LR": final_lr,
-                "dataset": '3D shapes',
+                "dataset": base_dataset,
                 "epochs": epochs,
                 "batch_size": batch_size,
                 "spurious type": shapes_exp_dict[EXP_NUM],
@@ -145,12 +147,12 @@ if __name__ == "__main__":
             },
             name = run_name
         )
-        wandb.config.base_dataset = "3D Shapes"
+        wandb.config.base_dataset = base_dataset
         wandb.config.augmentation = aug_dict[AUG_NUM]
         wandb.config.teacher = teacher_dict[TEACH_NUM]
         wandb.config.teacher_mechanism = shapes_exp_dict[EXP_NUM]
         
         train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
-        base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+dataset+"_"+shapes_exp_dict[EXP_NUM]
+        base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+shapes_exp_dict[EXP_NUM]
 
         train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)

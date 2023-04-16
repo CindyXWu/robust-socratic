@@ -28,7 +28,9 @@ if not os.path.exists(output_dir):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # print(f"Using {device} device")
 
-## ARGPARSE ## ============================================================
+# ======================================================================================
+# ARGPARSE
+# ======================================================================================
 # Add boolean flag for whether to use config file and sweep
 parser = argparse.ArgumentParser()
 parser.add_argument("--config_name", type=str, default=None)
@@ -37,7 +39,9 @@ parser.add_argument('--config_num', type=int, help='Index of the configuration t
 parser.add_argument("--sweep", type=bool, default=False)
 args = parser.parse_args()
 
-## OPEN YAML CONFIGS ## ===================================================
+# ======================================================================================
+# YAML CONFIGS
+# ======================================================================================
 if args.config_name:
     # Load the config file - contains list of dictionaries
     with open(args.config_name, 'r') as f:
@@ -67,12 +71,12 @@ def sweep_teacher():
     wandb.config.teacher_mechanism = dominoes_exp_dict[EXP_NUM]
 
     train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
-    base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+dataset+"_"+dominoes_exp_dict[EXP_NUM]
+    base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+dominoes_exp_dict[EXP_NUM]
     train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)
 
-# SETUP PARAMS - CHANGE THESE
 #================================================================================
-# Refer to dictionaries s_exp_num, aug_dict, s_teach_num in info_dictionaries.py
+# SETUP PARAMS - CHANGE THESE
+# Refer to dictionaries in info_dicts.py
 #================================================================================
 is_sweep = False
 TEACH_NUM = 1
@@ -81,7 +85,6 @@ AUG_NUM = 0
 if args.config_name:
     EXP_NUM = config['exp_num']
     TEACH_NUM = config['teacher_num']
-run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+dominoes_exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" dominoes"
 
 # ======================================================================================
 # SETUP PARAMS REQUIRING MANUAL INPUT
@@ -109,11 +112,10 @@ sweep_configuration = {
 }
 
 #==============================================================================
-#dominoes_exp_dict = {0: "CIFAR10", 1: "MNIST", 2: "Box", 3: "MNIST_Box", 4: "CIFAR10_MNIST", 5: "CIFAR10_Box", 6: "CIFAR10_MNIST_Box"}
+# Stuff depending on setup params - change less often
 #==============================================================================
 # Teacher model setup (change only if adding to dicts above)
 project = "Teacher Dominoes"
-dataset = "Dominoes"
 match TEACH_NUM:
     case 1:
         teacher = CustomResNet18(10).to(device)
@@ -121,6 +123,8 @@ match TEACH_NUM:
         teacher = CustomResNet50(10).to(device)
     case 3:
         teacher = wide_resnet_constructor(3, 10).to(device)
+run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+dominoes_exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" "+base_dataset
+
 
 if __name__ == "__main__":
     if is_sweep:
@@ -158,5 +162,5 @@ if __name__ == "__main__":
         #     show_images_grid(x, y, num_images=64)
         #     break
 
-        base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+dataset+"_"+dominoes_exp_dict[EXP_NUM]
+        base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+dominoes_exp_dict[EXP_NUM]
         train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)

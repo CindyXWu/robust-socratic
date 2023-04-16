@@ -28,7 +28,9 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
-## ARGPARSE ## ============================================================
+# ======================================================================================
+# ARGPARSE
+# ======================================================================================
 # Add boolean flag for whether to use config file and sweep
 parser = argparse.ArgumentParser()
 parser.add_argument("--config_name", type=str, default=None)
@@ -39,7 +41,9 @@ parser.add_argument('--config_num', type=int, help='Index of the configuration t
 parser.add_argument("--sweep", type=bool, default=False)
 args = parser.parse_args()
 
-## OPEN YAML CONFIGS ## ===================================================
+# ======================================================================================
+# YAML CONFIGS
+# ======================================================================================
 if args.config_name:
     # Load the config file - contains list of dictionaries
     with open(args.config_name, 'r') as f:
@@ -68,6 +72,7 @@ def sweep():
     wandb.config.teacher = teacher_dict[TEACH_NUM]
     wandb.config.student = student_dict[STUDENT_NUM]
     wandb.config.loss = loss_dict[LOSS_NUM]
+    # Need to set the parameters you're sweeping over from wandb.configs
     tau = wandb.config.tau
     lr = wandb.config.lr
     final_lr = wandb.config.final_lr
@@ -88,7 +93,7 @@ STUDENT_NUM = 1
 TEACH_NUM = 1
 LOSS_NUM = 1
 AUG_NUM = 0
-base_dataset = 'Dominoes'
+DATASET_NUM = 2
 
 if args.config_name:
     T_EXP_NUM = config['t_exp_num']
@@ -96,8 +101,8 @@ if args.config_name:
     TEACH_NUM = config['teacher_num']
     LOSS_NUM = config['loss_num']
     S_EXP_NUM = config['s_exp_num']
-    # Needs to be one of: 'CIFAR100', 'Dominoes', 'CIFAR10', 'Shapes'
-    base_dataset = config['dataset']
+    DATASET_NUM = config['dataset']
+base_dataset = dataset_dict[DATASET_NUM]
 
 # Necessary to make 'exp_dict' refer to correct dictionary from 'info_dicts.py'
 match base_dataset:
@@ -226,7 +231,7 @@ if __name__ == "__main__":
             name = run_name
         )
     
-    train_loader, test_loader = create_dataloader(base_dataset=base_dataset, S_EXP_NUM=S_EXP_NUM, batch_size=batch_size, spurious_corr=spurious_corr, mode='train')
+    train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=S_EXP_NUM, batch_size=batch_size, spurious_corr=spurious_corr, mode='train')
 
     wandb.config.base_dataset = base_dataset
     wandb.config.spurious_corr = spurious_corr
