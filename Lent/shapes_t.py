@@ -67,27 +67,8 @@ def sweep_teacher():
     wandb.config.teacher = teacher_dict[TEACH_NUM]
     wandb.config.teacher_mechanism = shapes_exp_dict[EXP_NUM]
 
-    randomise = False
-    match EXP_NUM:
-        case 1:
-            mechanisms = [0]
-            randomise = True
-        case 2:
-            mechanisms = [3]
-            randomise = True
-        case 3:
-            randomise = True
-            mechanisms = [0, 3]
-        case 4:
-            mechanisms = [0]
-        case 5:
-            mechanisms = [3]
-        case 6:
-            mechanisms = [0, 3]
-
-    train_loader = dataloader_3D_shapes('train', batch_size, randomise=randomise, mechanisms=mechanisms)
-    test_loader = dataloader_3D_shapes('test', batch_size, randomise=randomise, mechanisms=mechanisms)
-
+    train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
+    
     train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM, dataset=dataset)
 
 # SETUP PARAMS - CHANGE THESE
@@ -110,7 +91,7 @@ lr = 0.1
 final_lr = 0.01
 epochs = 8
 batch_size = 64
-
+base_dataset = "Shapes"
 sweep_configuration = {
     'method': 'bayes',
     'name': strftime("%m-%d %H:%M:%S", gmtime()),
@@ -169,25 +150,7 @@ if __name__ == "__main__":
         wandb.config.teacher = teacher_dict[TEACH_NUM]
         wandb.config.teacher_mechanism = shapes_exp_dict[EXP_NUM]
         
-        randomise = False
-        match EXP_NUM:
-            case 1:
-                mechanisms = [0]
-                randomise = True
-            case 2:
-                mechanisms = [3]
-                randomise = True
-            case 3:
-                randomise = True
-                mechanisms = [0, 3]
-            case 4:
-                mechanisms = [0]
-            case 5:
-                mechanisms = [3]
-            case 6:
-                mechanisms = [0, 3]
-
-        train_loader = dataloader_3D_shapes('train', batch_size, randomise=randomise, mechanisms=mechanisms)
-        test_loader = dataloader_3D_shapes('test', batch_size, randomise=randomise, mechanisms=mechanisms)
+        train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
         base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+dataset+"_"+shapes_exp_dict[EXP_NUM]
+
         train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)

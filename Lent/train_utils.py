@@ -207,11 +207,11 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
                     )
             it += 1
     
-def create_dataloader(base_dataset, S_EXP_NUM, batch_size, spurious_corr=1.0, mode='train'):
+def create_dataloader(base_dataset, EXP_NUM, batch_size, spurious_corr=1.0, mode='train'):
     """Set train and test loaders based on dataset and experiment. Used both for training and evaluation of counterfactuals."""
     if base_dataset in ["CIFAR10", "CIFAR100"]:
         randomize_cue = False
-        match S_EXP_NUM:
+        match EXP_NUM:
             case 0:
                 cue_type = 'nocue'
             case 1:
@@ -225,7 +225,7 @@ def create_dataloader(base_dataset, S_EXP_NUM, batch_size, spurious_corr=1.0, mo
     if base_dataset == "Dominoes":
         randomize_cues = [False, False]
         randomize_img = False
-        match S_EXP_NUM:
+        match EXP_NUM:
             case 0:
                 cue_proportions = [0.0, 0.0]
             case 1:
@@ -248,7 +248,7 @@ def create_dataloader(base_dataset, S_EXP_NUM, batch_size, spurious_corr=1.0, mo
 
     if base_dataset == 'Shapes':
         randomise = False
-        match S_EXP_NUM:
+        match EXP_NUM:
             case 1:
                 mechanisms = [0]
                 randomise = True

@@ -66,32 +66,9 @@ def sweep_teacher():
     wandb.config.teacher = teacher_dict[TEACH_NUM]
     wandb.config.teacher_mechanism = dominoes_exp_dict[EXP_NUM]
 
-    randomize_cues = [False, False]
-    randomize_img = False
-    match EXP_NUM:
-        case 0:
-            cue_proportions = [0.0, 0.0]
-        case 1:
-            cue_proportions = [mnist_frac, 0.0]
-            randomize_img = True
-        case 2:
-            cue_proportions = [0.0, box_frac]
-            randomize_img = True
-        case 3:
-            randomize_img = True
-            cue_proportions = [mnist_frac, box_frac]
-        case 4:
-            cue_proportions = [mnist_frac, 0.0]
-        case 5:
-            cue_proportions = [0.0, box_frac]
-        case 6:
-            cue_proportions = [mnist_frac, box_frac]
-
-    train_loader = get_dataloader(load_type='train', base_dataset='Dominoes Box', batch_size=64, randomize_img = randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
-    test_loader = get_dataloader(load_type='test', base_dataset='Dominoes Box', batch_size=64, randomize_img = randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
-
-    train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, TEACH_NUM, EXP_NUM, dataset=dataset)
-
+    train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
+    base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+dataset+"_"+dominoes_exp_dict[EXP_NUM]
+    train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)
 
 # SETUP PARAMS - CHANGE THESE
 #================================================================================
@@ -115,6 +92,7 @@ epochs = 20
 batch_size = 64
 mnist_frac = 1.0
 box_frac = 1.0
+base_dataset = "Dominoes"
 
 sweep_configuration = {
     'method': 'bayes',
@@ -172,30 +150,7 @@ if __name__ == "__main__":
         wandb.config.teacher = teacher_dict[TEACH_NUM]
         wandb.config.teacher_mechanism = dominoes_exp_dict[EXP_NUM]
         
-        randomize_cues = [False, False]
-        randomize_img = False
-        match EXP_NUM:
-            case 0:
-                cue_proportions = [0.0, 0.0]
-            case 1:
-                cue_proportions = [mnist_frac, 0.0]
-                randomize_img = True
-            case 2:
-                cue_proportions = [0.0, box_frac]
-                randomize_img = True
-            case 3:
-                randomize_img = True
-                cue_proportions = [mnist_frac, box_frac]
-            case 4:
-                cue_proportions = [mnist_frac, 0.0]
-            case 5:
-                cue_proportions = [0.0, box_frac]
-            case 6:
-                cue_proportions = [mnist_frac, box_frac]
-
-        train_loader = get_dataloader(load_type='train', base_dataset='Dominoes', batch_size=64, randomize_img = randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
-        test_loader = get_dataloader(load_type='test', base_dataset='Dominoes', batch_size=64, randomize_img = randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
-        base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+dataset+"_"+dominoes_exp_dict[EXP_NUM]
+        train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
 
         ## Plot images
         # for i, (x, y) in enumerate(train_loader):
@@ -203,4 +158,5 @@ if __name__ == "__main__":
         #     show_images_grid(x, y, num_images=64)
         #     break
 
+        base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+dataset+"_"+dominoes_exp_dict[EXP_NUM]
         train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)

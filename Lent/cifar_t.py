@@ -62,28 +62,12 @@ def sweep_teacher():
     lr = wandb.config.lr
     final_lr = wandb.config.final_lr
     epochs = wandb.config.epochs
-
-    randomize_loc = False
-    spurious_corr = 1
-    match EXP_NUM:
-        case 0:
-            spurious_type = 'plain'
-        case 1:
-            spurious_type = 'box'
-        case 2: 
-            spurious_type = 'box'
-            randomize_loc = True
-
     wandb.config.base_dataset = base_dataset
     wandb.config.augmentation = aug_dict[AUG_NUM]
     wandb.config.teacher = teacher_dict[TEACH_NUM]
     wandb.config.teacher_mechanism = cifar_exp_dict[EXP_NUM]
-    
-    # Dataloaders
-    train_loader = get_box_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
-    test_loader = get_box_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
-    # Fine-tune or train teacher from scratch
+    train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
     train_teacher(teacher, train_loader, test_loader, lr, final_lr, run_name, TEACH_NUM, EXP_NUM, epochs)
 
 # SETUP PARAMS - CHANGE THESE
@@ -102,6 +86,7 @@ lr = 0.15# 0.137
 final_lr = 0.01 #0.112
 epochs = 20
 batch_size = 64
+spurious_corr = 1
 
 sweep_name = strftime("%m-%d %H:%M:%S", gmtime())
 sweep_configuration = {
@@ -161,25 +146,11 @@ if __name__ == "__main__":
             name=run_name
         )
 
-        name = cifar_exp_dict[EXP_NUM]
-        randomize_loc = False
-        spurious_corr = 1
-        match EXP_NUM:
-            case 0:
-                spurious_type = 'plain'
-            case 1:
-                spurious_type = 'box'
-            case 2: 
-                spurious_type = 'box'
-                randomize_loc = True
-
         wandb.config.base_dataset = base_dataset
         wandb.config.augmentation = aug_dict[AUG_NUM]
         wandb.config.teacher = teacher_dict[TEACH_NUM]
         wandb.config.teacher_mechanism = cifar_exp_dict[EXP_NUM]
 
-        # Dataloaders
-        train_loader = get_box_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
-        test_loader = get_box_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+        train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
         base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+cifar_exp_dict[EXP_NUM]
         train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)
