@@ -10,7 +10,8 @@ from jacobian import *
 from contrastive import *
 from feature_match import *
 from utils_ekdeep import *
-from info_dicts import * 
+from info_dicts import *
+from shapes_3D import *
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -135,33 +136,12 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
 
     # Format: {'Mechanism name as string': dataloader}
     dataloaders = {}
-    if base_dataset in ["CIFAR10", "CIFAR100"]:
-        dataloaders[exp_dict[0]] = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type='nocue') # Plain
-        dataloaders[exp_dict[1]] = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type='box') # Box
-        dataloaders[exp_dict[2]] = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type='box', randomize_cue=True) # Box random
-    if base_dataset == "Dominoes":
-        randomize_cues = [False, False]
-        randomize_img = False
-        for i in range(7):
-            match i:
-                case 0:
-                    cue_proportions = [0.0, 0.0]
-                case 1:
-                    cue_proportions = [1.0, 0.0]
-                    randomize_img = True
-                case 2:
-                    cue_proportions = [0.0, 1.0]
-                    randomize_img = True
-                case 3:
-                    randomize_img = True
-                    cue_proportions = [1.0, 1.0]
-                case 4:
-                    cue_proportions = [1.0, 0.0]
-                case 5:
-                    cue_proportions = [0.0, 1.0]
-                case 6:
-                    cue_proportions = [1.0, 1.0]
-            dataloaders[dominoes_exp_dict[i]] = get_dataloader(load_type='test', base_dataset=base_dataset, batch_size=batch_size, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+    if base_dataset in ['CIFAR10', 'CIFAR100']:
+        dict_name = cifar_exp_dict
+    elif base_dataset == 'Dominoes':
+        dict_name = dominoes_exp_dict
+    for key in dict_name:
+        dataloaders[key] = create_dataloader(base_dataset=base_dataset, S_EXP_NUM=key, batch_size=batch_size, mode='test')
 
     for epoch in range(epochs):
         for inputs, labels in tqdm(train_loader):
@@ -227,3 +207,66 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
                     )
             it += 1
     
+def create_dataloader(base_dataset, S_EXP_NUM, batch_size, spurious_corr=1.0, mode='train'):
+    """Set train and test loaders based on dataset and experiment. Used both for training and evaluation of counterfactuals."""
+    if base_dataset in ["CIFAR10", "CIFAR100"]:
+        randomize_cue = False
+        match S_EXP_NUM:
+            case 0:
+                cue_type = 'nocue'
+            case 1:
+                cue_type = 'box'
+            case 2: 
+                cue_type = 'box'
+                randomize_cue = True
+        train_loader = get_box_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue, batch_size=batch_size)
+        test_loader = get_box_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue, batch_size=batch_size)
+
+    if base_dataset == "Dominoes":
+        randomize_cues = [False, False]
+        randomize_img = False
+        match S_EXP_NUM:
+            case 0:
+                cue_proportions = [0.0, 0.0]
+            case 1:
+                cue_proportions = [1.0, 0.0]
+                randomize_img = True
+            case 2:
+                cue_proportions = [0.0, 1.0]
+                randomize_img = True
+            case 3:
+                randomize_img = True
+                cue_proportions = [1.0, 1.0]
+            case 4:
+                cue_proportions = [1.0, 0.0]
+            case 5:
+                cue_proportions = [0.0, 1.0]
+            case 6:
+                cue_proportions = [1.0, 1.0]
+        train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+        test_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+
+    if base_dataset == 'Shapes':
+        randomise = False
+        match S_EXP_NUM:
+            case 1:
+                mechanisms = [0]
+                randomise = True
+            case 2:
+                mechanisms = [3]
+                randomise = True
+            case 3:
+                randomise = True
+                mechanisms = [0, 3]
+            case 4:
+                mechanisms = [0]
+            case 5:
+                mechanisms = [3]
+            case 6:
+                mechanisms = [0, 3]
+        train_loader = dataloader_3D_shapes('train', batch_size=batch_size, randomise=randomise, mechanisms=mechanisms)
+        test_loader = dataloader_3D_shapes('test', batch_size=batch_size, randomise=randomise, mechanisms=mechanisms)
+
+        if mode == 'test':
+            return test_loader
+        return train_loader, test_loader

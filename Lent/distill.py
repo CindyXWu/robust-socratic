@@ -72,64 +72,7 @@ def sweep():
     lr = wandb.config.lr
     final_lr = wandb.config.final_lr
 
-    ## Set train and test loaders based on dataset and experiment ##
-    if base_dataset in ["CIFAR10", "CIFAR100"]:
-        randomize_cue = False
-        match S_EXP_NUM:
-            case 0:
-                cue_type = 'nocue'
-            case 1:
-                cue_type = 'box'
-            case 2: 
-                cue_type = 'box'
-                randomize_cue = True
-        train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
-        test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
-
-    if base_dataset == "Dominoes":
-        randomize_cues = [False, False]
-        randomize_img = False
-        match S_EXP_NUM:
-            case 0:
-                cue_proportions = [0.0, 0.0]
-            case 1:
-                cue_proportions = [1.0, 0.0]
-                randomize_img = True
-            case 2:
-                cue_proportions = [0.0, 1.0]
-                randomize_img = True
-            case 3:
-                randomize_img = True
-                cue_proportions = [1.0, 1.0]
-            case 4:
-                cue_proportions = [1.0, 0.0]
-            case 5:
-                cue_proportions = [0.0, 1.0]
-            case 6:
-                cue_proportions = [1.0, 1.0]
-        train_loader = get_dataloader(load_type='train', base_dataset='Dominoes', batch_size=64, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
-        test_loader = get_dataloader(load_type='test', base_dataset='Dominoes', batch_size=64, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
-    
-    if base_dataset == 'Shapes':
-        randomise = False
-        match S_EXP_NUM:
-            case 1:
-                mechanisms = [0]
-                randomise = True
-            case 2:
-                mechanisms = [3]
-                randomise = True
-            case 3:
-                randomise = True
-                mechanisms = [0, 3]
-            case 4:
-                mechanisms = [0]
-            case 5:
-                mechanisms = [3]
-            case 6:
-                mechanisms = [0, 3]
-        train_loader = dataloader_3D_shapes('train', batch_size, randomise=randomise, mechanisms=mechanisms)
-        test_loader = dataloader_3D_shapes('test', batch_size, randomise=randomise, mechanisms=mechanisms)
+    train_loader, test_loader = create_dataloader(base_dataset=base_dataset, S_EXP_NUM=S_EXP_NUM, batch_size=batch_size, spurious_corr=spurious_corr, mode='train')
 
     train_distill(teacher, student, train_loader, test_loader, base_dataset, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha, tau=tau, s_layer=s_layer, t_layer=t_layer)
 
@@ -160,8 +103,10 @@ if args.config_name:
 match base_dataset:
     case 'CIFAR100':
         class_num = 100
+        exp_dict = cifar_exp_dict
     case 'CIFAR10':
         class_num = 10
+        exp_dict = cifar_exp_dict
     case 'Dominoes':
         exp_dict = dominoes_exp_dict
         class_num = 10
@@ -281,64 +226,7 @@ if __name__ == "__main__":
             name = run_name
         )
     
-    ## Set train and test loaders based on dataset and experiment ##
-    if base_dataset in ["CIFAR10", "CIFAR100"]:
-        randomize_cue = False
-        match S_EXP_NUM:
-            case 0:
-                cue_type = 'nocue'
-            case 1:
-                cue_type = 'box'
-            case 2: 
-                cue_type = 'box'
-                randomize_cue = True
-        train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
-        test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue)
-
-    if base_dataset == "Dominoes":
-        randomize_cues = [False, False]
-        randomize_img = False
-        match S_EXP_NUM:
-            case 0:
-                cue_proportions = [0.0, 0.0]
-            case 1:
-                cue_proportions = [1.0, 0.0]
-                randomize_img = True
-            case 2:
-                cue_proportions = [0.0, 1.0]
-                randomize_img = True
-            case 3:
-                randomize_img = True
-                cue_proportions = [1.0, 1.0]
-            case 4:
-                cue_proportions = [1.0, 0.0]
-            case 5:
-                cue_proportions = [0.0, 1.0]
-            case 6:
-                cue_proportions = [1.0, 1.0]
-        train_loader = get_dataloader(load_type='train', base_dataset='Dominoes', batch_size=64, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
-        test_loader = get_dataloader(load_type='test', base_dataset='Dominoes', batch_size=64, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
-    
-    if base_dataset == 'Shapes':
-        randomise = False
-        match S_EXP_NUM:
-            case 1:
-                mechanisms = [0]
-                randomise = True
-            case 2:
-                mechanisms = [3]
-                randomise = True
-            case 3:
-                randomise = True
-                mechanisms = [0, 3]
-            case 4:
-                mechanisms = [0]
-            case 5:
-                mechanisms = [3]
-            case 6:
-                mechanisms = [0, 3]
-        train_loader = dataloader_3D_shapes('train', batch_size, randomise=randomise, mechanisms=mechanisms)
-        test_loader = dataloader_3D_shapes('test', batch_size, randomise=randomise, mechanisms=mechanisms)
+    train_loader, test_loader = create_dataloader(base_dataset=base_dataset, S_EXP_NUM=S_EXP_NUM, batch_size=batch_size, spurious_corr=spurious_corr, mode='train')
 
     wandb.config.base_dataset = base_dataset
     wandb.config.spurious_corr = spurious_corr

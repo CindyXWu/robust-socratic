@@ -295,7 +295,7 @@ def get_transform(tform_type='nocue'):
 
 
 ### Dataloaders
-def get_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocue', cue_proportion=1.0, randomize_cue=False, 
+def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocue', cue_proportion=1.0, randomize_cue=False, 
                     randomize_img=False, batch_size=64, data_dir='data', subset_ids=None, cue_proportions=[1., 1.], randomize_cues=[False, False]):
     """Args:
         load_type: 'train' or 'test'

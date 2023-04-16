@@ -54,7 +54,7 @@ def sweep_teacher():
             "teacher": teacher_dict[TEACH_NUM],
             "dataset": "CIFAR-100",
             "batch_size": batch_size,
-            "experiment": exp_dict[EXP_NUM],
+            "experiment": cifar_exp_dict[EXP_NUM],
             },
         name=run_name
     )
@@ -77,11 +77,11 @@ def sweep_teacher():
     wandb.config.base_dataset = base_dataset
     wandb.config.augmentation = aug_dict[AUG_NUM]
     wandb.config.teacher = teacher_dict[TEACH_NUM]
-    wandb.config.teacher_mechanism = exp_dict[EXP_NUM]
+    wandb.config.teacher_mechanism = cifar_exp_dict[EXP_NUM]
     
     # Dataloaders
-    train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
-    test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+    train_loader = get_box_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+    test_loader = get_box_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
 
     # Fine-tune or train teacher from scratch
     train_teacher(teacher, train_loader, test_loader, lr, final_lr, run_name, TEACH_NUM, EXP_NUM, epochs)
@@ -137,7 +137,7 @@ match TEACH_NUM:
         teacher = wide_resnet_constructor(3, 100).to(device)
         base_dataset = 'CIFAR100'
 
-run_name = "T "+teacher_dict[TEACH_NUM]+", Data "+base_dataset+", Exp "+exp_dict[EXP_NUM]+", Aug "+aug_dict[AUG_NUM]
+run_name = "T "+teacher_dict[TEACH_NUM]+", Data "+base_dataset+", Exp "+cifar_exp_dict[EXP_NUM]+", Aug "+aug_dict[AUG_NUM]
 
 if __name__ == "__main__":
     if is_sweep:
@@ -156,12 +156,12 @@ if __name__ == "__main__":
                 "dataset": base_dataset,
                 "epochs": epochs,
                 "batch_size": batch_size,
-                "spurious type": exp_dict[EXP_NUM]
+                "spurious type": cifar_exp_dict[EXP_NUM]
             },
             name=run_name
         )
 
-        name = exp_dict[EXP_NUM]
+        name = cifar_exp_dict[EXP_NUM]
         randomize_loc = False
         spurious_corr = 1
         match EXP_NUM:
@@ -176,10 +176,10 @@ if __name__ == "__main__":
         wandb.config.base_dataset = base_dataset
         wandb.config.augmentation = aug_dict[AUG_NUM]
         wandb.config.teacher = teacher_dict[TEACH_NUM]
-        wandb.config.teacher_mechanism = exp_dict[EXP_NUM]
+        wandb.config.teacher_mechanism = cifar_exp_dict[EXP_NUM]
 
         # Dataloaders
-        train_loader = get_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
-        test_loader = get_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
-        base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+exp_dict[EXP_NUM]
+        train_loader = get_box_dataloader(load_type='train', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+        test_loader = get_box_dataloader(load_type ='test', base_dataset=base_dataset, spurious_type=spurious_type, spurious_corr=spurious_corr, randomize_loc=randomize_loc)
+        base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+cifar_exp_dict[EXP_NUM]
         train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)
