@@ -57,7 +57,7 @@ def sweep_teacher():
             "teacher": teacher_dict[TEACH_NUM],
             "dataset": "CIFAR-100",
             "batch_size": batch_size,
-            "experiment": dominoes_exp_dict[EXP_NUM],
+            "experiment": exp_dict[EXP_NUM],
             },
         name=run_name
     )
@@ -65,13 +65,13 @@ def sweep_teacher():
     lr = wandb.config.lr
     final_lr = wandb.config.final_lr
     epochs = wandb.config.epochs
-    wandb.config.base_dataset = "Dominoes"
+    wandb.config.base_dataset = base_dataset
     wandb.config.augmentation = aug_dict[AUG_NUM]
     wandb.config.teacher = teacher_dict[TEACH_NUM]
-    wandb.config.teacher_mechanism = dominoes_exp_dict[EXP_NUM]
+    wandb.config.teacher_mechanism = exp_dict[EXP_NUM]
 
     train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
-    base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+dominoes_exp_dict[EXP_NUM]
+    base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+exp_dict[EXP_NUM]
     train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)
 
 #================================================================================
@@ -95,7 +95,7 @@ epochs = 20
 batch_size = 64
 mnist_frac = 1.0
 box_frac = 1.0
-base_dataset = "Dominoes"
+base_dataset = "Shapes"
 
 sweep_configuration = {
     'method': 'bayes',
@@ -114,16 +114,35 @@ sweep_configuration = {
 #==============================================================================
 # Stuff depending on setup params - change less often
 #==============================================================================
-# Teacher model setup (change only if adding to dicts above)
-project = "Teacher Dominoes"
+# Necessary to make 'exp_dict' refer to correct dictionary from 'info_dicts.py'
+match base_dataset:
+    case 'CIFAR100':
+        class_num = 100
+        exp_dict = cifar_exp_dict
+    case 'CIFAR10':
+        class_num = 10
+        exp_dict = cifar_exp_dict
+    case 'Dominoes':
+        exp_dict = dominoes_exp_dict
+        class_num = 10
+    case 'Shapes':
+        exp_dict = shapes_exp_dict
+        class_num = 8
+
 match TEACH_NUM:
+    case 0:
+        teacher = LeNet5(class_num).to(device)
     case 1:
-        teacher = CustomResNet18(10).to(device)
+        teacher = CustomResNet18(class_num).to(device)
     case 2:
-        teacher = CustomResNet50(10).to(device)
+        teacher = CustomResNet50(class_num).to(device)
     case 3:
-        teacher = wide_resnet_constructor(3, 10).to(device)
-run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+dominoes_exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" "+base_dataset
+        teacher = wide_resnet_constructor(3, class_num).to(device)
+
+# Names for wandb logging
+project = "Teacher "+base_dataset
+run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" "+base_dataset
+print('project:', project)
 
 
 if __name__ == "__main__":
@@ -141,18 +160,18 @@ if __name__ == "__main__":
             config={
                 "LR": lr,
                 "final LR": final_lr,
-                "dataset": 'Dominoes',
+                "dataset": base_dataset,
                 "epochs": epochs,
                 "batch_size": batch_size,
-                "spurious type": dominoes_exp_dict[EXP_NUM],
+                "spurious type": exp_dict[EXP_NUM],
                 "Augmentation": aug_dict[AUG_NUM]
             },
             name = run_name
         )
-        wandb.config.base_dataset = "Dominoes"
+        wandb.config.base_dataset = base_dataset
         wandb.config.augmentation = aug_dict[AUG_NUM]
         wandb.config.teacher = teacher_dict[TEACH_NUM]
-        wandb.config.teacher_mechanism = dominoes_exp_dict[EXP_NUM]
+        wandb.config.teacher_mechanism = exp_dict[EXP_NUM]
         
         train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
 
@@ -162,5 +181,5 @@ if __name__ == "__main__":
         #     show_images_grid(x, y, num_images=64)
         #     break
 
-        base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+dominoes_exp_dict[EXP_NUM]
+        base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+exp_dict[EXP_NUM]
         train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)

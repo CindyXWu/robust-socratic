@@ -20,7 +20,6 @@ import warnings
 warnings.filterwarnings("ignore")
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-# print(f"Using {device} device")
 
 output_dir = "Image_Experiments/"   # Directory to store and load models from
 # Change directory to one this file is in
@@ -104,26 +103,6 @@ if args.config_name:
     DATASET_NUM = config['dataset']
 base_dataset = dataset_dict[DATASET_NUM]
 
-# Necessary to make 'exp_dict' refer to correct dictionary from 'info_dicts.py'
-match base_dataset:
-    case 'CIFAR100':
-        class_num = 100
-        exp_dict = cifar_exp_dict
-    case 'CIFAR10':
-        class_num = 10
-        exp_dict = cifar_exp_dict
-    case 'Dominoes':
-        exp_dict = dominoes_exp_dict
-        class_num = 10
-    case 'Shapes':
-        exp_dict = shapes_exp_dict
-        class_num = 8
-
-## WANDB PROJECT NAME
-project = "Distill "+teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]+"_"+base_dataset
-run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S mech '+exp_dict[S_EXP_NUM]+', T mech '+exp_dict[T_EXP_NUM]+', Loss: '+loss_dict[LOSS_NUM]
-print('project:', project)
-
 # ======================================================================================
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
@@ -153,7 +132,24 @@ spurious_corr = 1
 #     'early_terminate': {'type': 'hyperband', 'min_iter': 5}
 # }
 
-#================================================================================
+#==============================================================================
+# Stuff depending on setup params - change less often
+#==============================================================================
+# Necessary to make 'exp_dict' refer to correct dictionary from 'info_dicts.py'
+match base_dataset:
+    case 'CIFAR100':
+        class_num = 100
+        exp_dict = cifar_exp_dict
+    case 'CIFAR10':
+        class_num = 10
+        exp_dict = cifar_exp_dict
+    case 'Dominoes':
+        exp_dict = dominoes_exp_dict
+        class_num = 10
+    case 'Shapes':
+        exp_dict = shapes_exp_dict
+        class_num = 8
+
 # Training dynamics settings depending on loss function
 match LOSS_NUM:
     case 0:
@@ -194,9 +190,14 @@ match TEACH_NUM:
         teacher = wide_resnet_constructor(3, class_num).to(device)
         t_layer = {"11.path2.5": "final_features"} # Contrastive feature layer
 
-#================================================================================
+# Names for wandb logging
+project = "Distill "+teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]+"_"+base_dataset
+run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S mech '+exp_dict[S_EXP_NUM]+', T mech '+exp_dict[T_EXP_NUM]+', Loss: '+loss_dict[LOSS_NUM]
+print('project:', project)
 
+#================================================================================
 # Load saved teacher model (change only if changing file locations)
+#================================================================================
 # Clumsy try-except while I wrestle my codebase into sync
 try:
     load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+exp_dict[T_EXP_NUM]

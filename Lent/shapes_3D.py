@@ -34,6 +34,7 @@ class Shapes3D(Dataset):
         self.new_labels = np.empty([self.n_samples])
         self.num_classes = 8
 
+        # Make baseline labels - classes 1-8 for shape/colour
         if not randomise:
             shape = self.labels[:,4]
             hue = np.zeros_like(shape)
@@ -42,13 +43,13 @@ class Shapes3D(Dataset):
         else:
             self.new_labels = np.random.randint(0, self.num_classes, size=self.n_samples)
         
-        # There are two ways of designing this: I could apply reduction inside each mechanism if statement
-        # But if number of mechanisms is large, creates lots of boilerplate code
-        # Use 'logical and' on masks instead
+        # I could apply data mask inside if statement for each mechanism - if num mechanisms large, creates boilerplate code
+        # Use 'logical and' to combine masks instead
         if 0 in mechanisms:
             floor_hue = self.labels[:,0]
             mask_0 = np.array([True if (floor_hue[i]*10).astype(int) == self.new_labels[i] else False for i in range(self.n_samples)])
         else:
+            # Identity mask
             mask_0 = np.ones(self.n_samples, dtype=bool)
         if 3 in mechanisms:
             scale = self.labels[:,3]
