@@ -28,7 +28,7 @@ I evaluate distillation on counterfactual datasets for image experiments. The sh
   - For a teacher: set teacher model and experiment number.
   - The format will be a list of dictionaries. The way the config file is read, is by indexing this list of dictionaries with an experiment index. This is passed in a loop in a file which calls sbatch on SLURM files.
 - Files of form submit_\*.sh are bash scripting files which pass in YAML config files to call sbatch on the right configurations. All you need to do to run experiments with the correct YAML settings are change the config file name and SLURM script name.
-- Files named batch_* and arra_s are SLURM files.
+- Files named batch_* and array_s are SLURM files.
 - The file submit_array submits an array run in SLURM (better than calling multiple sbatch). You can choose to use this or not.
 - I have multiple SLURM scripts because I couldn't be bothered to change the file name being run in the SLURM scripts when calling them. These are batch_s (for distillation), batch_t (for CIFAR teacher training), batch_shapes and batch_dominoes. The ones with manual at the end are ones to be run in command line rather than by calling the bash scripting files.
 
@@ -39,7 +39,7 @@ I evaluate distillation on counterfactual datasets for image experiments. The sh
 
 ## Setting parameters:
 - The variables edited in the distillation files by the config are:
-  - TEACH_NUM, STUDENT_NUM, LOSS_NUM, AUG_NUM, dataset (or base_dataset) which define the exeriment you're running.
+  - TEACH_NUM, STUDENT_NUM, LOSS_NUM, AUG_NUM, DATASET_NUM which define the exeriment you're running and are keys of dictionaries in info_dicts.py. The entries of these dictionaries are more descriptive strings, e.g. teacher_dict[TEACH_NUM=0] is "LeNet".
 - The initial and final learning rate are not edited by the config file. At the current moment I have them set differently depending on the loss function being used, but I may add extra levels of granularity for selection of LR based on e.g. model and dataset. As expected, currently not all models train amazingly.
 - All variables not edited by config file:
   - Initial LR, final LR, epochs, temperature (fix at 20-30), tau (temperature for contrastive distillation, fixed at 0.1 for now), alpha (fraction of contrastive/Jacobian loss to use - in future may automatically set by evaluating both once, and setting alpha such that the size of both normal distillation and other losses is comparable), sweep configurations
