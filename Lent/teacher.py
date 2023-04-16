@@ -82,9 +82,12 @@ is_sweep = False
 TEACH_NUM = 1
 EXP_NUM = 0
 AUG_NUM = 0
+DATASET_NUM = 0
 if args.config_name:
     EXP_NUM = config['exp_num']
     TEACH_NUM = config['teacher_num']
+    DATASEt_NUM = config['dataset_num']
+base_dataset = dataset_dict[DATASET_NUM]
 
 # ======================================================================================
 # SETUP PARAMS REQUIRING MANUAL INPUT
@@ -95,7 +98,6 @@ epochs = 20
 batch_size = 64
 mnist_frac = 1.0
 box_frac = 1.0
-base_dataset = "Shapes"
 
 sweep_configuration = {
     'method': 'bayes',
