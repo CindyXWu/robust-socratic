@@ -11,7 +11,7 @@ Model distillation with mechanistic robustness.
 - wandb
 - yaml
 - argparse
-- tdqm, matplotlib, numpy
+- tdqm, matplotlib, numpy, Python 3.10 minimum
 
 ## Lent
 Image datasets for variety of distillation types. Start with ResNet50 and LeNet5 modified for CIFAR-10. Implement:
