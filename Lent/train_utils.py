@@ -12,7 +12,6 @@ from feature_match import *
 from utils_ekdeep import *
 from info_dicts import *
 from shapes_3D import *
-from pytest_train import *
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -182,17 +181,18 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
             lr = scheduler.get_lr()
             train_loss = loss.detach().cpu().numpy()
 
-            # if it == 0:
-            #     # Check that model is training correctly
-            #     for param in student.parameters():
-            #         assert param.grad is not None
+            if it == 0:
+                # Check that model is training correctly
+                for param in student.parameters():
+                    assert param.grad is not None
+                # for name in dataloaders:
+                #     title = 'Dominoes_'+name
+                #     plot_images(dataloaders[name], num_images=batch_size, title=title)
             if it % 100 == 0:
                 batch_size = inputs.shape[0]
                 train_acc = evaluate(student, train_loader, batch_size, max_ex=100)
                 test_acc = evaluate(student, test_loader, batch_size)
                 for name in dataloaders:
-                    title = 'Dominoes_'+name
-                    plot_images(dataloaders[name], num_images=batch_size, title=title)
                     # images, labels = next(iter(dataloaders[name]))
                     # images = wandb.Image(images, caption=title)
                     wandb.log({name: evaluate(student, dataloaders[name], batch_size)})
