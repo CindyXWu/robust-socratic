@@ -112,7 +112,7 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, projec
 
 def base_distill_loss(scores, targets, temp):
     scores = scores/temp
-    targets = F.softmax(targets/temp).argmax(dim=1)
+    targets = F.softmax(targets/temp)
     return ce_loss(scores, targets)
 
 def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr, final_lr, temp, epochs, loss_num, run_name, alpha=None, tau=None, s_layer=None, t_layer=None):
@@ -136,7 +136,7 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
     input_dim = c*w*h
     teacher_test_acc = evaluate(teacher, test_loader, batch_size)
     teacher.eval()
-    
+
     # Format: {'Mechanism name as string': dataloader}
     dataloaders = {}
     if base_dataset in ['CIFAR10', 'CIFAR100']:
