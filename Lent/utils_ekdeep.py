@@ -383,7 +383,7 @@ class LR_Scheduler(object):
         return self.current_lr
     
 if __name__ == "__main__":
-    train_loader = get_dataloader(load_type='train', base_dataset='Dominoes Box', batch_size=64, cue_type='domcues', cue_proportion=0.5, randomize_cue=True, cue_proportions=[1,1], randomize_cues=[False, False])
+    train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes Box', batch_size=64, cue_type='domcues', cue_proportion=0.5, randomize_cue=True, cue_proportions=[1,1], randomize_cues=[False, False])
     for i, (x, y) in enumerate(train_loader):
         x = einops.rearrange(x, 'b c h w -> b h w c')
         show_images_grid(x, y, num_images=64)

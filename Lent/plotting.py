@@ -9,7 +9,6 @@ import seaborn as sns
 import matplotlib as mpl
 
 api = wandb.Api()
-mpl.rcParams['font.family'] = 'Helvetica'
 
 def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
     fig = plt.figure(figsize=(8, 4), dpi=100)

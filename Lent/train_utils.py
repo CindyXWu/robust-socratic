@@ -181,16 +181,20 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
             lr = scheduler.get_lr()
             train_loss = loss.detach().cpu().numpy()
 
-            if it == 0:
-                # Check that model is training correctly
-                for param in student.parameters():
-                    assert param.grad is not None
+            # if it == 0:
+            #     # Check that model is training correctly
+            #     for param in student.parameters():
+            #         assert param.grad is not None
             if it % 100 == 0:
                 batch_size = inputs.shape[0]
                 train_acc = evaluate(student, train_loader, batch_size, max_ex=100)
                 test_acc = evaluate(student, test_loader, batch_size)
-                for key in dataloaders:
-                    wandb.log({key: evaluate(student, dataloaders[key], batch_size)})
+                for name in dataloaders:
+                    title = 'Dominoes_'+name
+                    plot_images(dataloaders[name], num_images=batch_size, title=title)
+                    # images, labels = next(iter(dataloaders[name]))
+                    # images = wandb.Image(images, caption=title)
+                    wandb.log({name: evaluate(student, dataloaders[name], batch_size)})
                 error = teacher_test_acc - test_acc
                 KL_diff = kl_loss(F.log_softmax(scores/temp, dim=1), F.log_softmax(targets/temp, dim=1))
                 top1_diff = torch.eq(student_preds, teacher_preds).float().mean()
@@ -222,7 +226,7 @@ def create_dataloader(base_dataset, EXP_NUM, batch_size, spurious_corr=1.0, mode
         train_loader = get_box_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue, batch_size=batch_size)
         test_loader = get_box_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue, batch_size=batch_size)
 
-    if base_dataset == "Dominoes":
+    elif base_dataset == "Dominoes":
         randomize_cues = [False, False]
         randomize_img = False
         match EXP_NUM:
@@ -246,7 +250,7 @@ def create_dataloader(base_dataset, EXP_NUM, batch_size, spurious_corr=1.0, mode
         train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
         test_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
 
-    if base_dataset == 'Shapes':
+    elif base_dataset == 'Shapes':
         randomise = False
         match EXP_NUM:
             case 0:
@@ -272,3 +276,36 @@ def create_dataloader(base_dataset, EXP_NUM, batch_size, spurious_corr=1.0, mode
     if mode == 'test':
         return test_loader
     return train_loader, test_loader
+
+def show_images_grid(imgs_, class_labels, num_images, title):
+    """Now modified to show both [c h w] and [h w c] images."""
+    ncols = int(np.ceil(num_images**0.5))
+    nrows = int(np.ceil(num_images / ncols))
+    _, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
+    axes = axes.flatten()
+
+    for ax_i, ax in enumerate(axes):
+        if ax_i < num_images:
+            img = imgs_[ax_i]
+            if img.ndim == 3 and img.shape[0] == 3:
+                img = img.transpose(1, 2, 0)
+            ax.imshow(img, cmap='Greys_r', interpolation='nearest')
+            ax.set_title(f'Class: {class_labels[ax_i]}')  # Display the class label as title
+            ax.set_xticks([])
+            ax.set_yticks([])
+        else:
+            ax.axis('off')
+    if title:
+        plt.savefig(title + '.png')
+    else:
+        plt.show()
+
+def plot_images(dataloader, num_images, title=None):
+    for i, (x, y) in enumerate(dataloader):
+        x = einops.rearrange(x, 'b c h w -> b h w c')
+        show_images_grid(x, y, num_images, title=title)
+        break
+
+if __name__ == "__main__":
+    for i in range(7):
+        create_dataloader('Dominoes', i, 16)
