@@ -135,7 +135,8 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
     batch_size, c, w, h = sample[0].shape
     input_dim = c*w*h
     teacher_test_acc = evaluate(teacher, test_loader, batch_size)
-
+    teacher.eval()
+    
     # Format: {'Mechanism name as string': dataloader}
     dataloaders = {}
     if base_dataset in ['CIFAR10', 'CIFAR100']:
