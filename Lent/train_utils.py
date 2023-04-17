@@ -12,11 +12,12 @@ from feature_match import *
 from utils_ekdeep import *
 from info_dicts import *
 from shapes_3D import *
+from pytest_train import *
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Instantiate losses
-kl_loss = nn.KLDivLoss(reduction='mean', log_target=True)
+kl_loss = nn.KLDivLoss(reduction='batchmean')
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
 mse_loss = nn.MSELoss(reduction='mean')
 
@@ -196,7 +197,7 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
                     # images = wandb.Image(images, caption=title)
                     wandb.log({name: evaluate(student, dataloaders[name], batch_size)})
                 error = teacher_test_acc - test_acc
-                KL_diff = kl_loss(F.log_softmax(scores/temp, dim=1), F.log_softmax(targets/temp, dim=1))
+                KL_diff = kl_loss(F.log_softmax(scores, dim=1), F.softmax(targets, dim=1))
                 top1_diff = torch.eq(student_preds, teacher_preds).float().mean()
                 print('Iteration: %i, %.2f%%' % (it, test_acc), "Epoch: ", epoch, "Loss: ", train_loss)
                 print("Project {}, LR {}, temp {}".format(run_name, lr, temp))
