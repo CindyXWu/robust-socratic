@@ -27,7 +27,7 @@ if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
 @torch.no_grad()
-def evaluate(model, dataset, batch_size, max_ex=0):
+def evaluate(model, dataset, batch_size, max_ex=0, title=None):
     """Evaluate model accuracy on dataset."""
     acc = 0
     for i, (features, labels) in enumerate(dataset):
@@ -40,6 +40,8 @@ def evaluate(model, dataset, batch_size, max_ex=0):
         acc += torch.sum(torch.eq(pred, labels)).item()
         if max_ex != 0 and i >= max_ex:
             break
+    if title:
+        plot_images(dataset, num_images=batch_size, title=title)
     # Return average accuracy as a percentage
     # Fraction of data points correctly classified
     return (acc*100 / ((i+1)*batch_size))
@@ -181,21 +183,17 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
             lr = scheduler.get_lr()
             train_loss = loss.detach().cpu().numpy()
 
-            if it == 0:
-                # Check that model is training correctly
-                for param in student.parameters():
-                    assert param.grad is not None
-                for name in dataloaders:
-                    title = 'Dominoes_'+name
-                    plot_images(dataloaders[name], num_images=batch_size, title=title)
+            # if it == 0:
+            #     # Check that model is training correctly
+            #     for param in student.parameters():
+            #         assert param.grad is not None
             if it % 100 == 0:
                 batch_size = inputs.shape[0]
                 train_acc = evaluate(student, train_loader, batch_size, max_ex=100)
                 test_acc = evaluate(student, test_loader, batch_size)
                 for name in dataloaders:
-                    # images, labels = next(iter(dataloaders[name]))
-                    # images = wandb.Image(images, caption=title)
-                    wandb.log({name: evaluate(student, dataloaders[name], batch_size)})
+                    title = 'Dominoes_'+name
+                    wandb.log({name: evaluate(student, dataloaders[name], batch_size, title=title)})
                 error = teacher_test_acc - test_acc
                 KL_diff = kl_loss(F.log_softmax(scores, dim=1), F.softmax(targets, dim=1))
                 top1_diff = torch.eq(student_preds, teacher_preds).float().mean()
