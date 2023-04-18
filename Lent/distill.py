@@ -100,7 +100,7 @@ if args.config_name:
     TEACH_NUM = config['teacher_num']
     LOSS_NUM = config['loss_num']
     S_EXP_NUM = config['s_exp_num']
-    DATASET_NUM = config['dataset']
+    DATASET_NUM = config['dataset_num']
 base_dataset = dataset_dict[DATASET_NUM]
 
 # ======================================================================================

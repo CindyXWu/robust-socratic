@@ -22,7 +22,7 @@ for s_exp_num in s_exp_nums:
         for t_num in teacher_nums:
             for loss_num in loss_nums:
                 for s_num in student_nums:
-                    experiments.append({'dataset': dataset, 'teacher_num': t_num, 'student_num': s_num, 's_exp_num': s_exp_num, 't_exp_num': t_exp_num, 'loss_num': loss_num})
+                    experiments.append({'dataset_num': dataset_num, 'teacher_num': t_num, 'student_num': s_num, 's_exp_num': s_exp_num, 't_exp_num': t_exp_num, 'loss_num': loss_num})
 
 with open(filename, "w") as f:
     yaml.dump(experiments, f)

@@ -41,9 +41,6 @@ def get_distill_loss(scores, targets, T, loss_fn):
     if isinstance(loss_fn, nn.KLDivLoss):
         soft_pred = F.log_softmax(scores/T, dim=1)
         soft_targets = F.log_softmax(targets/T, dim=1)  # Have set log_target=True
-    elif isinstance(loss_fn, nn.CrossEntropyLoss):
-        soft_pred = scores/T
-        soft_targets = F.softmax(targets/T).argmax(dim=1)
     elif isinstance(loss_fn, nn.MSELoss):
         soft_pred = F.softmax(scores/T, dim=1)
         soft_targets = F.softmax(targets/T, dim=1)

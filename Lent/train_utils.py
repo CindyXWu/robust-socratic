@@ -111,9 +111,9 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, projec
             save_path)
 
 def base_distill_loss(scores, targets, temp):
-    scores = scores/temp
+    scores = F.log_softmax(scores/temp)
     targets = F.softmax(targets/temp)
-    return ce_loss(scores, targets)
+    return kl_loss(scores, targets)
 
 def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr, final_lr, temp, epochs, loss_num, run_name, alpha=None, tau=None, s_layer=None, t_layer=None):
     """Train student model with distillation loss.
@@ -307,5 +307,7 @@ def plot_images(dataloader, num_images, title=None):
         break
 
 if __name__ == "__main__":
-    for i in range(7):
-        create_dataloader('Dominoes', i, 16)
+    scores = torch.randn(10, 10)
+    targets = torch.randn(10, 10)
+    loss = base_distill_loss(scores, targets, 1)
+    print(loss)
