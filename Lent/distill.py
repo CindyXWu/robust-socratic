@@ -21,11 +21,8 @@ warnings.filterwarnings("ignore")
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-output_dir = "Image_Experiments/"   # Directory to store and load models from
 # Change directory to one this file is in
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
 
 # ======================================================================================
 # ARGPARSE
@@ -90,7 +87,7 @@ T_EXP_NUM = 0
 S_EXP_NUM = 1
 STUDENT_NUM = 1
 TEACH_NUM = 1
-LOSS_NUM = 1
+LOSS_NUM = 2
 AUG_NUM = 0
 DATASET_NUM = 2
 
@@ -153,14 +150,14 @@ match base_dataset:
 # Training dynamics settings depending on loss function
 match LOSS_NUM:
     case 0:
-        alpha, lr, final_lr = 1, 0.1, 0.01
+        alpha, lr, final_lr = 1, 0.3, 0.03
     case 1:
-        alpha, lr, final_lr = 0.5, 0.5, 0.05
+        alpha, lr, final_lr = 0.5, 0.3, 0.03
         epochs = 20
     case 2:
         # Adjust for relative size of contrastive loss to distillation loss
         # E.g. 0.03 for contrastive ~60, distillation ~1
-        alpha, lr, final_lr = 0.01, 0.5, 0.05
+        alpha, lr, final_lr = 0.01, 0.3, 0.03
         epochs = 20
 
 # Student model setup (change only if adding to dicts above)

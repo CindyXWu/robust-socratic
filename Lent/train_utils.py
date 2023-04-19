@@ -3,6 +3,7 @@ from torch import nn, optim
 import os
 import wandb
 from tqdm import tqdm
+from sklearn.manifold import TSNE
 
 from image_models import *
 from plotting import *
@@ -20,11 +21,10 @@ kl_loss = nn.KLDivLoss(reduction='batchmean')
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
 mse_loss = nn.MSELoss(reduction='mean')
 
-output_dir = "Image_Experiments/"
-# Change directory to one this file is in
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
+image_dir = "Images/"
+if not os.path.exists(image_dir):
+    os.makedirs(image_dir)
 
 @torch.no_grad()
 def evaluate(model, dataset, batch_size, max_ex=0, title=None):
@@ -189,6 +189,7 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
             #     for param in student.parameters():
             #         assert param.grad is not None
             if it % 100 == 0:
+                visualise_features_2d(s_map, t_map, title="Iterations {}".format(it))
                 batch_size = inputs.shape[0]
                 train_acc = evaluate(student, train_loader, batch_size, max_ex=100)
                 test_acc = evaluate(student, test_loader, batch_size)
@@ -210,7 +211,10 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
                     "S LR": lr, }
                     )
             it += 1
-    
+        # Visualise 3d at end of each epoch
+        if loss_num == 2:
+            visualise_features_3d(s_map, t_map, title="Iterations {}".format(it))
+
 def create_dataloader(base_dataset, EXP_NUM, batch_size, spurious_corr=1.0, mode='train'):
     """Set train and test loaders based on dataset and experiment. Used both for training and evaluation of counterfactuals."""
     if base_dataset in ["CIFAR10", "CIFAR100"]:
@@ -296,7 +300,38 @@ def show_images_grid(imgs_, class_labels, num_images, title):
         else:
             ax.axis('off')
     if title:
-        plt.savefig(title + '.png')
+        plt.savefig(image_dir+title+'.png')
+    else:
+        plt.show()
+
+def visualise_features_3d(s_features, t_features, title=None):
+    tsne = TSNE(n_components=3, perplexity=30, learning_rate=200, n_iter=1000, random_state=42)
+    s = tsne.fit_transform(s_features.detach().numpy())
+    t = tsne.fit_transform(t_features.detach().numpy())
+    s_x, s_y, s_z = s[:, 0], s[:, 1], s[:, 2]
+    t_x, t_y, t_z = t[:, 0], t[:, 1], t[:, 2]
+
+    fig = plt.figure(figsize=(5, 5), dpi=300)
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(s_x, s_y, s_z, c='blue', label='Student', alpha=0.5)
+    ax.scatter(t_x, t_y, t_z, c='red', label='Teacher', alpha=0.5)
+    if title:
+        plt.savefig(image_dir+"3d/"+title+'.png')
+    else:
+        plt.show()
+
+def visualise_features_2d(s_features, t_features, title=None):
+    tsne = TSNE(n_components=2, perplexity=30, learning_rate=200, n_iter=1000, random_state=42)
+    s = tsne.fit_transform(s_features.detach().numpy())
+    t = tsne.fit_transform(t_features.detach().numpy())
+    s_x, s_y = s[:, 0], s[:, 1]
+    t_x, t_y = t[:, 0], t[:, 1]
+
+    fig = plt.figure(figsize=(5, 5), dpi=300)
+    plt.scatter(s_x, s_y, c='blue', label='Student', alpha=0.5)
+    plt.scatter(t_x, t_y, c='red', label='Teacher', alpha=0.5)
+    if title:
+        plt.savefig(image_dir+"2d/"+title+'_2d.png')
     else:
         plt.show()
 
