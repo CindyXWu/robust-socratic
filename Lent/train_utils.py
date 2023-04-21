@@ -189,7 +189,8 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
             #     for param in student.parameters():
             #         assert param.grad is not None
             if it % 100 == 0:
-                visualise_features_2d(s_map, t_map, title="Iterations {}".format(it))
+                if loss_num == 2:
+                    visualise_features_2d(s_map, t_map, title="Iterations {}".format(it))
                 batch_size = inputs.shape[0]
                 train_acc = evaluate(student, train_loader, batch_size, max_ex=100)
                 test_acc = evaluate(student, test_loader, batch_size)
