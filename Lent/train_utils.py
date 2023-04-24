@@ -213,7 +213,7 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
             it += 1
         # Visualise 3d at end of each epoch
         if loss_num == 2:
-            visualise_features_3d(s_map, t_map, title=run_name+"_"+it)
+            visualise_features_2d(s_map, t_map, title=run_name+"_"+it)
 
 def create_dataloader(base_dataset, EXP_NUM, batch_size, spurious_corr=1.0, mode='train'):
     """Set train and test loaders based on dataset and experiment. Used both for training and evaluation of counterfactuals."""
