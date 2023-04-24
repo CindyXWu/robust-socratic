@@ -17,8 +17,8 @@ filename = dataset+"_s.yml"
 
 # Todo: add augmentation
 experiments = []
-for s_exp_num in s_exp_nums:
-    for t_exp_num in t_exp_nums:
+for t_exp_num in t_exp_nums:
+    for s_exp_num in s_exp_nums:
         for t_num in teacher_nums:
             for loss_num in loss_nums:
                 for s_num in student_nums:
