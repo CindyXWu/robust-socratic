@@ -189,14 +189,13 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
             #     for param in student.parameters():
             #         assert param.grad is not None
             if it % 100 == 0:
-                if loss_num == 2:
-                    visualise_features_2d(s_map, t_map, title="Iterations {}".format(it))
                 batch_size = inputs.shape[0]
                 train_acc = evaluate(student, train_loader, batch_size, max_ex=100)
                 test_acc = evaluate(student, test_loader, batch_size)
                 for name in dataloaders:
                     title = 'Dominoes_'+name
-                    wandb.log({name: evaluate(student, dataloaders[name], batch_size, title=title)})
+                    # Currently not plotting datasets
+                    wandb.log({name: evaluate(student, dataloaders[name], batch_size, title=None)})
                 error = teacher_test_acc - test_acc
                 KL_diff = kl_loss(F.log_softmax(scores, dim=1), F.softmax(targets, dim=1))
                 top1_diff = torch.eq(student_preds, teacher_preds).float().mean()
@@ -214,7 +213,7 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
             it += 1
         # Visualise 3d at end of each epoch
         if loss_num == 2:
-            visualise_features_3d(s_map, t_map, title="Iterations {}".format(it))
+            visualise_features_3d(s_map, t_map, title=run_name+"_"+it)
 
 def create_dataloader(base_dataset, EXP_NUM, batch_size, spurious_corr=1.0, mode='train'):
     """Set train and test loaders based on dataset and experiment. Used both for training and evaluation of counterfactuals."""

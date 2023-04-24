@@ -18,7 +18,6 @@ class CRDLoss(nn.Module):
         self.embed_s = Embed(s_dim, feat_dim)
         self.embed_t = Embed(t_dim, feat_dim)
         self.T = T
-        self.embed = s_dim != t_dim
         self.criterion_s = ContrastLoss()
 
     def forward(self, f_s, f_t, y):
@@ -30,10 +29,8 @@ class CRDLoss(nn.Module):
         Returns:
             The contrastive loss for the student model
         """
-        # Only embed if the dimensions are different
-        if self.embed:
-            f_s = self.embed_s(f_s)
-            f_t = self.embed_t(f_t)
+        f_s = self.embed_s(f_s)
+        f_t = self.embed_t(f_t)
         # Numerator of equation 19
         f_s = torch.div(f_s,torch.norm(f_s, dim=1).unsqueeze(1))
         f_t = torch.div(f_t,torch.norm(f_t, dim=1).unsqueeze(1))
