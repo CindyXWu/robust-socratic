@@ -1,18 +1,18 @@
 import torch
 from torch import nn, optim
-import os
 import wandb
 from tqdm import tqdm
-from sklearn.manifold import TSNE
+from torch.nn import Module
+from torch.utils.data import DataLoader
 
-from image_models import *
+from models.image_models import *
 from plotting import *
-from jacobian import *
-from contrastive import *
-from feature_match import *
-from utils_ekdeep import *
+from losses.jacobian import *
+from losses.contrastive import *
+from losses.feature_match import *
+from datasets.utils_ekdeep import *
+from datasets.shapes_3D import *
 from info_dicts import *
-from shapes_3D import *
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -20,11 +20,6 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 kl_loss = nn.KLDivLoss(reduction='batchmean')
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
 mse_loss = nn.MSELoss(reduction='mean')
-
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
-image_dir = "Images/"
-if not os.path.exists(image_dir):
-    os.makedirs(image_dir)
 
 @torch.no_grad()
 def evaluate(model, dataset, batch_size, max_ex=0, title=None):
@@ -46,6 +41,7 @@ def evaluate(model, dataset, batch_size, max_ex=0, title=None):
     # Fraction of data points correctly classified
     return (acc*100 / ((i+1)*batch_size))
 
+
 def weight_reset(model):
     """Reset weights of model at start of training."""
     for module in model.modules():
@@ -54,6 +50,7 @@ def weight_reset(model):
         # Initialise
         if isinstance(module, nn.Conv2d):
             nn.init.kaiming_normal_(module.weight, mode="fan_out", nonlinearity="relu")
+
 
 def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, project, base_path):
     """Fine tune a pre-trained teacher model for specific downstream task, or train from scratch."""
@@ -69,8 +66,7 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, projec
         model.train()
         
         for inputs, labels in tqdm(train_loader):
-            inputs = inputs.to(device)
-            labels = labels.to(device)
+            inputs, labels = inputs.to(device), labels.to(device)
             scores = model(inputs)
 
             optimizer.zero_grad()
@@ -110,14 +106,31 @@ def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, projec
             },
             save_path)
 
+
 def base_distill_loss(scores, targets, temp):
     scores = F.log_softmax(scores/temp)
     targets = F.softmax(targets/temp)
     return kl_loss(scores, targets)
 
-def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr, final_lr, temp, epochs, loss_num, run_name, alpha=None, tau=None, s_layer=None, t_layer=None):
-    """Train student model with distillation loss.
-    Includes LR scheduling. Change loss function as required. 
+
+def train_distill(
+    teacher: Module, 
+    student: Module, 
+    train_loader: DataLoader, 
+    test_loader: DataLoader, 
+    base_dataset: str, 
+    lr: float, 
+    final_lr: float, 
+    temp: float, 
+    epochs: int, 
+    loss_num: int, 
+    run_name: str, 
+    alpha: float = None, 
+    tau: float = None, 
+    s_layer: float = None, 
+    t_layer: float = None
+    ) -> None:
+    """
     Args:
         tau: contrastive loss temperature
         temp: base distillation loss temperature
@@ -137,14 +150,7 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
     teacher_test_acc = evaluate(teacher, test_loader, batch_size)
     teacher.eval()
 
-    # Format: {'Mechanism name as string': dataloader}
-    dataloaders = {}
-    if base_dataset in ['CIFAR10', 'CIFAR100']:
-        dict_name = cifar_exp_dict
-    elif base_dataset == 'Dominoes':
-        dict_name = dominoes_exp_dict
-    for key in dict_name:
-        dataloaders[dict_name[key]] = create_dataloader(base_dataset=base_dataset, EXP_NUM=key, batch_size=batch_size, mode='test')
+    dataloaders = get_counterfactual_dataloaders(base_dataset, batch_size)
 
     for epoch in range(epochs):
         for inputs, labels in tqdm(train_loader):
@@ -184,10 +190,7 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
             lr = scheduler.get_lr()
             train_loss = loss.detach().cpu().numpy()
 
-            # if it == 0:
-            #     # Check that model is training correctly
-            #     for param in student.parameters():
-            #         assert param.grad is not None
+            # if it == 0: check_grads(student)
             if it % 100 == 0:
                 batch_size = inputs.shape[0]
                 train_acc = evaluate(student, train_loader, batch_size, max_ex=100)
@@ -213,133 +216,95 @@ def train_distill(teacher, student, train_loader, test_loader, base_dataset, lr,
             it += 1
         # Visualise 3d at end of each epoch
         if loss_num == 2:
-            visualise_features_2d(s_map, t_map, title=run_name+"_"+it)
+            visualise_features_2d(s_map, t_map, title=run_name+"_"+str(it))
 
-def create_dataloader(base_dataset, EXP_NUM, batch_size, spurious_corr=1.0, mode='train'):
-    """Set train and test loaders based on dataset and experiment. Used both for training and evaluation of counterfactuals."""
+def check_grads(model):
+    for param in model.parameters():
+        assert param.grad is not None
+
+
+def get_counterfactual_dataloaders(base_dataset: str, batch_size: int) -> dict[str, DataLoader]:
+    """Get dataloaders for counterfactual evaluation. Key of dictionary tells us which settings for counterfactual evals are used."""
+    dataloaders = {}
+    for exp in range(len(counterfactual_dict_all)):
+        dataloaders[list(counterfactual_dict_all.keys())[exp]] = create_dataloader(base_dataset=base_dataset, EXP_NUM=exp, batch_size=batch_size, mode='test')
+    return dataloaders
+
+
+def create_dataloader(base_dataset: Dataset, EXP_NUM: int, batch_size: int = 64, counterfactual: bool = False):
+    """Set train and test loaders based on dataset and experiment.
+    Used only for training and testing, not counterfactual evals.
+    For generating dominoes: box is cue 1, MNIST is cue 2.
+    For CIFAR100 box: box is cue 1.
+    """
+    if counterfactual:
+        key = list(counterfactual_dict_all.keys())[EXP_NUM]
+        mech_1_frac, mech_2_frac, randomize_mech_1, randomize_mech_2, randomize_img = counterfactual_dict_all[key]
+    else:
+        key = list(exp_dict_all.keys())[EXP_NUM]
+        mech_1_frac, mech_2_frac, randomize_mech_1, randomize_mech_2, randomize_img = exp_dict_all[key]
+
     if base_dataset in ["CIFAR10", "CIFAR100"]:
-        randomize_cue = False
-        match EXP_NUM:
-            case 0:
-                cue_type = 'nocue'
-            case 1:
-                cue_type = 'box'
-            case 2: 
-                cue_type = 'box'
-                randomize_cue = True
-        train_loader = get_box_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue, batch_size=batch_size)
-        test_loader = get_box_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=spurious_corr, randomize_cue=randomize_cue, batch_size=batch_size)
+        # match EXP_NUM:
+        #     case 0:
+        #         cue_type = 'nocue'
+        #     case 1:
+        #         cue_type = 'box'
+        #     case 2: 
+        #         cue_type = 'box'
+        #         randomize_cue = True
+        cue_type='box' if mech_1_frac != 0 else 'nocue'
+        train_loader = get_box_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=mech_1_frac, randomize_cue=randomize_mech_1, randomize_img = randomize_img, batch_size=batch_size)
+        test_loader = get_box_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=mech_1_frac, randomize_cue=randomize_mech_1, randomize_img = randomize_img, batch_size=batch_size)
 
     elif base_dataset == "Dominoes":
-        randomize_cues = [False, False]
-        randomize_img = False
-        match EXP_NUM:
-            case 0:
-                cue_proportions = [0.0, 0.0]
-            case 1:
-                cue_proportions = [1.0, 0.0]
-                randomize_img = True
-            case 2:
-                cue_proportions = [0.0, 1.0]
-                randomize_img = True
-            case 3:
-                randomize_img = True
-                cue_proportions = [1.0, 1.0]
-            case 4:
-                cue_proportions = [1.0, 0.0]
-            case 5:
-                cue_proportions = [0.0, 1.0]
-            case 6:
-                cue_proportions = [1.0, 1.0]
-        train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
-        test_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, cue_proportions=cue_proportions, randomize_cues=randomize_cues)
+        # match EXP_NUM:
+        #     case 0:
+        #         box_frac, mnist_frac = 0.0, 0.0
+        #     case 1:
+        #         box_frac, mnist_frac = 1.0, 0.0
+        #         randomize_img = True
+        #     case 2:
+        #         box_frac, mnist_frac = 0.0, 1.0
+        #         randomize_img = True
+        #     case 3:
+        #         randomize_img = True
+        #         box_frac, mnist_frac = 1.0, 1.0
+        #     case 4:
+        #         box_frac, mnist_frac = 1.0, 0.0
+        #     case 5:
+        #         box_frac, mnist_frac = 0.0, 1.0
+        #     case 6:
+        #         box_frac, mnist_frac = 1.0, 1.0
+        randomize_cues = [randomize_mech_1, randomize_mech_2]
+        train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, box_frac=mech_1_frac, mnist_frac=mech_2_frac, randomize_cues=randomize_cues)
+        test_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, box_frac=mech_1_frac, mnist_frac=mech_2_frac, randomize_cues=randomize_cues)
 
     elif base_dataset == 'Shapes':
-        randomise = False
-        match EXP_NUM:
-            case 0:
-                mechanisms = []
-            case 1:
-                mechanisms = [0]
-                randomise = True
-            case 2:
-                mechanisms = [3]
-                randomise = True
-            case 3:
-                randomise = True
-                mechanisms = [0, 3]
-            case 4:
-                mechanisms = [0]
-            case 5:
-                mechanisms = [3]
-            case 6:
-                mechanisms = [0, 3]
-        train_loader = dataloader_3D_shapes('train', batch_size=batch_size, randomise=randomise, mechanisms=mechanisms)
-        test_loader = dataloader_3D_shapes('test', batch_size=batch_size, randomise=randomise, mechanisms=mechanisms)
-
-    if mode == 'test':
+        # match EXP_NUM:
+        #     case 0:
+        #         mechanisms = []
+        #     case 1:
+        #         mechanisms = [0]
+        #         randomise = True
+        #     case 2:
+        #         mechanisms = [3]
+        #         randomise = True
+        #     case 3:
+        #         randomise = True
+        #         mechanisms = [0, 3]
+        #     case 4:
+        #         mechanisms = [0]
+        #     case 5:
+        #         mechanisms = [3]
+        #     case 6:
+        #         mechanisms = [0, 3]
+        train_loader = dataloader_3D_shapes('train', batch_size=batch_size, randomize=randomize_img, floor_frac=mech_1_frac, scale_frac=mech_2_frac)
+        test_loader = dataloader_3D_shapes('test', batch_size=batch_size, randomise=randomize_img, floor_frac=mech_1_frac, scale_frac=mech_2_frac)
+    if counterfactual:
         return test_loader
     return train_loader, test_loader
 
-def show_images_grid(imgs_, class_labels, num_images, title):
-    """Now modified to show both [c h w] and [h w c] images."""
-    ncols = int(np.ceil(num_images**0.5))
-    nrows = int(np.ceil(num_images / ncols))
-    _, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
-    axes = axes.flatten()
-
-    for ax_i, ax in enumerate(axes):
-        if ax_i < num_images:
-            img = imgs_[ax_i]
-            if img.ndim == 3 and img.shape[0] == 3:
-                img = img.transpose(1, 2, 0)
-            ax.imshow(img, cmap='Greys_r', interpolation='nearest')
-            ax.set_title(f'Class: {class_labels[ax_i]}')  # Display the class label as title
-            ax.set_xticks([])
-            ax.set_yticks([])
-        else:
-            ax.axis('off')
-    if title:
-        plt.savefig(image_dir+title+'.png')
-    else:
-        plt.show()
-
-def visualise_features_3d(s_features, t_features, title=None):
-    tsne = TSNE(n_components=3, perplexity=30, learning_rate=200, n_iter=1000, random_state=42)
-    s = tsne.fit_transform(s_features.detach().numpy())
-    t = tsne.fit_transform(t_features.detach().numpy())
-    s_x, s_y, s_z = s[:, 0], s[:, 1], s[:, 2]
-    t_x, t_y, t_z = t[:, 0], t[:, 1], t[:, 2]
-
-    fig = plt.figure(figsize=(5, 5), dpi=300)
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(s_x, s_y, s_z, c='blue', label='Student', alpha=0.5)
-    ax.scatter(t_x, t_y, t_z, c='red', label='Teacher', alpha=0.5)
-    if title:
-        plt.savefig(image_dir+"3d/"+title+'.png')
-    else:
-        plt.show()
-
-def visualise_features_2d(s_features, t_features, title=None):
-    tsne = TSNE(n_components=2, perplexity=30, learning_rate=200, n_iter=1000, random_state=42)
-    s = tsne.fit_transform(s_features.detach().numpy())
-    t = tsne.fit_transform(t_features.detach().numpy())
-    s_x, s_y = s[:, 0], s[:, 1]
-    t_x, t_y = t[:, 0], t[:, 1]
-
-    fig = plt.figure(figsize=(5, 5), dpi=300)
-    plt.scatter(s_x, s_y, c='blue', label='Student', alpha=0.5)
-    plt.scatter(t_x, t_y, c='red', label='Teacher', alpha=0.5)
-    if title:
-        plt.savefig(image_dir+"2d/"+title+'_2d.png')
-    else:
-        plt.show()
-
-def plot_images(dataloader, num_images, title=None):
-    for i, (x, y) in enumerate(dataloader):
-        x = einops.rearrange(x, 'b c h w -> b h w c')
-        show_images_grid(x, y, num_images, title=title)
-        break
 
 if __name__ == "__main__":
     scores = torch.randn(10, 10)

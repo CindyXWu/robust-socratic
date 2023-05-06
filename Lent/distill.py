@@ -5,15 +5,17 @@ import argparse
 from time import gmtime, strftime
 import yaml 
 
-from image_models import *
-from plotting import *
-from jacobian import *
-from contrastive import *
-from feature_match import *
-from utils_ekdeep import *
-from image_utils import *
+from datasets.image_utils import *
 from info_dicts import *
 from train_utils import *
+from models.image_models import *
+from plotting import *
+from losses.jacobian import *
+from losses.contrastive import *
+from losses.feature_match import *
+from datasets.utils_ekdeep import *
+from datasets.shapes_3D import *
+from info_dicts import *
 
 # Suppress warnings "divide by zero" produced by NaN gradients
 import warnings
@@ -42,7 +44,7 @@ args = parser.parse_args()
 # ======================================================================================
 if args.config_name:
     # Load the config file - contains list of dictionaries
-    with open(args.config_name, 'r') as f:
+    with open(f'configs/{args.config_name}', 'r') as f:
         configs = yaml.safe_load(f)
     config = configs[args.config_num]
 

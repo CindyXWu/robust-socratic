@@ -6,12 +6,13 @@ import argparse
 import yaml
 from time import gmtime, strftime
 
-from image_models import *
+from models.image_models import *
 from plotting import *
-from jacobian import *
-from contrastive import *
-from feature_match import *
-from utils_ekdeep import *
+from losses.jacobian import *
+from losses.contrastive import *
+from losses.feature_match import *
+from datasets.utils_ekdeep import *
+from datasets.shapes_3D import *
 from info_dicts import * 
 from train_utils import *
 
@@ -19,11 +20,11 @@ from train_utils import *
 import warnings
 warnings.filterwarnings("ignore")
 
-output_dir = "Image_Experiments/"
+teacher_dir = "teacher/"
 # Change directory to one this file is in
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
+if not os.path.exists(teacher_dir):
+    os.makedirs(teacher_dir)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # print(f"Using {device} device")
@@ -57,7 +58,7 @@ def sweep_teacher():
             "teacher": teacher_dict[TEACH_NUM],
             "dataset": "CIFAR-100",
             "batch_size": batch_size,
-            "experiment": exp_dict[EXP_NUM],
+            "experiment": exp_name,
             },
         name=run_name
     )
@@ -68,10 +69,9 @@ def sweep_teacher():
     wandb.config.base_dataset = base_dataset
     wandb.config.augmentation = aug_dict[AUG_NUM]
     wandb.config.teacher = teacher_dict[TEACH_NUM]
-    wandb.config.teacher_mechanism = exp_dict[EXP_NUM]
-
+    wandb.config.teacher_mechanism = short_exp_name
     train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
-    base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+exp_dict[EXP_NUM]
+    base_path = teacher_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+exp_name
     train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)
 
 #================================================================================
@@ -82,22 +82,29 @@ is_sweep = False
 TEACH_NUM = 1
 EXP_NUM = 0
 AUG_NUM = 0
-DATASET_NUM = 0
+DATASET_NUM = 1
 if args.config_name:
     EXP_NUM = config['exp_num']
     TEACH_NUM = config['teacher_num']
     DATASEt_NUM = config['dataset_num']
 base_dataset = dataset_dict[DATASET_NUM]
+exp_name = list(exp_dict_all.keys())[EXP_NUM]
+# "Allow only spurious mechanisms: M=100%, S1=randomized, S2=100%" ->
+# M=100%, S1=randomized, S2=100%
+short_exp_name = exp_name.split(":")[-1].strip()
 
-# ======================================================================================
+#==================================================================================
 # SETUP PARAMS REQUIRING MANUAL INPUT
-# ======================================================================================
+# ===================================================================================
 lr = 0.2
 final_lr = 0.1
 epochs = 20
 batch_size = 64
-mnist_frac = 1.0
-box_frac = 1.0
+
+# Names for wandb logging
+project = "Teacher "+base_dataset
+run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+short_exp_name+", aug: "+aug_dict[AUG_NUM]+" "+base_dataset
+print('project:', project)
 
 sweep_configuration = {
     'method': 'bayes',
@@ -120,15 +127,11 @@ sweep_configuration = {
 match base_dataset:
     case 'CIFAR100':
         class_num = 100
-        exp_dict = cifar_exp_dict
     case 'CIFAR10':
         class_num = 10
-        exp_dict = cifar_exp_dict
     case 'Dominoes':
-        exp_dict = dominoes_exp_dict
         class_num = 10
     case 'Shapes':
-        exp_dict = shapes_exp_dict
         class_num = 8
 
 match TEACH_NUM:
@@ -140,12 +143,6 @@ match TEACH_NUM:
         teacher = CustomResNet50(class_num).to(device)
     case 3:
         teacher = wide_resnet_constructor(3, class_num).to(device)
-
-# Names for wandb logging
-project = "Teacher "+base_dataset
-run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+exp_dict[EXP_NUM]+", aug: "+aug_dict[AUG_NUM]+" "+base_dataset
-print('project:', project)
-
 
 if __name__ == "__main__":
     if is_sweep:
@@ -165,7 +162,7 @@ if __name__ == "__main__":
                 "dataset": base_dataset,
                 "epochs": epochs,
                 "batch_size": batch_size,
-                "spurious type": exp_dict[EXP_NUM],
+                "spurious type": short_exp_name,
                 "Augmentation": aug_dict[AUG_NUM]
             },
             name = run_name
@@ -173,9 +170,9 @@ if __name__ == "__main__":
         wandb.config.base_dataset = base_dataset
         wandb.config.augmentation = aug_dict[AUG_NUM]
         wandb.config.teacher = teacher_dict[TEACH_NUM]
-        wandb.config.teacher_mechanism = exp_dict[EXP_NUM]
+        wandb.config.teacher_mechanism = short_exp_name
         
-        train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
+        train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size)
 
         ## Plot images
         # for i, (x, y) in enumerate(train_loader):
@@ -183,5 +180,5 @@ if __name__ == "__main__":
         #     show_images_grid(x, y, num_images=64)
         #     break
 
-        base_path = output_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+exp_dict[EXP_NUM]
+        base_path = teacher_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+short_exp_name
         train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)
