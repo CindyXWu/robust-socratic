@@ -86,7 +86,7 @@ DATASET_NUM = 1
 if args.config_name:
     EXP_NUM = config['exp_num']
     TEACH_NUM = config['teacher_num']
-    DATASEt_NUM = config['dataset_num']
+    DATASET_NUM = config['dataset_num']
 base_dataset = dataset_dict[DATASET_NUM]
 exp_name = list(exp_dict_all.keys())[EXP_NUM]
 # "Allow only spurious mechanisms: M=100%, S1=randomized, S2=100%" ->

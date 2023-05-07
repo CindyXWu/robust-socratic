@@ -4,7 +4,7 @@ import wandb
 from tqdm import tqdm
 from torch.nn import Module
 from torch.utils.data import DataLoader
-
+from typing import Tuple
 from models.image_models import *
 from plotting import *
 from losses.jacobian import *
@@ -227,8 +227,8 @@ def check_grads(model):
 def get_counterfactual_dataloaders(base_dataset: str, batch_size: int) -> dict[str, DataLoader]:
     """Get dataloaders for counterfactual evaluation. Key of dictionary tells us which settings for counterfactual evals are used."""
     dataloaders = {}
-    for exp in range(len(counterfactual_dict_all)):
-        dataloaders[list(counterfactual_dict_all.keys())[exp]], _ = create_dataloader(base_dataset=base_dataset, EXP_NUM=exp, batch_size=batch_size, mode='test')
+    for i, key in enumerate(counterfactual_dict_all):
+        dataloaders[key], _ = create_dataloader(base_dataset=base_dataset, EXP_NUM=i, batch_size=batch_size, mode='test')
     return dataloaders
 
 
@@ -256,7 +256,7 @@ def create_dataloader(base_dataset: Dataset, EXP_NUM: int, batch_size: int = 64,
         test_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, box_frac=mech_1_frac, mnist_frac=mech_2_frac, randomize_cues=randomize_cues)
 
     elif base_dataset == 'Shapes':
-        train_loader = dataloader_3D_shapes('train', batch_size=batch_size, randomize=randomize_img, floor_frac=mech_1_frac, scale_frac=mech_2_frac)
+        train_loader = dataloader_3D_shapes('train', batch_size=batch_size, randomise=randomize_img, floor_frac=mech_1_frac, scale_frac=mech_2_frac)
         test_loader = dataloader_3D_shapes('test', batch_size=batch_size, randomise=randomize_img, floor_frac=mech_1_frac, scale_frac=mech_2_frac)
  
     return train_loader, test_loader

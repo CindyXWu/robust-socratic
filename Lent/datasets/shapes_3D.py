@@ -7,7 +7,10 @@ from torch.utils.data import DataLoader, Dataset
 import torch.nn.functional as F
 import torch
 import einops
-from typing import List, Tuple
+import sys
+from numpy.typing import NDArray
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 from plotting import *
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -33,6 +36,10 @@ class Shapes3D(Dataset):
         self._NUM_VALUES_PER_FACTOR = {'floor_hue': 10, 'wall_hue': 10, 'object_hue': 10, 
                                 'scale': 8, 'shape': 4, 'orientation': 15}
         self.randomise = randomise
+        self.floor_frac = floor_frac
+        self.scale_frac = scale_frac
+        # should keep False for now - other method doesn't work well yet
+        self.remove_mech = False
 
         # Convert into scalar labels
         self.new_labels = np.empty([self.n_samples])
@@ -52,7 +59,8 @@ class Shapes3D(Dataset):
             floor_hue = self.labels[:,0]
             # Images where floor hue is the same as the label
             mask_0 = np.array([True if (floor_hue[i]*10).astype(int) == self.new_labels[i] else False for i in range(self.n_samples)])
-            mask_0 = self.apply_frac_randomised(mask_0, floor_frac)
+            if not self.remove_mech:
+                mask_0 = self.apply_frac_randomised(mask_0, floor_frac)
         if scale_frac != 0:
             scale = self.labels[:,3]
             # Hash maps to integers - idx[i] is scale value for image i
@@ -67,9 +75,10 @@ class Shapes3D(Dataset):
         # Get labels as one hot encodings for mixup
         self.one_hot_encode()
 
-    def apply_frac_randomised(self, mask, frac):
+    def apply_frac_randomised(self, mask: NDArray[np.bool_], frac: float):
         """In case where frac is not 1, randomise the mechanism for frac of the images.
-        Assume a frac of 0.6 means only 60% of images have the mechanism corresponding to label, and 40% have a randomised mechanism. 
+        Assume a frac of 0.6 means only 60% of images have the mechanism corresponding to label, and 40% have a randomised mechanism.
+        This is not applied as augmentation but rather as a dataset preprocessing step.
         An alternative definition is given below.
         """
         numels = np.sum(mask) # Number of spurious images
@@ -81,45 +90,11 @@ class Shapes3D(Dataset):
         mask[select_idx] = True
         return mask
 
-    def apply_frac_removed(self, mech: str, mask: np.ndarray, frac: float):
-        """Now assume frac of 0.6 means 60% of images have the mechanism corresponding to label, and 40% have this mechanism corresponding to a totally random value (for large area variations like floor hue this is uniform to not disrupt the image's frequency domain representation and might not be in original dataset)."""
-        if mech == 'floor_hue':
-            pass
-    
-    def sample_batch(self, batch_size, fixed_factor, fixed_factor_value):
-        """ Samples a batch of images with fixed_factor=fixed_factor_value, but with
-            the other factors varying randomly.
-        Args:
-            batch_size: number of images to sample.
-            fixed_factor: index of factor that is fixed in range(6).
-            fixed_factor_value: integer value of factor that is fixed 
-            in range(_NUM_VALUES_PER_FACTOR[_FACTORS_IN_ORDER[fixed_factor]]).
-
-        Returns:
-            batch: images shape [batch_size,64,64,3]
-        """
-        factors = np.zeros([len(self._FACTORS_IN_ORDER), batch_size],
-                            dtype=np.int32)
-        for factor, name in enumerate(self._FACTORS_IN_ORDER):
-            num_choices = self._NUM_VALUES_PER_FACTOR[name]
-            factors[factor] = np.random.choice(num_choices, batch_size)
-        factors[fixed_factor] = fixed_factor_value
-        indices = self.get_index(factors)
-        ims = []
-        for ind in indices:
-            im = images[ind]
-            im = np.asarray(im)
-            ims.append(im)
-        ims = np.stack(ims, axis=0)
-        ims = ims / 255. # normalise values to range [0,1]
-        ims = ims.astype(np.float32)
-        return ims.reshape([batch_size, 64, 64, 3])
-
-    def get_index(self, factors):
+    def get_index(self, factors: NDArray[np.int_]):
         """ Converts factors to indices in range(num_data)
         Args:
             factors: np array shape [6,batch_size].
-                    factors[i]=factors[i,:] takes integer values in 
+                    factors[i]=factors[i,:] with values in 
                     range(_NUM_VALUES_PER_FACTOR[_FACTORS_IN_ORDER[i]]).
 
         Returns:
@@ -141,9 +116,35 @@ class Shapes3D(Dataset):
             image: numpy array image of shape [3, 64, 64]
             label: scalar torch tensor label in range 1-12
         """
-        x, y = self.process_img(self.images[idx,:,:,:], self.new_labels[idx])
+        x = self.images[idx,:,:,:]
+        if self.remove_mech:
+            x = self.remove_floor_hue(x)
+        x, y = self.process_img(x, self.new_labels[idx])
         return x, y
 
+    def remove_floor_hue(self, x: np.ndarray[np.uint8]):
+        """Augmentation for cue correlation fraction by changing floor hue to a random colour.
+        Args:
+            tolerance: tolerance for Euclidian distance between pixels and floor colour.
+        """
+        # Select random uniform value between 0 and 1
+        rand = np.random.uniform()
+        # If floor hue is same as object or wall there is no way I can edit its value separately
+        # Return and skip this image
+        if self.pixel_similarity(x[63,0,:], x[31, 42,:]) or self.pixel_similarity(x[63,0,:], x[31, 0,:]):
+            return x
+        # If rand > floor_frac then remove floor hue mechanism by randomising pixels
+        if 0 < self.floor_frac < 1 and rand > self.floor_frac:
+            floor_col = x[63,0,:]
+            mask = self.pixel_similarity(x, floor_col, tolerance=3)
+            x[mask] = np.random.randint(0, 256, size=3)
+        return x
+
+    def pixel_similarity(self, arr_1, arr_2, tolerance=10):
+        abs_diff = np.abs(arr_1 - arr_2)
+        mask = np.all(abs_diff <= tolerance, axis=-1)
+        return mask
+    
     def process_img(self, x, y):
         """Convert from numpy array uint8 to torch float32 tensor. Convert y to torch long tensor."""
         x = einops.rearrange(x, 'h w c -> c h w')
@@ -155,9 +156,9 @@ class Shapes3D(Dataset):
         return self.n_samples
 
      
-def dataloader_3D_shapes(load_type, batch_size, randomize=False, floor_frac=0, scale_frac=0):
+def dataloader_3D_shapes(load_type, batch_size, randomise=False, floor_frac=0, scale_frac=0):
     """Load dataset."""
-    dataset = Shapes3D(randomize_shape=randomize, floor_frac=floor_frac, scale_frac=scale_frac)
+    dataset = Shapes3D(randomise=randomise, floor_frac=floor_frac, scale_frac=scale_frac)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=(load_type=='train'), drop_last=True, num_workers=0)
     return dataloader
 
