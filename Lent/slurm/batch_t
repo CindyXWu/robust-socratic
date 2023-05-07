@@ -50,7 +50,7 @@ conda deactivate
 conda activate pytorch
 
 #! Full path to application executable: 
-application="python cifar_t.py"
+application="python ../teacher.py"
 
 #! Run options for the application:
 options=""

@@ -38,7 +38,7 @@ conda deactivate
 conda activate pytorch
 
 #! Full path to application executable: 
-application="python cifar_s.py"
+application="python ../distill.py"
 
 #! Run options for the application:
 options=""
