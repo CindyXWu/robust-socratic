@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set the argument to pass to myscript.sh
-config_file="configs/Dominoes_t.yml"
+config_file="../configs/Dominoes_t.yml"
 configs=$(python -c "import yaml; print(yaml.safe_load(open('$config_file')))")
 
 # Define the number of configurations
