@@ -20,7 +20,7 @@ from train_utils import *
 import warnings
 warnings.filterwarnings("ignore")
 
-teacher_dir = "teacher/"
+teacher_dir = "teachers/"
 # Change directory to one this file is in
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 if not os.path.exists(teacher_dir):
@@ -97,7 +97,7 @@ short_exp_name = exp_name.split(":")[-1].strip()
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ===================================================================================
 lr = 0.2
-final_lr = 0.1
+final_lr = 0.01
 epochs = 20
 batch_size = 64
 

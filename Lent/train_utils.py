@@ -216,7 +216,8 @@ def train_distill(
             it += 1
         # Visualise 3d at end of each epoch
         if loss_num == 2:
-            visualise_features_2d(s_map, t_map, title=run_name+"_"+str(it))
+            visualise_features_3d(s_map, t_map, title=run_name+"_"+str(it))
+
 
 def check_grads(model):
     for param in model.parameters():
@@ -227,11 +228,11 @@ def get_counterfactual_dataloaders(base_dataset: str, batch_size: int) -> dict[s
     """Get dataloaders for counterfactual evaluation. Key of dictionary tells us which settings for counterfactual evals are used."""
     dataloaders = {}
     for exp in range(len(counterfactual_dict_all)):
-        dataloaders[list(counterfactual_dict_all.keys())[exp]] = create_dataloader(base_dataset=base_dataset, EXP_NUM=exp, batch_size=batch_size, mode='test')
+        dataloaders[list(counterfactual_dict_all.keys())[exp]], _ = create_dataloader(base_dataset=base_dataset, EXP_NUM=exp, batch_size=batch_size, mode='test')
     return dataloaders
 
 
-def create_dataloader(base_dataset: Dataset, EXP_NUM: int, batch_size: int = 64, counterfactual: bool = False):
+def create_dataloader(base_dataset: Dataset, EXP_NUM: int, batch_size: int = 64, counterfactual: bool = False) -> Tuple[DataLoader, DataLoader]:
     """Set train and test loaders based on dataset and experiment.
     Used only for training and testing, not counterfactual evals.
     For generating dominoes: box is cue 1, MNIST is cue 2.
@@ -245,64 +246,19 @@ def create_dataloader(base_dataset: Dataset, EXP_NUM: int, batch_size: int = 64,
         mech_1_frac, mech_2_frac, randomize_mech_1, randomize_mech_2, randomize_img = exp_dict_all[key]
 
     if base_dataset in ["CIFAR10", "CIFAR100"]:
-        # match EXP_NUM:
-        #     case 0:
-        #         cue_type = 'nocue'
-        #     case 1:
-        #         cue_type = 'box'
-        #     case 2: 
-        #         cue_type = 'box'
-        #         randomize_cue = True
         cue_type='box' if mech_1_frac != 0 else 'nocue'
         train_loader = get_box_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=mech_1_frac, randomize_cue=randomize_mech_1, randomize_img = randomize_img, batch_size=batch_size)
         test_loader = get_box_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=mech_1_frac, randomize_cue=randomize_mech_1, randomize_img = randomize_img, batch_size=batch_size)
 
     elif base_dataset == "Dominoes":
-        # match EXP_NUM:
-        #     case 0:
-        #         box_frac, mnist_frac = 0.0, 0.0
-        #     case 1:
-        #         box_frac, mnist_frac = 1.0, 0.0
-        #         randomize_img = True
-        #     case 2:
-        #         box_frac, mnist_frac = 0.0, 1.0
-        #         randomize_img = True
-        #     case 3:
-        #         randomize_img = True
-        #         box_frac, mnist_frac = 1.0, 1.0
-        #     case 4:
-        #         box_frac, mnist_frac = 1.0, 0.0
-        #     case 5:
-        #         box_frac, mnist_frac = 0.0, 1.0
-        #     case 6:
-        #         box_frac, mnist_frac = 1.0, 1.0
         randomize_cues = [randomize_mech_1, randomize_mech_2]
         train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, box_frac=mech_1_frac, mnist_frac=mech_2_frac, randomize_cues=randomize_cues)
         test_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, box_frac=mech_1_frac, mnist_frac=mech_2_frac, randomize_cues=randomize_cues)
 
     elif base_dataset == 'Shapes':
-        # match EXP_NUM:
-        #     case 0:
-        #         mechanisms = []
-        #     case 1:
-        #         mechanisms = [0]
-        #         randomise = True
-        #     case 2:
-        #         mechanisms = [3]
-        #         randomise = True
-        #     case 3:
-        #         randomise = True
-        #         mechanisms = [0, 3]
-        #     case 4:
-        #         mechanisms = [0]
-        #     case 5:
-        #         mechanisms = [3]
-        #     case 6:
-        #         mechanisms = [0, 3]
         train_loader = dataloader_3D_shapes('train', batch_size=batch_size, randomize=randomize_img, floor_frac=mech_1_frac, scale_frac=mech_2_frac)
         test_loader = dataloader_3D_shapes('test', batch_size=batch_size, randomise=randomize_img, floor_frac=mech_1_frac, scale_frac=mech_2_frac)
-    if counterfactual:
-        return test_loader
+ 
     return train_loader, test_loader
 
 

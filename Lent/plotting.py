@@ -74,7 +74,7 @@ def plot_acc(train_acc, test_acc, it, base_name='', title=''):
     plt.close("all")
     
 
-def show_images_grid(imgs_, class_labels, num_images, title):
+def show_images_grid(imgs_, class_labels, num_images, title=None):
     """Now modified to show both [c h w] and [h w c] images."""
     ncols = int(np.ceil(num_images**0.5))
     nrows = int(np.ceil(num_images / ncols))
