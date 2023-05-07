@@ -15,6 +15,7 @@ from datasets.utils_ekdeep import *
 from datasets.shapes_3D import *
 from info_dicts import * 
 from train_utils import *
+from configs.sweep_configs import * 
 
 # Suppress warnings "divide by zero" produced by NaN gradients
 import warnings
@@ -70,6 +71,7 @@ def sweep_teacher():
     wandb.config.augmentation = aug_dict[AUG_NUM]
     wandb.config.teacher = teacher_dict[TEACH_NUM]
     wandb.config.teacher_mechanism = short_exp_name
+
     train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size, mode='train')
     base_path = teacher_dir+"teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+exp_name
     train_teacher(teacher, train_loader, test_loader, lr, final_lr, epochs, run_name, base_path=base_path)
@@ -82,7 +84,7 @@ is_sweep = False
 TEACH_NUM = 1
 EXP_NUM = 0
 AUG_NUM = 0
-DATASET_NUM = 1
+DATASET_NUM = 2
 if args.config_name:
     EXP_NUM = config['exp_num']
     TEACH_NUM = config['teacher_num']
@@ -105,20 +107,6 @@ batch_size = 64
 project = "Teacher "+base_dataset
 run_name = "teacher:"+teacher_dict[TEACH_NUM]+", teacher mechanism: "+short_exp_name+", aug: "+aug_dict[AUG_NUM]+" "+base_dataset
 print('project:', project)
-
-sweep_configuration = {
-    'method': 'bayes',
-    'name': strftime("%m-%d %H:%M:%S", gmtime()),
-    'metric': {'goal': 'maximize', 'name': 'teacher test acc'},
-    # CHANGE THESE 
-    'parameters': {
-        'epochs': {'values': [1]},
-        'lr': {'distribution': 'log_uniform', 'min': math.log(0.1), 'max': math.log(1)},
-        'final_lr': {'distribution': 'log_uniform', 'min': math.log(0.05), 'max': math.log(0.1)}
-    },
-    # Iter refers to number of times in code the metric is logged
-    'early_terminate': {'type': 'hyperband', 'min_iter': 5}
-}
 
 #==============================================================================
 # Stuff depending on setup params - change less often
@@ -147,7 +135,7 @@ match TEACH_NUM:
 if __name__ == "__main__":
     if is_sweep:
         # Set configuration and project for sweep and initialise agent
-        sweep_id = wandb.sweep(sweep=sweep_configuration, project=project) 
+        sweep_id = wandb.sweep(sweep=t_sweep_configuration, project=project) 
         wandb.agent(sweep_id, function=sweep_teacher, count=10)
     # Should be used for retraining once best model indentified from sweep
     else:

@@ -13,7 +13,9 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from plotting import *
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+# Get the current script's directory
+script_dir = os.path.dirname(os.path.realpath(__file__))
+file_path = os.path.join(script_dir, '3dshapes.h5')
 
 class Shapes3D(Dataset):
     def __init__(self, randomise=False, floor_frac=0, scale_frac=0):
@@ -25,7 +27,7 @@ class Shapes3D(Dataset):
             floor_frac: fraction of images where floor hue is predictive of label. Set to 0 is equivalent to randomising or removing the feature.
             scale_frac: fraction of images where scale is predictive of label. Set to 0 is equivalent to randomising or removing the feature.
         """
-        with h5py.File('3dshapes.h5', 'r') as dataset:
+        with h5py.File(file_path, 'r') as dataset:
             self.images = np.array(dataset['images'])  # convert h5py Dataset to numpy array shape [480000,64,64,3], uint8 in range(256)
             self.labels = np.array(dataset['labels'])  # convert h5py Dataset to numpy array shape [480000,6], float64
             self.image_shape = self.images.shape[1:]  # [64,64,3]
@@ -55,6 +57,8 @@ class Shapes3D(Dataset):
             self.new_labels = np.random.randint(0, self.num_classes, size=self.n_samples)
         
         # Add mechanisms at given fraction
+        mask_0 = np.ones_like(self.new_labels, dtype=bool)
+        mask_3 = np.ones_like(self.new_labels, dtype=bool)
         if floor_frac != 0:
             floor_hue = self.labels[:,0]
             # Images where floor hue is the same as the label

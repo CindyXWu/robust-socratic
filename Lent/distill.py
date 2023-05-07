@@ -2,7 +2,6 @@ import torch
 import os
 import wandb
 import argparse
-from time import gmtime, strftime
 import yaml 
 
 from datasets.image_utils import *
@@ -16,6 +15,7 @@ from losses.feature_match import *
 from datasets.utils_ekdeep import *
 from datasets.shapes_3D import *
 from info_dicts import *
+from configs.sweep_configs import *
 
 # Suppress warnings "divide by zero" produced by NaN gradients
 import warnings
@@ -65,8 +65,8 @@ def sweep():
     # spurious_corr = wandb.config.spurious_corr
     wandb.config.spurious_corr = spurious_corr
     wandb.config.base_dataset = base_dataset
-    wandb.config.student_mechanism = exp_dict[S_EXP_NUM]
-    wandb.config.teacher_mechanism = exp_dict[T_EXP_NUM]
+    wandb.config.student_mechanism = s_short_exp_name
+    wandb.config.teacher_mechanism = t_short_exp_name
     wandb.config.teacher = teacher_dict[TEACH_NUM]
     wandb.config.student = student_dict[STUDENT_NUM]
     wandb.config.loss = loss_dict[LOSS_NUM]
@@ -101,7 +101,12 @@ if args.config_name:
     S_EXP_NUM = config['s_exp_num']
     DATASET_NUM = config['dataset_num']
 base_dataset = dataset_dict[DATASET_NUM]
-
+s_exp_name = list(exp_dict_all.keys())[S_EXP_NUM]
+t_exp_name = list(exp_dict_all.keys())[T_EXP_NUM]
+# "Allow only spurious mechanisms: M=100%, S1=randomized, S2=100%" ->
+# M=100%, S1=randomized, S2=100%
+s_short_exp_name = s_exp_name.split(":")[-1].strip()
+t_short_exp_name = t_exp_name.split(":")[-1].strip()
 # ======================================================================================
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
@@ -114,23 +119,6 @@ tau = 0.1 # Contrastive loss temperature
 batch_size = 64
 spurious_corr = 1
 
-## Uncomment and change values for sweep
-# Note I have an early stop criteria but this is optional
-# sweep_configuration = {
-#     'method': 'bayes',
-#     'name': strftime("%m-%d %H:%M:%S", gmtime()),
-#     'metric': {'goal': 'maximize', 'name': 'student test acc'},
-#     # CHANGE THESE
-#     'parameters': {
-#         #'spurious_corr': {'values': [0.5, 0.6, 0.7, 0.8, 0.9, 1]}, # For grid search
-#         # 'alpha': {'distribution': 'uniform', 'min': 0, 'max': 1}, # For bayes search
-#         'lr': {'distribution': 'uniform', 'min': 0.01, 'max': 0.5},
-#         'final_lr': {'distribution': 'uniform', 'min': 0.001, 'max': 0.1},
-#         'tau': {'distribution': 'log_uniform', 'min': -5, 'max': 2.3},
-#     },
-#     'early_terminate': {'type': 'hyperband', 'min_iter': 5}
-# }
-
 #==============================================================================
 # Stuff depending on setup params - change less often
 #==============================================================================
@@ -138,15 +126,11 @@ spurious_corr = 1
 match base_dataset:
     case 'CIFAR100':
         class_num = 100
-        exp_dict = cifar_exp_dict
     case 'CIFAR10':
         class_num = 10
-        exp_dict = cifar_exp_dict
     case 'Dominoes':
-        exp_dict = dominoes_exp_dict
         class_num = 10
     case 'Shapes':
-        exp_dict = shapes_exp_dict
         class_num = 8
 
 # Training dynamics settings depending on loss function
@@ -191,7 +175,7 @@ match TEACH_NUM:
 
 # Names for wandb logging
 project = "Distill "+teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]+"_"+base_dataset
-run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S mech '+exp_dict[S_EXP_NUM]+', T mech '+exp_dict[T_EXP_NUM]+', Loss: '+loss_dict[LOSS_NUM]
+run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S mech '+s_short_exp_name+', T mech '+t_short_exp_name+', Loss: '+loss_dict[LOSS_NUM]
 print('project:', project)
 
 #================================================================================
@@ -199,10 +183,10 @@ print('project:', project)
 #================================================================================
 # Clumsy try-except while I wrestle my codebase into sync
 try:
-    load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+exp_dict[T_EXP_NUM]
+    load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+t_short_exp_name
     checkpoint = torch.load(load_name, map_location=device)
 except:
-    load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+exp_dict[T_EXP_NUM]+"_final"
+    load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+t_short_exp_name+"_final"
 checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
 try:
@@ -235,8 +219,8 @@ if __name__ == "__main__":
 
     wandb.config.base_dataset = base_dataset
     wandb.config.spurious_corr = spurious_corr
-    wandb.config.student_mechanism = exp_dict[S_EXP_NUM]
-    wandb.config.teacher_mechanism = exp_dict[T_EXP_NUM]
+    wandb.config.student_mechanism = s_short_exp_name
+    wandb.config.teacher_mechanism = t_short_exp_name
     wandb.config.teacher = teacher_dict[TEACH_NUM]
     wandb.config.student = student_dict[STUDENT_NUM]
     wandb.config.loss = loss_dict[LOSS_NUM]
