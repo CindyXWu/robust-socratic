@@ -1,5 +1,8 @@
 import os
 import yaml
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 from info_dicts import *
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
