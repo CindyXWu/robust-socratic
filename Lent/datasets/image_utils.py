@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch
 import random
 import os
-from shapes_3D import *
+from datasets.shapes_3D import *
 import einops
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))

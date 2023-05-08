@@ -228,7 +228,7 @@ def get_counterfactual_dataloaders(base_dataset: str, batch_size: int) -> dict[s
     """Get dataloaders for counterfactual evaluation. Key of dictionary tells us which settings for counterfactual evals are used."""
     dataloaders = {}
     for i, key in enumerate(counterfactual_dict_all):
-        dataloaders[key], _ = create_dataloader(base_dataset=base_dataset, EXP_NUM=i, batch_size=batch_size, mode='test')
+        dataloaders[key], _ = create_dataloader(base_dataset=base_dataset, EXP_NUM=i, batch_size=batch_size, counterfactual=True)
     return dataloaders
 
 

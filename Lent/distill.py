@@ -75,7 +75,7 @@ def sweep():
     lr = wandb.config.lr
     final_lr = wandb.config.final_lr
 
-    train_loader, test_loader = create_dataloader(base_dataset=base_dataset, S_EXP_NUM=S_EXP_NUM, batch_size=batch_size, spurious_corr=spurious_corr, mode='train')
+    train_loader, test_loader = create_dataloader(base_dataset=base_dataset, S_EXP_NUM=S_EXP_NUM, batch_size=batch_size)
 
     train_distill(teacher, student, train_loader, test_loader, base_dataset, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha, tau=tau, s_layer=s_layer, t_layer=t_layer)
 
@@ -86,12 +86,12 @@ def sweep():
 #================================================================================================
 is_sweep = args.sweep
 T_EXP_NUM = 0
-S_EXP_NUM = 1
+S_EXP_NUM = 0
 STUDENT_NUM = 1
 TEACH_NUM = 1
-LOSS_NUM = 2
+LOSS_NUM = 1
 AUG_NUM = 0
-DATASET_NUM = 2
+DATASET_NUM = 1
 
 if args.config_name:
     T_EXP_NUM = config['t_exp_num']
@@ -107,6 +107,7 @@ t_exp_name = list(exp_dict_all.keys())[T_EXP_NUM]
 # M=100%, S1=randomized, S2=100%
 s_short_exp_name = s_exp_name.split(":")[-1].strip()
 t_short_exp_name = t_exp_name.split(":")[-1].strip()
+
 # ======================================================================================
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
@@ -183,10 +184,10 @@ print('project:', project)
 #================================================================================
 # Clumsy try-except while I wrestle my codebase into sync
 try:
-    load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+t_short_exp_name
+    load_name = "teachers/teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+t_short_exp_name
     checkpoint = torch.load(load_name, map_location=device)
 except:
-    load_name = "Image_Experiments/teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+t_short_exp_name+"_final"
+    load_name = "teachers/teacher_"+teacher_dict[TEACH_NUM]+"_"+base_dataset+"_"+t_short_exp_name+"_final"
 checkpoint = torch.load(load_name, map_location=device)
 teacher.load_state_dict(checkpoint['model_state_dict'])
 try:
@@ -215,7 +216,7 @@ if __name__ == "__main__":
             name = run_name
         )
     
-    train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=S_EXP_NUM, batch_size=batch_size, spurious_corr=spurious_corr, mode='train')
+    train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=S_EXP_NUM, batch_size=batch_size)
 
     wandb.config.base_dataset = base_dataset
     wandb.config.spurious_corr = spurious_corr

@@ -126,7 +126,7 @@ class Shapes3D(Dataset):
         x, y = self.process_img(x, self.new_labels[idx])
         return x, y
 
-    def remove_floor_hue(self, x: np.ndarray[np.uint8]):
+    def remove_floor_hue(self, x: NDArray[np.uint8]):
         """Augmentation for cue correlation fraction by changing floor hue to a random colour.
         Args:
             tolerance: tolerance for Euclidian distance between pixels and floor colour.

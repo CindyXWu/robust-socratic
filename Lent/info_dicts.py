@@ -21,6 +21,9 @@ exp_dict_all = {"No mechanisms (baseline): M=100%, S1=0%, S2=0%": [0, 0, False, 
                   "Student both spurious mechanisms: M=100%, S1=60%, S2=30%": [0.9, 0.6, False, False, False]
                   }
 
+## For debugging
+# exp_dict_all = {"CIFAR10": [0, 0, False, False, False],}
+
 # Counterfactual evals
 # Experiment number implicit in index of list converted dictionary
 counterfactual_dict_all = {"All mechanisms: M=100%, S1=100%, S2=100%": 

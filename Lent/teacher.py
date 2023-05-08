@@ -99,8 +99,8 @@ short_exp_name = exp_name.split(":")[-1].strip()
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ===================================================================================
 lr = 0.2
-final_lr = 0.01
-epochs = 20
+final_lr = 0.05
+epochs = 10
 batch_size = 64
 
 # Names for wandb logging
@@ -121,6 +121,7 @@ match base_dataset:
         class_num = 10
     case 'Shapes':
         class_num = 8
+        epochs = 2
 
 match TEACH_NUM:
     case 0:
