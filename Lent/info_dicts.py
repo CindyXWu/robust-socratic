@@ -7,7 +7,13 @@ aug_dict = {0: "None", 1: "Mixup et al", 2: "Union of datasets"}
 dataset_dict = {0: "CIFAR100", 1: "Dominoes", 2: "Shapes"}
 
 # Exhaustive experiments
-shapes_exp_dict = {0: "Shape_Color", 1: "Floor", 2: "Scale", 3: "Floor_Scale", 4: "Shape_Color_Floor", 5: "Shape_Color_Scale", 6: "Shape_Color_Floor_Scale"}
+shapes_exp_dict = {0: "Shape_Color", 
+                   1: "Floor", 
+                   2: "Scale", 
+                   3: "Floor_Scale", 
+                   4: "Shape_Color_Floor", 
+                   5: "Shape_Color_Scale", 
+                   6: "Shape_Color_Floor_Scale"}
 dominoes_exp_dict = {"CIFAR10": [0, 0, False, False, False], 
                      "Box": [1, 0, True, False, False], 
                      "MNIST": [0, 1, True, False, False], 
