@@ -1,14 +1,18 @@
-import matplotlib.pyplot as plt
-from torchvision.utils import make_grid
-import wandb
 from collections import defaultdict
 import pandas as pd
 import numpy as np
-import seaborn as sns
-from sklearn.manifold import TSNE
-import matplotlib as mpl
 import os
 import einops
+import torch
+from typing import List, Optional
+
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import seaborn as sns
+from torchvision.utils import make_grid
+import wandb
+from sklearn.manifold import TSNE
+
 
 from info_dicts import *
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -17,6 +21,7 @@ if not os.path.exists(image_dir):
     os.makedirs(image_dir)
 
 api = wandb.Api()
+
 
 def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
     fig = plt.figure(figsize=(8, 4), dpi=100)
@@ -38,6 +43,7 @@ def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
         plt.show()
     plt.close("all")
 
+
 def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
     fig = plt.figure(figsize=(8, 4), dpi=100)
     plt.plot(loss)
@@ -52,6 +58,7 @@ def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
     else:
         plt.show()
     plt.close("all")
+
 
 def plot_acc(train_acc, test_acc, it, base_name='', title=''):
     fig = plt.figure(figsize=(8, 4), dpi=100)
@@ -115,7 +122,8 @@ def visualise_features_3d(s_features, t_features, title=None):
         plt.show()
 
 
-def visualise_features_2d(s_features, t_features, title=None):
+def visualise_features_2d(s_features: torch.Tensor, t_features: torch.Tensor, title=None):
+    """Student and teacher features shape [num_samples, feature_dim]."""
     tsne = TSNE(n_components=2, perplexity=30, learning_rate=200, n_iter=1000, random_state=42)
     s = tsne.fit_transform(s_features.detach().numpy())
     t = tsne.fit_transform(t_features.detach().numpy())
@@ -139,19 +147,28 @@ def plot_images(dataloader, num_images, title=None):
 
 
 
-def wandb_get_data(project_name, t_num, s_num, exp_num, groupby_metrics):
-    runs = api.runs(project_name)
-    teacher = 'ResNet18_CIFAR100' #teacher_dict[t_num]
-    student = 'ResNet18_Flexi' #student_dict[s_num]
-    t_mech = 'plain' #exp_dict[exp_num]
-    s_mech = 'plain' #exp_dict[exp_num]
-    loss = 'Base Distillation'
+def wandb_get_data(project_name: str, 
+                   t_num: int, 
+                   s_num: int, 
+                   exp_dict: dict[str, List],
+                   s_exp_num: Optional[int] = None,
+                   t_exp_num: Optional[int] = None,
+                   loss_num: Optional[int] = None, 
+                   groupby_metrics: Optional[List[str]] = None) -> pd.DataFrame:
+    """Get data from wandb for experiment set, filter and group. 
+    Calculate mean/var of metrics and return historical information with mean/var interleaved."""
+    runs = api.runs(project_name) 
+    teacher = teacher_dict[t_num]
+    student = student_dict[s_num]
+    t_mech = list(exp_dict.keys())[t_exp_num]
+    s_mech = list(exp_dict.keys())[s_exp_num]
+    loss = loss_dict[loss_num]
     filtered_runs = []
+
     # Filter by above settings and remove any crashed or incomplete runs
     for run in runs:
         if (run.config.get('teacher') == teacher and 
             run.config.get('student') == student and 
-            run.config.get('teacher_mechanism') == t_mech and
             run.config.get('loss') == loss):
             history = run.history()
             if '_step' in history.columns and history['_step'].max() >= 100:
@@ -196,7 +213,7 @@ def wandb_get_data(project_name, t_num, s_num, exp_num, groupby_metrics):
 
 # Order of subplots by metric name - used to make grouped plots make sense
 order_list = ['Student train accuracy', 'Student test accuracy', 'Student plain test accuracy', 'Student randomised box test accuracy', 'Student box test accuracy', 'Student-teacher error', 'Student lr', 'Student loss']
-def wandb_plot(histories, title):
+def wandb_plot(histories: pd.DataFrame, title: str):
     sns.set(style='whitegrid', context='paper', font_scale=1.2)     # Set seaborn styling
     num_groups = len(set([history['name'].iloc[0] for history in histories]))
     palette = sns.color_palette("deep", num_groups)
@@ -255,6 +272,6 @@ def custom_sort(col):
         return len(order_list) + 1
 
 if __name__ == "__main__":
-    title = 'ResNet18 CIFAR100 plain to ResNet18 Flexi'
-    histories = wandb_get_data('Student (debug)', 1, 1, 0, ['spurious_corr', 'student_mechanism'])
+    title = 'Jacobian loss'
+    histories = wandb_get_data('Student (debug)', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, loss_num=1)
     wandb_plot(histories, title)
