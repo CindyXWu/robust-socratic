@@ -6,10 +6,25 @@ loss_dict  = {0: "Base Distillation", 1: "Jacobian", 2: "Contrastive"}
 aug_dict = {0: "None", 1: "Mixup et al", 2: "Union of datasets"}
 dataset_dict = {0: "CIFAR100", 1: "Dominoes", 2: "Shapes"}
 
-## Exhaustive experiments
-# shapes_exp_dict = {0: "Shape_Color", 1: "Floor", 2: "Scale", 3: "Floor_Scale", 4: "Shape_Color_Floor", 5: "Shape_Color_Scale", 6: "Shape_Color_Floor_Scale"}
-# dominoes_exp_dict = {0: "CIFAR10", 1: "MNIST", 2: "Box", 3: "MNIST_Box", 4: "CIFAR10_MNIST", 5: "CIFAR10_Box", 6: "CIFAR10_MNIST_Box"}
-# cifar_exp_dict = {0: "P", 1: "B", 2: "BR"}
+# Exhaustive experiments
+shapes_exp_dict = {0: "Shape_Color", 
+                   1: "Floor", 
+                   2: "Scale", 
+                   3: "Floor_Scale", 
+                   4: "Shape_Color_Floor", 
+                   5: "Shape_Color_Scale", 
+                   6: "Shape_Color_Floor_Scale"}
+dominoes_exp_dict = {"CIFAR10": [0, 0, False, False, False], 
+                     "Box": [1, 0, True, False, False], 
+                     "MNIST": [0, 1, True, False, False], 
+                     "MNIST_Box": [1, 1, True, False, False], 
+                     "CIFAR10_MNIST": [0, 0, False, False, False],
+                     "CIFAR10_Box": [1, 0, False, False, False], 
+                     "CIFAR10_MNIST_Box": [1, 1, False, False, False]}
+# For single mechanism the second element is ignored so all values are just placeholders
+cifar_exp_dict = {"P": [0, 0, False, False, False], 
+                  "B": [1, 0, False, False, False], 
+                  "BR": [1, 0, False, True, False]}
 
 #====================================================================================================================
 # List elements: mech 1 frac, mech 2 frac, random image, random mech 1, random mech 2

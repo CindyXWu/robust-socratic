@@ -92,6 +92,7 @@ TEACH_NUM = 1
 LOSS_NUM = 1
 AUG_NUM = 0
 DATASET_NUM = 1
+exp_dict = dominoes_exp_dict
 
 if args.config_name:
     T_EXP_NUM = config['t_exp_num']
@@ -101,8 +102,8 @@ if args.config_name:
     S_EXP_NUM = config['s_exp_num']
     DATASET_NUM = config['dataset_num']
 base_dataset = dataset_dict[DATASET_NUM]
-s_exp_name = list(exp_dict_all.keys())[S_EXP_NUM]
-t_exp_name = list(exp_dict_all.keys())[T_EXP_NUM]
+s_exp_name = list(exp_dict.keys())[S_EXP_NUM]
+t_exp_name = list(exp_dict.keys())[T_EXP_NUM]
 # "Allow only spurious mechanisms: M=100%, S1=randomized, S2=100%" ->
 # M=100%, S1=randomized, S2=100%
 s_short_exp_name = s_exp_name.split(":")[-1].strip()
