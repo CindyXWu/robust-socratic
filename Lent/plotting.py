@@ -4,6 +4,9 @@ import numpy as np
 import os
 import einops
 import torch
+import multiprocessing as mp
+from functools import reduce
+import warnings
 from typing import List, Optional, Dict, Tuple
 
 from info_dicts import *
@@ -15,14 +18,14 @@ import wandb
 from wandb.sdk.wandb_run import Run
 from sklearn.manifold import TSNE
 
+warnings.filterwarnings("ignore", category=FutureWarning)
 
-from info_dicts import *
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 image_dir = "images/"
 if not os.path.exists(image_dir):
     os.makedirs(image_dir)
 
-api = wandb.Api()
+api = wandb.Api(overrides=None, timeout=None, api_key =None)
 
 
 def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
@@ -163,18 +166,21 @@ def wandb_get_data(project_name: str,
     student = student_dict[s_num]
     t_mech = list(exp_dict.keys())[t_exp_num] if t_exp_num else None
     s_mech = list(exp_dict.keys())[s_exp_num] if s_exp_num else None
-    loss = loss_dict[loss_num]
+    loss = "Jacobian" #loss_dict[loss_num]
     filtered_runs = []
 
     # Filter by above settings and remove any crashed or incomplete runs
     for run in runs:
         if (run.config.get('teacher') == teacher and 
-            run.config.get('student') == student and 
+            run.config.get('student') == student and
             run.config.get('loss') == loss):
             history = run.history()
             if '_step' in history.columns and history['_step'].max() >= 100:
                 filtered_runs.append(run)
-    print(filtered_runs[0])
+                # Clean history of NaNs
+                run.history = clean_history(history)
+
+    assert(len(filtered_runs) > 0), "No runs found with the given settings"
     grouped_runs = get_grouped_runs(filtered_runs, groupby_metrics)
 
     # Compute the means and variances for all of the metrics for each group of runs
@@ -182,46 +188,91 @@ def wandb_get_data(project_name: str,
     for key, runs in grouped_runs.items():
         metrics = defaultdict(list)
         for run in runs:
-            history = run.history()
+            history = run.history
             for metric in history.columns:
-                if not metric.startswith('_'):
-                    metrics[metric].append(history[['_step', metric]])
+                metrics[metric].append(history[[metric]])
 
-        # print("====================", "\n", metrics)
         # Calculate the mean and variance for each metric between repeat runs
         means_and_vars = {}
         for metric, metric_values in metrics.items():
             combined = pd.concat(metric_values)
-            # Check if there is only one run
-            # if len(runs) == 1:
-            #     # If so, set the variance to 0 and the mean to the values from that run
-            #     mean = combined.rename(columns={metric: f'{metric}_mean'})
-            #     var = pd.DataFrame({'_step': mean['_step'], f'{metric}_var': [0]*len(mean)})
-            # else:
-            #     mean = combined.groupby('_step')[metric].mean().reset_index().rename(columns={metric: f'{metric}_mean'})
-            #     var = combined.groupby('_step')[metric].var().reset_index().rename(columns={metric: f'{metric}_var'})
-            # Create dictionary of DataFrames for each metric
-            mean = combined.rename(columns={metric: f'{metric}_mean'})
-            if len(runs) == 1:
-                var = pd.DataFrame({'_step': mean['_step'], f'{metric}_var': [0]*len(mean)})
-            else:
-                var = combined.groupby('_step')[metric].var().reset_index().rename(columns={metric: f'{metric}_var'})
-            means_and_vars[metric] = mean.merge(var, how='outer', on='_step')
+            mean = combined.groupby(combined.index)[metric].mean().reset_index().rename(columns={metric: f'{metric} Mean'})
+            var = combined.groupby(combined.index)[metric].var().reset_index().rename(columns={metric: f'{metric} Var'})
+            means_and_vars[metric] = mean.merge(var, left_index=True, right_index=True)
 
         # Combine the means and vars for each metric into a single dataframe
         first_metric = list(means_and_vars.keys())[0]
         combined = means_and_vars[first_metric]
         for metric in list(means_and_vars.keys())[1:]:
-            combined = combined.merge(means_and_vars[metric], on='_step')
+            combined = combined.merge(means_and_vars[metric], left_index=True, right_index=True)
 
         # Name each row of the dataframe with the values of the grouped metrics
         combined['name'] = [' '.join([str(k) for k in key])] * len(combined)
         histories.append(combined)
 
+    # histories = get_histories(grouped_runs)
+    assert(len(histories) > 0), "Something went wrong with making history dataframe"
     return histories
 
 
-def get_grouped_runs(runs: List[Run], groupby_metrics: List) -> Dict[Tuple[str, ...], List[Run]]:
+def plot_counterfactual_heatmaps(combined_history: List[pd.DataFrame], exp_dict: Dict[str, List]) -> Dict[str, np.ndarray]:
+    data_to_plot = {}
+    axes_labels = []
+    num_keys = len(exp_dict.keys())
+
+    for key in exp_dict.keys():
+        data_to_plot[key] = np.zeros((num_keys, num_keys))
+        axes_labels.append(key.replace('_', ' '))
+                           
+    for history in combined_history:
+        name = history['name'].iloc[0]
+        # Split name
+        mechs= name.split(' ')
+        row = list(exp_dict.keys()).index(mechs[1])
+        col = list(exp_dict.keys()).index(mechs[0])
+        for key in exp_dict.keys():
+            data_to_plot[key][row, col] = history[f'{key} Mean'].loc[history[f'{key} Mean'].last_valid_index()]
+
+    for key, data in data_to_plot.items():
+        fig, ax = plt.subplots()
+        heatmap = sns.heatmap(data, cmap='mako', annot=True, fmt=".1f", cbar=True, ax=ax)
+        
+        ax.set_xticklabels(axes_labels, rotation='vertical', fontsize=8)
+        ax.set_yticklabels(axes_labels, rotation='horizontal', fontsize=8)
+        ax.set_xlabel('Teacher Mechanism')
+        ax.set_ylabel('Student Mechanism')
+        ax.set_title(key)
+        plt.show()
+
+
+def compute_mean_and_variance(run: Run, metric: str):
+    """Compute the mean and variance for a specific metric in a run."""
+    metric_values = run.history[[metric]]
+    mean = metric_values.groupby(metric_values.index)[metric].mean()
+    mean = mean.reset_index().rename(columns={metric: f'{metric} Mean'})
+    var = metric_values.groupby(metric_values.index)[metric].var()
+    var = var.reset_index().rename(columns={metric: f'{metric} Var'})
+    return mean.merge(var, on=metric_values.index)
+
+
+def process_runs(runs: List[Run]):
+    """Compute the mean and variance for all metrics in a group of runs."""
+    metrics = runs[0].history.columns
+    means_and_vars = {metric: compute_mean_and_variance(run, metric) for run in runs for metric in metrics}
+    return reduce(lambda df1, df2: df1.merge(df2, on=df1.index), means_and_vars.values())
+
+
+def get_histories(grouped_runs: Dict[Tuple[str, ...], List[Run]]) -> List[pd.DataFrame]:
+    """Compute the mean and variance for all metrics for each group of runs."""
+    histories = []
+    for key, runs in grouped_runs.items():
+        combined = process_runs(runs)
+        combined['name'] = [' '.join([str(k) for k in key])] * len(combined)
+        histories.append(combined)
+    return histories
+
+
+def get_grouped_runs(runs: List[Run], groupby_metrics: List[str]) -> Dict[Tuple[str, ...], List[Run]]:
     """Given runs list, set key to value of metrics used to group by and values to list of runs satisfyinh these metric values."""
     grouped_runs = defaultdict(list)
     for run in runs:
@@ -230,29 +281,32 @@ def get_grouped_runs(runs: List[Run], groupby_metrics: List) -> Dict[Tuple[str, 
     return grouped_runs
 
 
+def clean_history(history: pd.DataFrame) -> pd.DataFrame:
+    """Remove any NaN datapoints individually due to data logging bug where wandb believes logging data as separate dictionaries is a new timstep at each call."""
+    history_clean = pd.DataFrame()
+    for col in history.columns:
+        if not col.startswith('_'):
+            col_array = history[col].values
+            col_array_clean = col_array[~np.isnan(col_array)]
+            history_clean[col] = pd.Series(col_array_clean)
+    history_clean.reset_index(drop=True, inplace=True)
+    return history_clean
+
+
 def get_order_list(exp_dict: Dict[str, List]):
     """Order of subplots by metric name - used to make grouped plots make sense"""
     const_graph_list = ['T-S Top 1 Fidelity', 'T-S KL', 'T-S Test Difference', 'S Test', 'S Train', 'S Loss']
     dataset_specific_mechs = list(exp_dict.keys())
-    return dataset_specific_mechs + const_graph_list
-    
+    order_list = dataset_specific_mechs + const_graph_list
+    return order_list
+
 
 def wandb_plot(histories: pd.DataFrame, title: str):
     sns.set(style='whitegrid', context='paper', font_scale=1.2)     # Set seaborn styling
     num_groups = len(set([history['name'].iloc[0] for history in histories]))
     palette = sns.color_palette("deep", num_groups)
 
-    # Get the columns that end in '_mean'
-    history = histories[0]
-    print("Column names:", history.columns)
-    print("Number of columns:", len(history.columns))
-    print("Number of rows:", len(history))
-    print("DataFrame shape:", history.shape)
-    print("DataFrame info:")
-    print(history.info())
-    print("DataFrame head:")
-    print(history.head())
-    mean_cols = [col for col in histories[0].columns if col.endswith('_mean')] 
+    mean_cols = [col for col in histories[0].columns if col.endswith(' Mean')] 
     mean_cols.sort(key=custom_sort)
     # Determine the number of rows and columns needed for the subplots
     n_metrics = len(mean_cols)
@@ -278,18 +332,18 @@ def wandb_plot(histories: pd.DataFrame, title: str):
         ax.set_prop_cycle(color=[color_dict[group_name] for group_name in color_dict])
 
     for i, mean_col in enumerate(mean_cols):
-        var_col = mean_col.replace('_mean', '_var')
+        var_col = mean_col.replace(' Mean', ' Var')
         for history in histories:
             group_name = history['name'].iloc[0]
             if mean_col in history.columns and var_col in history.columns:
-                axs[i].plot(history['_step'], history[mean_col], linewidth=1, label=group_name)
-                axs[i].fill_between(history['_step'], 
-                                    history[mean_col] - 2 * history[var_col].apply(np.sqrt),
-                                    history[mean_col] + 2 * history[var_col].apply(np.sqrt),
+                axs[i].plot(history.index, history[mean_col], linewidth=1, label=group_name)
+                axs[i].fill_between(history.index, 
+                                    history[mean_col] - history[var_col].apply(np.sqrt),
+                                    history[mean_col] + history[var_col].apply(np.sqrt),
                                     alpha=0.2)
-        axs[i].set_title(mean_col.replace('_mean', '').capitalize(), fontsize=12)
+        axs[i].set_title(mean_col.replace(' Mean', ''), fontsize=12)
 
-    axs[-1].set_xlabel('Step', fontsize=12)
+    axs[-1].set_xlabel('Training step/100 iterations', fontsize=12)
     lines, labels = axs[0].get_legend_handles_labels()
     fig.legend(lines, labels, loc='lower center', ncol=4)
 
@@ -299,7 +353,7 @@ def wandb_plot(histories: pd.DataFrame, title: str):
 
 
 def custom_sort(col):
-    metric_name = col.replace('_mean', '')
+    metric_name = col.replace(' Mean', '')
     if metric_name in order_list:
         return order_list.index(metric_name)
     else:
@@ -309,4 +363,4 @@ if __name__ == "__main__":
     title = 'Jacobian loss'
     histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], loss_num=1)
     order_list = get_order_list(dominoes_exp_dict)
-    # wandb_plot(histories, title)
+    plot_counterfactual_heatmaps(histories, dominoes_exp_dict)
