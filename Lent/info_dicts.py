@@ -29,11 +29,11 @@ cifar_exp_dict = {"P": [0, 0, False, False, False],
 #====================================================================================================================
 # List elements: mech 1 frac, mech 2 frac, random image, random mech 1, random mech 2
 # If there is only one mechanism, then skip references to mech 2 frac and random mech 2
-exp_dict_all = {"No mechanisms (baseline): M=100%, S1=0%, S2=0%": [0, 0, False, False, False], 
-                  "Teacher one spurious mechanism: M=100%, S1=0%, S2=60%": [0, 0.6, False, False, False], 
-                  "Teacher both spurious mechanisms: M=100%, S1=30%, S2=60%": [0.3, 0.6, False, False, False],
-                  "Student one spurious mechanism: M=100%, S1=60%, S2=0%": [0.6, 0.9, False, False, False],
-                  "Student both spurious mechanisms: M=100%, S1=60%, S2=30%": [0.9, 0.6, False, False, False]
+exp_dict_all = {"No mechanisms (baseline): M=100% S1=0% S2=0%": [0, 0, False, False, False], 
+                  "Teacher one spurious mechanism: M=100% S1=0% S2=60%": [0, 0.6, False, False, False], 
+                  "Teacher both spurious mechanisms: M=100% S1=30% S2=60%": [0.3, 0.6, False, False, False],
+                  "Student one spurious mechanism: M=100% S1=60% S2=0%": [0.6, 0.9, False, False, False],
+                  "Student both spurious mechanisms: M=100% S1=60% S2=30%": [0.9, 0.6, False, False, False]
                   }
 
 ## For debugging
@@ -41,10 +41,19 @@ exp_dict_all = {"No mechanisms (baseline): M=100%, S1=0%, S2=0%": [0, 0, False, 
 
 # Counterfactual evals
 # Experiment number implicit in index of list converted dictionary
-counterfactual_dict_all = {"All mechanisms: M=100%, S1=100%, S2=100%": 
+counterfactual_dict_all = {"All mechanisms: M=100% S1=100% S2=100%": 
                            [1, 1, False, False, False], 
-                           "Only spurious mechanisms: M=100%, S1=randomized, S2=100%": [1, 1, True, False, False], 
-                           "Randomize spurious mechanisms: M=100%, S1=randomized, S2=100%": [1, 1, False, True, False], 
-                           "Randomize spurious mechanisms: M=100%, S1=100%, S2=randomized": [1, 1, False, False, True], 
-                           "Randomize image: M=randomized, S1=100%, S2=100%": [1, 1, True, False, False]
+                           "Only spurious mechanisms: M=0% S1=100% S2=100%": [1, 1, True, False, False], 
+                           "Randomize spurious mechanisms: M=100% S1=randomized S2=100%": [1, 1, False, True, False], 
+                           "Randomize spurious mechanisms: M=100% S1=100% S2=randomized": [1, 1, False, False, True], 
+                           "Randomize image: M=randomized S1=100% S2=100%": [1, 1, True, False, False]
                            }
+
+# Use shortening for legends in plots
+mech_map = {"CIFAR10": "C", 
+            "Box": "B", 
+            "MNIST": "M", 
+            "MNIST_Box": "MB", 
+            "CIFAR10_MNIST": "CM", 
+            "CIFAR10_Box": "CB", 
+            "CIFAR10_MNIST_Box": "CMB"}

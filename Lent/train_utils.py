@@ -22,27 +22,56 @@ ce_loss = nn.CrossEntropyLoss(reduction='mean')
 mse_loss = nn.MSELoss(reduction='mean')
 
 @torch.no_grad()
-def evaluate(model, dataset, batch_size, max_ex=0, title=None):
-    """Evaluate model accuracy on dataset."""
+def evaluate(model: nn.Module, 
+             dataloader: DataLoader, 
+             batch_size: int, 
+             max_ex: int, 
+             title: Optional[str] = None) -> float:
+    """Accuracy for max_ex batches."""
     acc = 0
-    for i, (features, labels) in enumerate(dataset):
+    for i, (features, labels) in enumerate(dataloader):
         labels = labels.to(device)
         features = features.to(device)
-        # Batch size in length, varying from 0 to 1
-        scores = nn.functional.softmax(model(features.to(device)), dim=1)
+        scores = model(features)
         _, pred = torch.max(scores, 1)
-        # Save to pred 
         acc += torch.sum(torch.eq(pred, labels)).item()
         if max_ex != 0 and i >= max_ex:
             break
     if title:
-        plot_images(dataset, num_images=batch_size, title=title)
-    # Return average accuracy as a percentage
-    # Fraction of data points correctly classified
+        plot_images(dataloader, num_images=batch_size, title=title)
+    # Avg acc - frac data points correctly classified
     return (acc*100 / ((i+1)*batch_size))
 
 
-def weight_reset(model):
+@torch.no_grad()
+def counterfactual_evaluate(teacher: nn.Module, 
+                     student: nn.Module, 
+                     dataloader: DataLoader, 
+                     batch_size: int, 
+                     max_ex: int, 
+                     title: Optional[str] = None) -> float:
+    """Student test accuracy, T-S KL and T-S top-1 accuracy for max_ex batches."""
+    acc = 0
+    KL = 0
+    top_1 = 0
+    for i, (features, labels) in enumerate(dataloader):
+        if max_ex != 0 and i > max_ex:
+            break
+        labels, features = labels.to(device), features.to(device)
+        targets, scores = teacher(features), student(features)
+        s_pred, t_pred = torch.argmax(scores, 1), torch.argmax(targets, 1)
+        acc += torch.sum(torch.eq(s_pred, labels)).item() # Total accurate samples in batch
+        KL += kl_loss(F.log_softmax(scores, dim=1), F.softmax(targets, dim=1)) # Batchwise mean KL
+        top_1 += torch.eq(s_pred, t_pred).float().mean() # Batchwise mean top-1 accuracy
+    if title:
+        plot_images(dataloader, num_images=batch_size, title=title)
+    avg_acc = acc*100/(i*batch_size)
+    avg_KL = KL/i
+    avg_top_1 = top_1/i
+    return avg_acc, avg_KL, avg_top_1
+
+
+def weight_reset(model: nn.Module):
     """Reset weights of model at start of training."""
     for module in model.modules():
         if hasattr(module, 'reset_parameters'):
@@ -52,8 +81,14 @@ def weight_reset(model):
             nn.init.kaiming_normal_(module.weight, mode="fan_out", nonlinearity="relu")
 
 
-def train_teacher(model, train_loader, test_loader, lr, final_lr, epochs, project, base_path):
-    """Fine tune a pre-trained teacher model for specific downstream task, or train from scratch."""
+def train_teacher(model: nn.Module, 
+                  train_loader: DataLoader, 
+                  test_loader: DataLoader, 
+                  lr: float, 
+                  final_lr: float, 
+                  epochs: int, 
+                  project: str, 
+                  base_path: str) -> None:
     optimizer = optim.SGD(model.parameters(), lr=lr)
     it = 0
     scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
@@ -125,10 +160,11 @@ def train_distill(
     epochs: int, 
     loss_num: int, 
     run_name: str, 
-    alpha: float = None, 
-    tau: float = None, 
-    s_layer: float = None, 
-    t_layer: float = None
+    alpha: Optional[float] = None, 
+    tau: Optional[float] = None, 
+    s_layer: Optional[float] = None, 
+    t_layer: Optional[float] = None,
+    N_eval_batches: Optional[int] = 4,
     ) -> None:
     """
     Args:
@@ -139,28 +175,27 @@ def train_distill(
         loss_num: index of loss dictionary (in info_dicts.py) describing which loss fn to use
         base_dataset: tells us which dataset out of CIFAR10, CIFAR100, Dominoes and Shapes to use
     """
+    teacher.eval()
+    student.train()
+    # weight_reset(student)
+
     optimizer = optim.SGD(student.parameters(), lr=lr)
     scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
     it = 0
+
     output_dim = len(train_loader.dataset.classes)
-    # weight_reset(student)
     sample = next(iter(train_loader))
     batch_size, c, w, h = sample[0].shape
     input_dim = c*w*h
-    teacher_test_acc = evaluate(teacher, test_loader, batch_size)
-    teacher.eval()
 
     dataloaders = get_counterfactual_dataloaders(base_dataset, batch_size)
 
     for epoch in range(epochs):
         for inputs, labels in tqdm(train_loader):
-            inputs = inputs.to(device)
+            inputs, labels = inputs.to(device), labels.to(device)
             inputs.requires_grad = True
-            labels = labels.to(device)
-            scores = student(inputs)
-            targets = teacher(inputs) 
-            student_preds = scores.argmax(dim=1)
-            teacher_preds = targets.argmax(dim=1)
+            scores, targets = student(inputs), teacher(inputs) 
+            student_preds, teacher_preds = scores.argmax(dim=1), targets.argmax(dim=1)
 
             # for param in student.parameters():
             #     assert param.requires_grad
@@ -192,34 +227,32 @@ def train_distill(
 
             # if it == 0: check_grads(student)
             if it % 100 == 0:
-                batch_size = inputs.shape[0]
-                train_acc = evaluate(student, train_loader, batch_size, max_ex=100)
-                test_acc = evaluate(student, test_loader, batch_size)
+                train_acc = evaluate(student, train_loader, batch_size, max_ex=5)
+                test_acc, test_KL, test_top1 = counterfactual_evaluate(teacher, student, test_loader, batch_size, max_ex=N_eval_batches, title=None)
+                # Dictionary holds counterfactual acc, KL and top 1 fidelity for each dataset
+                cf_evals = defaultdict(float)
                 for name in dataloaders:
                     title = 'Dominoes_'+name
                     # Currently not plotting datasets
-                    wandb.log({name: evaluate(student, dataloaders[name], batch_size, title=None)})
-                error = teacher_test_acc - test_acc
-                KL_diff = kl_loss(F.log_softmax(scores, dim=1), F.softmax(targets, dim=1))
-                top1_diff = torch.eq(student_preds, teacher_preds).float().mean()
+                    cf_evals[name], cf_evals[name+" T-S KL"], cf_evals[name+" T-S Top 1 Fidelity"] = counterfactual_evaluate(teacher, student, dataloaders[name], batch_size, max_ex=N_eval_batches, title=None)
                 print('Iteration: %i, %.2f%%' % (it, test_acc), "Epoch: ", epoch, "Loss: ", train_loss)
                 print("Project {}, LR {}, temp {}".format(run_name, lr, temp))
-                wandb.log({
-                    "T-S KL": KL_diff, 
-                    "T-S Top 1 Fidelity": top1_diff, 
+                results = {**cf_evals, **{
+                    "T-S KL": test_KL, 
+                    "T-S Top 1 Fidelity": test_top1, 
                     "S Train": train_acc, 
                     "S Test": test_acc, 
-                    "T-S Test Difference": error, 
                     "S Loss": train_loss, 
-                    "S LR": lr, }
-                    )
+                    "S LR": lr, } 
+                }
+                wandb.log(results)
             it += 1
-        # Visualise 3d at end of each epoch
-        if loss_num == 2:
-            visualise_features_3d(s_map, t_map, title=run_name+"_"+str(it))
+        ## Visualise 3d at end of each epoch
+        # if loss_num == 2:
+        #     visualise_features_3d(s_map, t_map, title=run_name+"_"+str(it))
 
 
-def check_grads(model):
+def check_grads(model: nn.Module):
     for param in model.parameters():
         assert param.grad is not None
 
@@ -228,11 +261,15 @@ def get_counterfactual_dataloaders(base_dataset: str, batch_size: int) -> dict[s
     """Get dataloaders for counterfactual evaluation. Key of dictionary tells us which settings for counterfactual evals are used."""
     dataloaders = {}
     for i, key in enumerate(counterfactual_dict_all):
-        dataloaders[key], _ = create_dataloader(base_dataset=base_dataset, EXP_NUM=i, batch_size=batch_size, counterfactual=True)
+        # Only get test set
+        _, dataloaders[key] = create_dataloader(base_dataset=base_dataset, EXP_NUM=i, batch_size=batch_size, counterfactual=True)
     return dataloaders
 
 
-def create_dataloader(base_dataset: Dataset, EXP_NUM: int, batch_size: int = 64, counterfactual: bool = False) -> Tuple[DataLoader, DataLoader]:
+def create_dataloader(base_dataset: Dataset, 
+                      EXP_NUM: int, 
+                      batch_size: int = 64, 
+                      counterfactual: bool = False) -> Tuple[DataLoader, DataLoader]:
     """Set train and test loaders based on dataset and experiment.
     Used only for training and testing, not counterfactual evals.
     For generating dominoes: box is cue 1, MNIST is cue 2.
@@ -260,10 +297,3 @@ def create_dataloader(base_dataset: Dataset, EXP_NUM: int, batch_size: int = 64,
         test_loader = dataloader_3D_shapes('test', batch_size=batch_size, randomise=randomize_img, floor_frac=mech_1_frac, scale_frac=mech_2_frac)
  
     return train_loader, test_loader
-
-
-if __name__ == "__main__":
-    scores = torch.randn(10, 10)
-    targets = torch.randn(10, 10)
-    loss = base_distill_loss(scores, targets, 1)
-    print(loss)

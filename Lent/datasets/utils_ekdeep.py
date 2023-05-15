@@ -307,8 +307,9 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
     Datasets default download=False. Set download=True to download for first time.
     It does not matter what you set cue_type to if base_dataset is 'Dominoes' - the proportion of cues/presence is controlled by 'cue_proportions'.
     E.g. if you want plain dominoes (CIFAR only predictive of label), use box_frac=0, mnist_frac=0.
+    Shuffle automatically set to true for test and train.
     """
-    ## I GOT RID OF THIS FOR NOW, so 'Dominoes' BASE DATASET AUTOMATICALLY MEANS CUED DOMINOES: CAN ADD BACK LATER
+    ## 'Dominoes' base dataset automatically means cued dominoes for now
     # if base_dataset == 'Dominoes':
     #     base_dataset = 'CIFAR10'
     #     cue_proportion = 0.0 if cue_type == 'nocue' else cue_proportion
@@ -321,7 +322,7 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
     # define base dataset (pick train or test)
     dset_type = getattr(torchvision.datasets, base_dataset)
     dset = dset_type(root=f'{data_dir}/{base_dataset.lower()}/', 
-                     train=(load_type == 'train'), download=False, transform=get_transform('nocue'))
+                     train=(load_type =='train'), download=False, transform=get_transform('nocue'))
 
     # pick cue
     if (cue_type == 'nocue'):
@@ -343,7 +344,7 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
         dset = torch.utils.data.Subset(dset, subset_ids)
 
     # define dataloader
-    dataloader = DataLoader(dset, batch_size=batch_size, shuffle=(load_type=='train'), drop_last=True)
+    dataloader = DataLoader(dset, batch_size=batch_size, shuffle=True, drop_last=True)
     return dataloader
 
 

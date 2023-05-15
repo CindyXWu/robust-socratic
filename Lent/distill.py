@@ -176,7 +176,8 @@ match TEACH_NUM:
         t_layer = {"11.path2.5": "final_features"} # Contrastive feature layer
 
 # Names for wandb logging
-project = "Distill "+teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]+"_"+base_dataset
+# project = "Distill "+teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]+"_"+base_dataset
+project = "Test"
 run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S mech '+s_short_exp_name+', T mech '+t_short_exp_name+', Loss: '+loss_dict[LOSS_NUM]
 print('project:', project)
 
