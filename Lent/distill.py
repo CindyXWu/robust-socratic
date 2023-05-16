@@ -141,12 +141,10 @@ match LOSS_NUM:
         alpha, lr, final_lr = 1, 0.3, 0.03
     case 1:
         alpha, lr, final_lr = 0.5, 0.3, 0.03
-        epochs = 20
     case 2:
         # Adjust for relative size of contrastive loss to distillation loss
         # E.g. 0.03 for contrastive ~60, distillation ~1
         alpha, lr, final_lr = 0.01, 0.3, 0.03
-        epochs = 20
 
 # Student model setup (change only if adding to dicts above)
 match STUDENT_NUM:

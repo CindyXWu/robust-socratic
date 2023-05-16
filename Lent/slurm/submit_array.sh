@@ -1,6 +1,6 @@
 #!/bin/bash
 
-config_file="configs/Dominoes_s.yml"
+config_file="Dominoes_s.yml"
 rel_config_file="../${config_file}"
 num_configs=$(python -c "import yaml; print(len(yaml.safe_load(open('$rel_config_file'))))")
 
