@@ -86,13 +86,13 @@ def sweep():
 #================================================================================================
 is_sweep = args.sweep
 T_EXP_NUM = 0
-S_EXP_NUM = 0
+S_EXP_NUM = 3
 STUDENT_NUM = 1
 TEACH_NUM = 1
 LOSS_NUM = 1
 AUG_NUM = 0
 DATASET_NUM = 1
-exp_dict = dominoes_exp_dict
+exp_dict = exp_dict_all
 
 if args.config_name:
     T_EXP_NUM = config['t_exp_num']
@@ -102,8 +102,8 @@ if args.config_name:
     S_EXP_NUM = config['s_exp_num']
     DATASET_NUM = config['dataset_num']
 base_dataset = dataset_dict[DATASET_NUM]
-s_exp_name = list(exp_dict.keys())[S_EXP_NUM]
-t_exp_name = list(exp_dict.keys())[T_EXP_NUM]
+s_exp_name = list(exp_dict_all.keys())[S_EXP_NUM]
+t_exp_name = list(exp_dict_all.keys())[T_EXP_NUM]
 # "Allow only spurious mechanisms: M=100%, S1=randomized, S2=100%" ->
 # M=100%, S1=randomized, S2=100%
 s_short_exp_name = s_exp_name.split(":")[-1].strip()
@@ -176,8 +176,7 @@ match TEACH_NUM:
         t_layer = {"11.path2.5": "final_features"} # Contrastive feature layer
 
 # Names for wandb logging
-# project = "Distill "+teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]+"_"+base_dataset
-project = "Test"
+project = "Distill "+teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]+"_"+base_dataset
 run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S mech '+s_short_exp_name+', T mech '+t_short_exp_name+', Loss: '+loss_dict[LOSS_NUM]
 print('project:', project)
 

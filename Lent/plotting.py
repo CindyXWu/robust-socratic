@@ -335,7 +335,7 @@ def custom_sort(col: str, type: str) -> int:
         return len(order_list) + 1
 
 
-def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str) -> None:
+def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: str) -> None:
     sns.set(style='whitegrid', context='paper', font_scale=1)
     num_groups = len(set([history['Group Name'].iloc[0] for history in histories]))
 
@@ -384,7 +384,13 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str) -> Non
                                     alpha=0.2)
         axs[i].set_ylim(0, 100)
         axs[i].set_title(mean_col.replace(' Mean', '').replace('_', ' '), fontsize=18)
-        axs[i].set_ylabel('Test Accuracy', fontsize=15)  # Add your desired y-axis label here
+        match mode:
+            case 'acc':
+                axs[i].set_ylabel('Test accuracy/percent', fontsize=15)
+            case 'kl':
+                axs[i].set_ylabel('KL divergence', fontsize=15)
+            case 'fidelity':
+                axs[i].set_ylabel('Top-1 fidelity/percent', fontsize=15)
         labelLines(axs[i].get_lines(), align=False, fontsize=11)
         axs[i].set_xlabel('Training step/100 iterations', fontsize=15)
     lines, labels = axs[0].get_legend_handles_labels()

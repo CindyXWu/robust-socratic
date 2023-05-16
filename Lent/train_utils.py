@@ -142,7 +142,7 @@ def train_teacher(model: nn.Module,
             save_path)
 
 
-def base_distill_loss(scores, targets, temp):
+def base_distill_loss(scores: torch.Tensor, targets: torch.Tensor, temp: float) -> torch.Tensor:
     scores = F.log_softmax(scores/temp)
     targets = F.softmax(targets/temp)
     return kl_loss(scores, targets)

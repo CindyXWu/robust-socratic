@@ -29,11 +29,11 @@ cifar_exp_dict = {"P": [0, 0, False, False, False],
 #====================================================================================================================
 # List elements: mech 1 frac, mech 2 frac, random image, random mech 1, random mech 2
 # If there is only one mechanism, then skip references to mech 2 frac and random mech 2
-exp_dict_all = {"No mechanisms (baseline): M=100%, S1=0%, S2=0%": [0, 0, False, False, False], 
-                  "Teacher one spurious mechanism: M=100%, S1=0%, S2=60%": [0, 0.6, False, False, False], 
-                  "Teacher both spurious mechanisms: M=100%, S1=30%, S2=60%": [0.3, 0.6, False, False, False],
-                  "Student one spurious mechanism: M=100%, S1=60%, S2=0%": [0.6, 0.9, False, False, False],
-                  "Student both spurious mechanisms: M=100%, S1=60%, S2=30%": [0.9, 0.6, False, False, False]
+exp_dict_all = {"No mechanisms (baseline): M=100% S1=0% S2=0%": [0, 0, False, False, False], 
+                  "Teacher one spurious mechanism: M=100% S1=0% S2=60%": [0, 0.6, False, False, False], 
+                  "Teacher both spurious mechanisms: M=100% S1=30% S2=60%": [0.3, 0.6, False, False, False],
+                  "Student one spurious mechanism: M=100% S1=60% S2=0%": [0.6, 0.9, False, False, False],
+                  "Student both spurious mechanisms: M=100% S1=60% S2=30%": [0.9, 0.6, False, False, False]
                   }
 
 ## For debugging
