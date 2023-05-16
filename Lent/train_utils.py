@@ -55,7 +55,7 @@ def counterfactual_evaluate(teacher: nn.Module,
     KL = 0
     top_1 = 0
     for i, (features, labels) in enumerate(dataloader):
-        if max_ex != 0 and i > max_ex:
+        if max_ex != 0 and i >= max_ex:
             break
         labels, features = labels.to(device), features.to(device)
         targets, scores = teacher(features), student(features)
@@ -67,7 +67,7 @@ def counterfactual_evaluate(teacher: nn.Module,
         plot_images(dataloader, num_images=batch_size, title=title)
     avg_acc = acc*100/(i*batch_size)
     avg_KL = KL/i
-    avg_top_1 = top_1/i
+    avg_top_1 = top_1*100/i
     return avg_acc, avg_KL, avg_top_1
 
 
@@ -195,7 +195,6 @@ def train_distill(
             inputs, labels = inputs.to(device), labels.to(device)
             inputs.requires_grad = True
             scores, targets = student(inputs), teacher(inputs) 
-            student_preds, teacher_preds = scores.argmax(dim=1), targets.argmax(dim=1)
 
             # for param in student.parameters():
             #     assert param.requires_grad

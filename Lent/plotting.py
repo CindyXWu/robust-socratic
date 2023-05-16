@@ -8,11 +8,13 @@ import multiprocessing as mp
 from functools import reduce
 import warnings
 from torch.utils.data import DataLoader
+from labellines import labelLines
 from typing import List, Optional, Dict, Tuple
 
 from info_dicts import *
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from scipy.signal import savgol_filter
 import seaborn as sns
 from torchvision.utils import make_grid
 import wandb
@@ -27,7 +29,10 @@ if not os.path.exists(image_dir):
     os.makedirs(image_dir)
 
 api = wandb.Api(overrides=None, timeout=None, api_key =None)
-
+# Set the style and color palette
+sns.set_style("whitegrid")
+sns.set_palette("pastel")
+plt.rcParams['figure.facecolor'] = '#C7D9FF'
 
 def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
     fig = plt.figure(figsize=(8, 4), dpi=100)
@@ -157,16 +162,16 @@ def wandb_get_data(project_name: str,
                    s_num: int, 
                    exp_dict: dict[str, List],
                    groupby_metrics: List[str],
-                   s_exp_num: Optional[int] = None,
-                   t_exp_num: Optional[int] = None,
+                   s_mech: Optional[int] = None,
+                   t_mech: Optional[int] = None,
                    loss_num: Optional[int] = None) -> List[pd.DataFrame]:
     """Get data from wandb for experiment set, filter and group. 
     Calculate mean/var of metrics and return historical information with mean/var interleaved."""
     runs = api.runs(project_name) 
     teacher = teacher_dict[t_num]
     student = student_dict[s_num]
-    t_mech = list(exp_dict.keys())[t_exp_num] if t_exp_num else None
-    s_mech = list(exp_dict.keys())[s_exp_num] if s_exp_num else None
+    t_mech = list(exp_dict.keys())[t_mech] if t_mech else None
+    s_mech = list(exp_dict.keys())[s_mech] if s_mech else None
     loss = loss_dict[loss_num]
     filtered_runs = []
 
@@ -174,13 +179,15 @@ def wandb_get_data(project_name: str,
     for run in runs:
         if (run.config.get('teacher') == teacher and 
             run.config.get('student') == student and
-            run.config.get('teacher_mech') == t_mech and
+            run.config.get('teacher_mechanism') == t_mech and
             run.config.get('loss') == loss):
             history = run.history()
             if '_step' in history.columns and history['_step'].max() >= 100:
                 filtered_runs.append(run)
                 # Clean history of NaNs
-                run.history = clean_history(history)
+                history = clean_history(history)
+                # Filter history
+                run.history = smooth_history(history)
 
     assert(len(filtered_runs) > 0), "No runs found with the given settings"
     grouped_runs = get_grouped_runs(filtered_runs, groupby_metrics)
@@ -210,7 +217,7 @@ def wandb_get_data(project_name: str,
 
         # Name each row of the dataframe with the values of the grouped metrics
         # **Use shortened names for mechs**
-        combined['Group Name'] = [('T ' + mech_map[key[0]] + ', S ' + mech_map[key[1]])] * len(combined)
+        combined['Group Name'] = [('S: ' + mech_map[key[ 1]])] * len(combined)
         histories.append(combined)
 
     # histories = get_histories(grouped_runs)
@@ -296,6 +303,14 @@ def clean_history(history: pd.DataFrame) -> pd.DataFrame:
     return history_clean
 
 
+def smooth_history(history: pd.DataFrame, window_length: Optional[int]=5, polyorder: Optional[int] = 3) -> pd.DataFrame:
+    nan_mask = history.isna()
+    # Smooth each column in the DataFrame, interpolating for NaNs
+    filtered_history = history.interpolate().apply(lambda x: savgol_filter(x, window_length, polyorder, mode='mirror'))
+    filtered_history[nan_mask] = np.nan # Apply the NaN mask to the filtered history
+    return filtered_history
+
+
 def get_order_list(exp_dict: Dict[str, List]) -> Tuple[List, List]:
     """Order of subplots by metric name - used to make grouped plots make sense"""
     const_graph_list = ['T-S Top 1 Fidelity', 'T-S KL', 'T-S Test Difference']
@@ -318,56 +333,64 @@ def custom_sort(col: str, type: str) -> int:
         return order_list.index(metric_name)
     else:
         return len(order_list) + 1
-    
+
 
 def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str) -> None:
-    sns.set(style='whitegrid', context='paper', font_scale=1.2)     # Set seaborn styling
+    sns.set(style='whitegrid', context='paper', font_scale=1)
     num_groups = len(set([history['Group Name'].iloc[0] for history in histories]))
-    palette = sns.color_palette("deep", num_groups)
 
-    # Determine the number of rows and columns needed for the subplots
+    # Determine rows and columns for subplots
     n_metrics = len(cols)
     n_cols = min(3, len(cols))
     n_rows = np.ceil(n_metrics / n_cols).astype(int)
-    plot_width, plot_height = 10, 3 * n_rows
+    plot_width, plot_height = 20, 5* n_rows
 
-    # Create a grid of subplots
-    fig, axs = plt.subplots(n_rows, n_cols, figsize=(plot_width, plot_height), sharex=True)
-    axs = axs.flatten() # Flatten the array of subplots    # Flatten the axs array so that we can iterate over it with a single loop
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(plot_width, plot_height), sharey=True)
+    axs = axs.flatten() # Flatten the axs array so that we can iterate over it with a single loop
     # Remove any unused subplots
     if n_metrics < n_rows * n_cols:
         for i in range(n_metrics, n_rows * n_cols):
             fig.delaxes(axs[i])
 
-    # Set a consistent color cycle for all subplots
+    # Colour and line style stuff
+    colors = mpl.cm.get_cmap('cool', num_groups+1) # +1 as we ditch yellow
     color_dict = {}
-    color_cycle = iter(palette)
-    for history in histories:
+    for i, history in enumerate(histories):
         group_name = history['Group Name'].iloc[0]
+        color = colors(i)
+        if color[0] > 0.8 and color[1] > 0.8 and color[2] < 0.2:  # Check if i exceeds the maximum index of colors
+            continue
         if group_name not in color_dict:
-            color_dict[group_name] = next(color_cycle)
+            color_dict[group_name] = colors(i)  # Use the next color in the colormap
+    line_styles = ['-', '--', '-.', ':']
+
     for ax in axs:
         ax.set_prop_cycle(color=[color_dict[group_name] for group_name in color_dict])
 
     for i, mean_col in enumerate(cols):
         var_col = mean_col.replace(' Mean', ' Var')
-        for history in histories:
+        for line_num, history in enumerate(histories):
             group_name = history['Group Name'].iloc[0]
             if mean_col in history.columns and var_col in history.columns:
-                axs[i].plot(history.index, history[mean_col], linewidth=1, label=group_name)
+                line = axs[i].plot(history.index, 
+                                   history[mean_col], 
+                                   linewidth=3, 
+                                   label=group_name, 
+                                   color=color_dict[group_name], 
+                                   linestyle=line_styles[line_num%len(line_styles)])
                 axs[i].fill_between(history.index, 
                                     history[mean_col] - history[var_col].apply(np.sqrt),
                                     history[mean_col] + history[var_col].apply(np.sqrt),
                                     alpha=0.2)
-        axs[i].set_title(mean_col.replace(' Mean', '').replace('_', ' '), fontsize=12)
-
-    axs[-1].set_xlabel('Training step/100 iterations', fontsize=12)
-    plt.subplots_adjust(top=0.90)
+        axs[i].set_ylim(0, 100)
+        axs[i].set_title(mean_col.replace(' Mean', '').replace('_', ' '), fontsize=18)
+        axs[i].set_ylabel('Test Accuracy', fontsize=15)  # Add your desired y-axis label here
+        labelLines(axs[i].get_lines(), align=False, fontsize=11)
+        axs[i].set_xlabel('Training step/100 iterations', fontsize=15)
     lines, labels = axs[0].get_legend_handles_labels()
-    fig.legend(lines, labels, loc='lower center', ncol=4)
-
-    fig.suptitle(title, fontsize=15)
-    plt.tight_layout()
+    fig.legend(lines, labels, loc='lower center', ncol=num_groups, fontsize=18, bbox_to_anchor=(0.5, -0.02))
+    # fig.suptitle(title, fontsize=20)
+    plt.tight_layout(pad=5)
     plt.savefig('images/vstime/'+title+'.png', dpi=300, bbox_inches='tight')
 
 
@@ -391,13 +414,13 @@ def wandb_plot(histories: List[pd.DataFrame], title: str) -> None:
     mean_cols.sort(key=lambda col: custom_sort(col, 'acc'))
     make_plot(histories, mean_cols, title)
 
-
+plot_names = ['M S1 S2', 'S1 S2', 'Rand S1', 'Rand S2', 'Rand M']
 if __name__ == "__main__":
     title = 'Jacobian Loss'
     loss_num = 1
     exp_dict = dominoes_exp_dict
     loss = loss_dict[loss_num]
     # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-    histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=3, loss_num=loss_num)
+    histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=2, loss_num=loss_num)
     wandb_plot(histories, title)
     # plot_counterfactual_heatmaps(histories, dominoes_exp_dict, loss_num)
