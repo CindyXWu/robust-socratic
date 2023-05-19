@@ -114,8 +114,8 @@ def train_teacher(model: nn.Module,
             
             if it % 100 == 0:
                 batch_size = inputs.shape[0]
-                train_acc.append(evaluate(model, train_loader, batch_size, max_ex=100))
-                test_acc.append(evaluate(model, test_loader, batch_size))
+                train_acc.append(evaluate(model, train_loader, batch_size, max_ex=10))
+                test_acc.append(evaluate(model, test_loader, batch_size, max_ex=10))
                 print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch)
                 print("Project {}, LR {}".format(project, lr))
                 wandb.log({"Test Accuracy": test_acc[-1], "Loss": train_loss[-1], "LR": lr})
@@ -164,7 +164,7 @@ def train_distill(
     tau: Optional[float] = None, 
     s_layer: Optional[float] = None, 
     t_layer: Optional[float] = None,
-    N_eval_batches: Optional[int] = 4,
+    N_eval_batches: Optional[int] = 10,
     ) -> None:
     """
     Args:
@@ -226,7 +226,7 @@ def train_distill(
 
             # if it == 0: check_grads(student)
             if it % 100 == 0:
-                train_acc = evaluate(student, train_loader, batch_size, max_ex=5)
+                train_acc = evaluate(student, train_loader, batch_size, max_ex=10)
                 test_acc, test_KL, test_top1 = counterfactual_evaluate(teacher, student, test_loader, batch_size, max_ex=N_eval_batches, title=None)
                 # Dictionary holds counterfactual acc, KL and top 1 fidelity for each dataset
                 cf_evals = defaultdict(float)
