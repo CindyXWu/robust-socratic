@@ -276,10 +276,10 @@ def create_dataloader(base_dataset: Dataset,
     """
     if counterfactual:
         key = list(counterfactual_dict_all.keys())[EXP_NUM]
-        mech_1_frac, mech_2_frac, randomize_mech_1, randomize_mech_2, randomize_img = counterfactual_dict_all[key]
+        mech_1_frac, mech_2_frac, randomize_img, randomize_mech_1, randomize_mech_2 = counterfactual_dict_all[key]
     else:
         key = list(exp_dict_all.keys())[EXP_NUM]
-        mech_1_frac, mech_2_frac, randomize_mech_1, randomize_mech_2, randomize_img = exp_dict_all[key]
+        mech_1_frac, mech_2_frac, randomize_img, randomize_mech_1, randomize_mech_2 = exp_dict_all[key]
 
     if base_dataset in ["CIFAR10", "CIFAR100"]:
         cue_type='box' if mech_1_frac != 0 else 'nocue'

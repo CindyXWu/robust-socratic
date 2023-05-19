@@ -14,11 +14,12 @@ shapes_exp_dict = {0: "Shape_Color",
                    4: "Shape_Color_Floor", 
                    5: "Shape_Color_Scale", 
                    6: "Shape_Color_Floor_Scale"}
+# List elements: mech 1 frac, mech 2 frac, random image, random mech 1, random mech 2
 dominoes_exp_dict = {"CIFAR10": [0, 0, False, False, False], 
                      "Box": [1, 0, True, False, False], 
                      "MNIST": [0, 1, True, False, False], 
                      "MNIST_Box": [1, 1, True, False, False], 
-                     "CIFAR10_MNIST": [0, 0, False, False, False],
+                     "CIFAR10_MNIST": [0, 1, False, False, False],
                      "CIFAR10_Box": [1, 0, False, False, False], 
                      "CIFAR10_MNIST_Box": [1, 1, False, False, False]}
 # For single mechanism the second element is ignored so all values are just placeholders
@@ -57,3 +58,12 @@ mech_map = {"CIFAR10": "C",
             "CIFAR10_MNIST": "CM", 
             "CIFAR10_Box": "CB", 
             "CIFAR10_MNIST_Box": "CMB"}
+
+new_mech_map = {"M=100% S1=0% S2=0%": "100 0 0", 
+                  "M=100% S1=0% S2=60%": "100 0 60", 
+                  "M=100% S1=30% S2=60%": "100 30 60",
+                  "M=100% S1=60% S2=0%": "100 60 0",
+                  "M=100% S1=60% S2=30%": "100 60 30"
+                  }
+
+new_mech_list = ["100 0 0", "100 0 60", "100 30 60", "100 60 0", "100 60 30"]
