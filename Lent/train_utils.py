@@ -276,20 +276,21 @@ def create_dataloader(base_dataset: Dataset,
     """
     if counterfactual:
         key = list(counterfactual_dict_all.keys())[EXP_NUM]
-        mech_1_frac, mech_2_frac, randomize_img, randomize_mech_1, randomize_mech_2 = counterfactual_dict_all[key]
+        image_frac, mech_1_frac, mech_2_frac, randomize_img, randomize_mech_1, randomize_mech_2 = counterfactual_dict_all[key]
     else:
         key = list(exp_dict_all.keys())[EXP_NUM]
-        mech_1_frac, mech_2_frac, randomize_img, randomize_mech_1, randomize_mech_2 = exp_dict_all[key]
+        image_frac, mech_1_frac, mech_2_frac, randomize_img, randomize_mech_1, randomize_mech_2 = exp_dict_all[key]
 
     if base_dataset in ["CIFAR10", "CIFAR100"]:
+        # Image frac isn't relevant - always 100 so don't pass in
         cue_type='box' if mech_1_frac != 0 else 'nocue'
         train_loader = get_box_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=mech_1_frac, randomize_cue=randomize_mech_1, randomize_img = randomize_img, batch_size=batch_size)
         test_loader = get_box_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=mech_1_frac, randomize_cue=randomize_mech_1, randomize_img = randomize_img, batch_size=batch_size)
 
     elif base_dataset == "Dominoes":
-        randomize_cues = [randomize_mech_1, randomize_mech_2]
-        train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, box_frac=mech_1_frac, mnist_frac=mech_2_frac, randomize_cues=randomize_cues)
-        test_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, box_frac=mech_1_frac, mnist_frac=mech_2_frac, randomize_cues=randomize_cues)
+        # BOX: MECH 1, MNIST: MECH 2
+        train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, box_frac=mech_1_frac, mnist_frac=mech_2_frac, image_frac=image_frac, randomize_box=randomize_mech_1, randomize_mnist=randomize_mech_2)
+        test_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, box_frac=mech_1_frac, mnist_frac=mech_2_frac, image_frac=image_frac, randomize_box=randomize_mech_1, randomize_mnist=randomize_mech_2)
 
     elif base_dataset == 'Shapes':
         train_loader = dataloader_3D_shapes('train', batch_size=batch_size, randomise=randomize_img, floor_frac=mech_1_frac, scale_frac=mech_2_frac)

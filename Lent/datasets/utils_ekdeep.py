@@ -141,9 +141,17 @@ class domDataset(Dataset):
 
 # Dominoes dataset
 class domCueDataset(Dataset):
-    def __init__(self, dataset, dataset_simple, box_frac, mnist_frac, randomize_cues=[False, False], randomize_img=False):
-
-        # setup dataset
+    """Dataset for Dominoes with cues.
+    Important: when passing in vars, box always comes first, then MNIST, then image.
+    """
+    def __init__(self, dataset, 
+                 dataset_simple, 
+                 box_frac, 
+                 mnist_frac, 
+                 image_frac=1.0, 
+                 randomize_box=False,
+                 randomize_mnist=False, 
+                 randomize_img=False):
         self.dataset = dataset
         self.classes = dataset.classes
         self.dataset_simple = dataset_simple
@@ -151,22 +159,27 @@ class domCueDataset(Dataset):
         self.targets = np.array(dataset.targets)
 
         # cue information
-        self.mnist_frac, self.box_frac, self.randomize_mnist, self.randomize_box, self.randomize_img = mnist_frac, box_frac, randomize_cues[0], randomize_cues[1], randomize_img
+        self.mnist_frac, self.box_frac, self.image_frac, self.randomize_box, self.randomize_box, self.randomize_img = mnist_frac, box_frac, image_frac, randomize_box, randomize_mnist, randomize_img
         self.mnist_cue_ids = get_cue_ids(targets=self.targets, n_classes=self.n_classes, prob=self.mnist_frac)
         self.box_cue_ids = get_cue_ids(targets=self.targets, n_classes=self.n_classes, prob=self.box_frac)
 
         # association IDs
         self.association_ids = get_dominoes_associations(targets_c10=self.targets, targets_fmnist=np.array(dataset_simple.targets))
 
-    # dataset length
     def __len__(self):
         return len(self.dataset)
 
-    # retrieve next sample
     def __getitem__(self, item):
         image, label = self.dataset[item]
         associated_id = self.association_ids[label][item]
-        image = self.dataset[np.random.randint(0, len(self.dataset))][0] if self.randomize_img else image
+
+        if self.randomize_img:
+            image = self.dataset[np.random.randint(0, len(self.dataset))][0]
+        elif self.image_frac < 1 and np.random.uniform() > self.image_frac:
+            # If image_frac < 1, then we randomly drop the image with probability 1 - image_frac
+            image = torch.zeros_like(image)
+        else:
+            image = image
 
         if self.mnist_frac > 0:
             put_mnist = (np.random.uniform() < self.mnist_frac) if self.mnist_cue_ids is None else self.mnist_cue_ids[label][item]
@@ -296,7 +309,7 @@ def get_transform(tform_type='nocue'):
 
 ### Dataloaders
 def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocue', cue_proportion=1.0, randomize_cue=False, 
-                    randomize_img=False, batch_size=64, data_dir='data', subset_ids=None, box_frac=1.0, mnist_frac=1.0, randomize_cues=[False, False]):
+                    randomize_img=False, batch_size=64, data_dir='data', subset_ids=None, box_frac=1.0, mnist_frac=1.0, image_frac=1.0, randomize_box=False, randomize_mnist=False):
     """Args:
         load_type: 'train' or 'test'
         base_dataset: 'CIFAR10', 'CIFAR100'
@@ -338,7 +351,7 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
         dset_type = getattr(torchvision.datasets, 'FashionMNIST')
         dset_simple = dset_type(root=f'{data_dir}/FashionMNIST/', 
                         train=(load_type == 'train'), download=False, transform=get_transform('dominoes'))
-        dset = domCueDataset(dset, dset_simple, box_frac, mnist_frac, randomize_cues=randomize_cues, randomize_img=randomize_img)
+        dset = domCueDataset(dset, dset_simple, box_frac=box_frac, mnist_frac=mnist_frac, image_frac=image_frac, randomize_box=randomize_box, randomize_mnist=randomize_mnist, randomize_img=randomize_img)
 
     if isinstance(subset_ids, np.ndarray):
         dset = torch.utils.data.Subset(dset, subset_ids)

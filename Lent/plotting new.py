@@ -64,6 +64,10 @@ def wandb_get_data(project_name: str,
             datetime.datetime.fromtimestamp(run.summary["_timestamp"]) >= cutoff_date
             ):
             history = run.history()
+            # Rename to fix my bug
+            run_t_mech = run.config.get('teacher_mechanism')
+            if run_t_mech in temp_dict.keys():
+                run.config['teacher_mechanism'] = temp_dict[run_t_mech]
             if '_step' in history.columns and history['_step'].max() >= 10:
                 filtered_runs.append(run)
                 # Clean history of NaNs
@@ -104,7 +108,6 @@ def wandb_get_data(project_name: str,
         else:
             combined['Group Name'] = [('S: '+new_mech_map[key[1]])] * len(combined)
         histories.append(combined)
-        print(combined['Group Name'])
     # histories = get_histories(grouped_runs)
     assert len(histories) is not None
     return histories
@@ -195,6 +198,7 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
         ax.set_prop_cycle(color=[color_dict[group_name] for group_name in color_dict])
 
     for i, mean_col in enumerate(cols):
+        print("col num", i, mean_col)
         var_col = mean_col.replace(' Mean', ' Var')
         for line_num, history in enumerate(histories):
             group_name = history['Group Name'].iloc[0]
@@ -281,23 +285,22 @@ def get_counterfactual_order_list():
 
 
 
-plot_names = ['M S1 S2', 'S1 S2', 'Rand S1', 'Rand S2', 'Rand M']
+plot_names = ['M=100 S1=100 S2=100', 'M=R S1=100 S2=100', 'M=0 S1=100 S2=100', 'M=100 S1=100 S2=R', 'M=100 S1=R S2=100']
 teacher_mechs = ['M=100% S1=0% S2=0%', 'M=100% S1=0% S2=60%', 'M=100% S1=30% S2=60%']
 if __name__ == "__main__":
-    t_mech = 1
     use_t_mech = False
-    loss_num = 0
 
-    if not use_t_mech:
-        title = f'{loss_dict[loss_num]} Loss, Teacher Mechanism ' + teacher_mechs[t_mech]
-    else:
-        title = f'{loss_dict[loss_num]} Loss '
+    for t_mech in range(3):
+        for loss_num in range(2):
+            if not use_t_mech:
+                title = f'{loss_dict[loss_num]} Loss, Teacher Mechanism ' + teacher_mechs[t_mech]
+            else:
+                title = f'{loss_dict[loss_num]} Loss '
 
-    metric_names = [x.split(":")[-1].strip() for x in list(exp_dict_all.keys())]
-    counterfactual_metric_names = [x.split(":")[-1].strip() for x in list(counterfactual_dict_all.keys())]
-    loss = loss_dict[loss_num]
-
-    # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-    histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=exp_dict_all, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=t_mech, loss_num=loss_num, use_t_mech=use_t_mech)
-    counterfactual_plot(histories, counterfactual_dict_all, title)
-    # plot_counterfactual_heatmaps(histories, exp_dict=exp_dict_all, loss_num=loss_num)
+            metric_names = [x.split(":")[-1].strip() for x in list(exp_dict_all.keys())]
+            counterfactual_metric_names = [x.split(":")[-1].strip() for x in list(counterfactual_dict_all.keys())]
+            loss = loss_dict[loss_num]
+            # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
+            histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=exp_dict_all, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=t_mech, loss_num=loss_num, use_t_mech=use_t_mech)
+            counterfactual_plot(histories, counterfactual_dict_all, title)
+            # plot_counterfactual_heatmaps(histories, exp_dict=exp_dict_all, loss_num=loss_num)
