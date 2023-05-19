@@ -24,8 +24,8 @@ dominoes_exp_dict = {"CIFAR10": [1, 0, 0, False, False, False],
                      "CIFAR10_MNIST_Box": [1, 1, 1, False, False, False]}
 # For single mechanism the second element is ignored so all values are just placeholders
 cifar_exp_dict = {"P": [1, 0, 0, False, False, False], 
-                  "B": [1, 1, 0, False, False, False], 
-                  "BR": [1, 1, 0, False, True, False]}
+                  "B": [1, 1, 0, True, False, False], 
+                  "BR": [1, 1, 0, True, True, False]}
 
 #====================================================================================================================
 # List elements: image frac, mech 1 frac, mech 2 frac, random image, random mech 1, random mech 2
@@ -33,12 +33,9 @@ cifar_exp_dict = {"P": [1, 0, 0, False, False, False],
 exp_dict_all = {"No mechanisms (baseline): M=100% S1=0% S2=0%": [1, 0, 0, False, False, False], 
                   "Teacher one spurious mechanism: M=100% S1=0% S2=60%": [1, 0, 0.6, False, False, False], 
                   "Teacher both spurious mechanisms: M=100% S1=30% S2=60%": [1, 0.3, 0.6, False, False, False],
-                  "Student one spurious mechanism: M=100% S1=60% S2=0%": [1, 0.6, 0.9, False, False, False],
-                  "Student both spurious mechanisms: M=100% S1=60% S2=30%": [1, 0.9, 0.6, False, False, False]
+                  "Student both spurious mechanism: M=100% S1=60% S2=90%": [1, 0.6, 0.9, False, False, False],
+                  "Student both spurious mechanisms: M=100% S1=90% S2=60%": [1, 0.9, 0.6, False, False, False]
                   }
-
-## For debugging
-# exp_dict_all = {"CIFAR10": [0, 0, False, False, False],}
 
 # Counterfactual evals
 # Experiment number implicit in index of list converted dictionary

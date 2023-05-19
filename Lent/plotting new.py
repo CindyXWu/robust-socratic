@@ -66,8 +66,8 @@ def wandb_get_data(project_name: str,
             history = run.history()
             # Rename to fix my bug
             run_t_mech = run.config.get('teacher_mechanism')
-            if run_t_mech in temp_dict.keys():
-                run.config['teacher_mechanism'] = temp_dict[run_t_mech]
+            # if run_t_mech in temp_dict.keys():
+            #     run.config['teacher_mechanism'] = temp_dict[run_t_mech]
             if '_step' in history.columns and history['_step'].max() >= 10:
                 filtered_runs.append(run)
                 # Clean history of NaNs
