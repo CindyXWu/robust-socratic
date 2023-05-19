@@ -92,7 +92,7 @@ TEACH_NUM = 1
 LOSS_NUM = 1
 AUG_NUM = 0
 DATASET_NUM = 1
-exp_dict = exp_dict_all
+exp_dict = dominoes_exp_dict
 
 if args.config_name:
     T_EXP_NUM = config['t_exp_num']
@@ -116,7 +116,7 @@ wandb_run = True # Set to False to check loss functions
 lr = 0.3
 final_lr = 0.05
 temp = 30 # Fix this at about 20-30 (result of hyperparam sweeps)
-epochs = 6
+epochs = 10
 tau = 0.1 # Contrastive loss temperature
 batch_size = 64
 spurious_corr = 1
