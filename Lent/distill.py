@@ -113,7 +113,7 @@ t_short_exp_name = t_exp_name.split(":")[-1].strip()
 # SETUP PARAMS REQUIRING MANUAL INPUT
 # ======================================================================================
 wandb_run = True # Set to False to check loss functions
-lr = 0.01
+lr = 0.3
 final_lr = 0.05
 temp = 30 # Fix this at about 20-30 (result of hyperparam sweeps)
 epochs = 10
@@ -138,13 +138,13 @@ match base_dataset:
 # Training dynamics settings depending on loss function
 match LOSS_NUM:
     case 0:
-        alpha, lr, final_lr = 1, 0.3, 0.03
+        alpha = 1
     case 1:
-        alpha, lr, final_lr = 0.5, 0.3, 0.03
+        alpha = 0.5
     case 2:
         # Adjust for relative size of contrastive loss to distillation loss
         # E.g. 0.03 for contrastive ~60, distillation ~1
-        alpha, lr, final_lr = 0.01, 0.3, 0.03
+        alpha= 0.01
 
 # Student model setup (change only if adding to dicts above)
 match STUDENT_NUM:

@@ -4,7 +4,6 @@ import numpy as np
 import os
 import einops
 import torch
-import multiprocessing as mp
 from functools import reduce
 import warnings
 from torch.utils.data import DataLoader
@@ -217,7 +216,7 @@ def wandb_get_data(project_name: str,
 
         # Name each row of the dataframe with the values of the grouped metrics
         # **Use shortened names for mechs**
-        combined['Group Name'] = [('S: ' + mech_map[key[ 1]])] * len(combined)
+        combined['Group Name'] = [('S: ' + mech_map[key[1]])] * len(combined)
         histories.append(combined)
 
     # histories = get_histories(grouped_runs)
