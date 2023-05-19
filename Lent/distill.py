@@ -92,7 +92,7 @@ TEACH_NUM = 1
 LOSS_NUM = 1
 AUG_NUM = 0
 DATASET_NUM = 1
-exp_dict = dominoes_exp_dict
+exp_dict = exp_dict_all
 
 if args.config_name:
     T_EXP_NUM = config['t_exp_num']
@@ -114,9 +114,9 @@ t_short_exp_name = t_exp_name.split(":")[-1].strip()
 # ======================================================================================
 wandb_run = True # Set to False to check loss functions
 lr = 0.3
-final_lr = 0.05
+final_lr = 0.1
 temp = 30 # Fix this at about 20-30 (result of hyperparam sweeps)
-epochs = 10
+epochs = 7
 tau = 0.1 # Contrastive loss temperature
 batch_size = 64
 spurious_corr = 1
@@ -174,7 +174,7 @@ match TEACH_NUM:
         t_layer = {"11.path2.5": "final_features"} # Contrastive feature layer
 
 # Names for wandb logging
-project = "Distill "+teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]+"_"+base_dataset
+project = "Distill "+teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]+"_"+base_dataset+" gamma"
 run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S mech '+s_short_exp_name+', T mech '+t_short_exp_name+', Loss: '+loss_dict[LOSS_NUM]
 print('project:', project)
 

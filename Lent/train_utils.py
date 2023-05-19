@@ -275,6 +275,7 @@ def create_dataloader(base_dataset: Dataset,
     For CIFAR100 box: box is cue 1.
     """
     if counterfactual:
+        # Load counterfactual datasets
         key = list(counterfactual_dict_all.keys())[EXP_NUM]
         image_frac, mech_1_frac, mech_2_frac, randomize_img, randomize_mech_1, randomize_mech_2 = counterfactual_dict_all[key]
     else:
@@ -282,7 +283,7 @@ def create_dataloader(base_dataset: Dataset,
         image_frac, mech_1_frac, mech_2_frac, randomize_img, randomize_mech_1, randomize_mech_2 = exp_dict_all[key]
 
     if base_dataset in ["CIFAR10", "CIFAR100"]:
-        # Image frac isn't relevant - always 100 so don't pass in
+        # Image frac isn't relevant - always 100 for these exps so don't pass in
         cue_type='box' if mech_1_frac != 0 else 'nocue'
         train_loader = get_box_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=mech_1_frac, randomize_cue=randomize_mech_1, randomize_img = randomize_img, batch_size=batch_size)
         test_loader = get_box_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=mech_1_frac, randomize_cue=randomize_mech_1, randomize_img = randomize_img, batch_size=batch_size)

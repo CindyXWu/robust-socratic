@@ -159,7 +159,7 @@ class domCueDataset(Dataset):
         self.targets = np.array(dataset.targets)
 
         # cue information
-        self.mnist_frac, self.box_frac, self.image_frac, self.randomize_box, self.randomize_box, self.randomize_img = mnist_frac, box_frac, image_frac, randomize_box, randomize_mnist, randomize_img
+        self.mnist_frac, self.box_frac, self.image_frac, self.randomize_box, self.randomize_mnist, self.randomize_img = mnist_frac, box_frac, image_frac, randomize_box, randomize_mnist, randomize_img
         self.mnist_cue_ids = get_cue_ids(targets=self.targets, n_classes=self.n_classes, prob=self.mnist_frac)
         self.box_cue_ids = get_cue_ids(targets=self.targets, n_classes=self.n_classes, prob=self.box_frac)
 
@@ -314,12 +314,10 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
         load_type: 'train' or 'test'
         base_dataset: 'CIFAR10', 'CIFAR100'
         cue_type: 'nocue', 'box', 'dominoes', 'domcues'
-        box_frac: only used for domcues
-        mnist_frac: only used for domcues
-        randomize_cues: used only for domcues
+        box_frac, mnist_frac, image_frac, randomize_box, randomize_mnist: only for Dominoes
     Datasets default download=False. Set download=True to download for first time.
-    It does not matter what you set cue_type to if base_dataset is 'Dominoes' - the proportion of cues/presence is controlled by 'cue_proportions'.
-    E.g. if you want plain dominoes (CIFAR only predictive of label), use box_frac=0, mnist_frac=0.
+    Doesn't matter what cue_type equals if base_dataset is 'Dominoes' - proporition of cues controlled by 'cue_proportions'.
+    E.g. plain dominoes (CIFAR only predictive of label), use box_frac=0, mnist_frac=0.
     Shuffle automatically set to true for test and train.
     """
     ## 'Dominoes' base dataset automatically means cued dominoes for now
@@ -327,7 +325,10 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
     #     base_dataset = 'CIFAR10'
     #     cue_proportion = 0.0 if cue_type == 'nocue' else cue_proportion
     #     cue_type = 'dominoes'
-
+    
+    # Set this to true when first running code
+    download_datasets = False
+    
     if base_dataset == 'Dominoes':
         base_dataset = 'CIFAR10'
         cue_type = 'domcues'
@@ -335,7 +336,7 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
     # define base dataset (pick train or test)
     dset_type = getattr(torchvision.datasets, base_dataset)
     dset = dset_type(root=f'{data_dir}/{base_dataset.lower()}/', 
-                     train=(load_type =='train'), download=False, transform=get_transform('nocue'))
+                     train=(load_type =='train'), download=download_datasets, transform=get_transform('nocue'))
 
     # pick cue
     if (cue_type == 'nocue'):
@@ -345,12 +346,12 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
     elif (cue_type == 'dominoes'):
         dset_type = getattr(torchvision.datasets, 'FashionMNIST')
         dset_simple = dset_type(root=f'{data_dir}/FashionMNIST/', 
-                        train=(load_type == 'train'), download=False, transform=get_transform('dominoes'))
+                        train=(load_type == 'train'), download=download_datasets, transform=get_transform('dominoes'))
         dset = domDataset(dset, dset_simple, box_frac, mnist_frac, randomize_cue=randomize_cue, randomize_img=randomize_img)
     elif (cue_type == 'domcues'):
         dset_type = getattr(torchvision.datasets, 'FashionMNIST')
         dset_simple = dset_type(root=f'{data_dir}/FashionMNIST/', 
-                        train=(load_type == 'train'), download=False, transform=get_transform('dominoes'))
+                        train=(load_type == 'train'), download=download_datasets, transform=get_transform('dominoes'))
         dset = domCueDataset(dset, dset_simple, box_frac=box_frac, mnist_frac=mnist_frac, image_frac=image_frac, randomize_box=randomize_box, randomize_mnist=randomize_mnist, randomize_img=randomize_img)
 
     if isinstance(subset_ids, np.ndarray):
