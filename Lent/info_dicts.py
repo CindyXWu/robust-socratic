@@ -14,7 +14,7 @@ shapes_exp_dict = {0: "Shape_Color",
                    4: "Shape_Color_Floor", 
                    5: "Shape_Color_Scale", 
                    6: "Shape_Color_Floor_Scale"}
-# List elements: image frac, mech 1 frac (box), mech 2 frac (MNIST), random image, random mech 1, random mech 2
+# List elements: image frac, mech 1 frac (box), mech 2 frac (MNIST), random image, random mech 1 (box), random mech 2 (MNIST)
 dominoes_exp_dict = {"CIFAR10": [1, 0, 0, False, False, False], 
                      "Box": [1, 1, 0, True, False, False], 
                      "MNIST": [1, 0, 1, True, False, False], 
@@ -33,7 +33,7 @@ cifar_exp_dict = {"P": [1, 0, 0, False, False, False],
 exp_dict_all = {"No mechanisms (baseline): M=100% S1=0% S2=0%": [1, 0, 0, False, False, False], 
                   "Teacher one spurious mechanism: M=100% S1=0% S2=60%": [1, 0, 0.6, False, False, False], 
                   "Teacher both spurious mechanisms: M=100% S1=30% S2=60%": [1, 0.3, 0.6, False, False, False],
-                  "Student both spurious mechanism: M=100% S1=60% S2=90%": [1, 0.6, 0.9, False, False, False],
+                  "Student both spurious mechanisms: M=100% S1=60% S2=90%": [1, 0.6, 0.9, False, False, False],
                   "Student both spurious mechanisms: M=100% S1=90% S2=60%": [1, 0.9, 0.6, False, False, False]
                   }
 
