@@ -294,6 +294,7 @@ def create_dataloader(base_dataset: Dataset,
         test_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, randomize_img=randomize_img, box_frac=mech_1_frac, mnist_frac=mech_2_frac, image_frac=image_frac, randomize_box=randomize_mech_1, randomize_mnist=randomize_mech_2)
 
     elif base_dataset == 'Shapes':
+        # FLOOR: MECH 1, SCALE: MECH 2
         train_loader = dataloader_3D_shapes('train', batch_size=batch_size, randomise=randomize_img, floor_frac=mech_1_frac, scale_frac=mech_2_frac)
         test_loader = dataloader_3D_shapes('test', batch_size=batch_size, randomise=randomize_img, floor_frac=mech_1_frac, scale_frac=mech_2_frac)
  

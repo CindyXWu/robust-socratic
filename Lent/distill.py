@@ -91,7 +91,7 @@ STUDENT_NUM = 1
 TEACH_NUM = 1
 LOSS_NUM = 1
 AUG_NUM = 0
-DATASET_NUM = 1
+DATASET_NUM = 2
 exp_dict = exp_dict_all
 
 if args.config_name:
