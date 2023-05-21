@@ -7,16 +7,16 @@ from info_dicts import *
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-dataset_num = 1 # Defines filename for yaml file
-s_exp_nums = [0, 1, 2, 3, 4, 5, 6]
-t_exp_nums = [3, 4, 5, 6]
+dataset_num = 2 # Defines filename for yaml file
+s_exp_nums = [1, 3, 4]
+t_exp_nums = [0, 1, 2]
 teacher_nums = [1]
 student_nums = [1]
 loss_nums = [0, 1]
 aug_nums = [0]
 
 dataset = dataset_dict[dataset_num]
-filename = dataset+"_s_old.yml"
+filename = dataset+"_s.yml"
 
 # Todo: add augmentation
 experiments = []
