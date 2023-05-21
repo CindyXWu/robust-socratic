@@ -42,7 +42,7 @@ exp_dict_all = {"No mechanisms (baseline): M=100% S1=0% S2=0%": [1, 0, 0, False,
 # List elements: image frac, mech 1 frac, mech 2 frac, random image, random mech 1, random mech 2
 counterfactual_dict_all = {"All mechanisms: M=100% S1=100% S2=100%": 
                            [1, 1, 1, False, False, False], 
-                           "Only spurious mechanisms: M=0% S1=100% S2=100%": [0, 1, 1, False, False, False], 
+                           #"Only spurious mechanisms: M=0% S1=100% S2=100%": [0, 1, 1, False, False, False], 
                            "Randomize spurious mechanisms: M=100% S1=randomized S2=100%": [1, 1, 1, False, True, False], 
                            "Randomize spurious mechanisms: M=100% S1=100% S2=randomized": [1, 1, 1, False, False, True], 
                            "Randomize image: M=randomized S1=100% S2=100%": [1, 1, 1, True, False, False]
