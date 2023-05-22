@@ -45,7 +45,8 @@ class Shapes3D(Dataset):
 
         # Convert into scalar labels
         self.new_labels = np.empty([self.n_samples])
-        self.classes = 8
+        self.num_classes = 8
+        self.classes = ['yellowish cube', 'yellowish cylinder', 'orangeish sphere', 'greenish pill', 'purpleish cube', 'purpleish cylinder', 'blueish sphere', 'pinkish pill']
 
         # Make baseline labels - classes 1-8 for shape/colour
         if not randomise:
@@ -54,7 +55,7 @@ class Shapes3D(Dataset):
             hue[self.labels[:, 2] >= 0.5] = 1
             self.new_labels = hue*4 + shape
         else:
-            self.new_labels = np.random.randint(0, self.classes, size=self.n_samples)
+            self.new_labels = np.random.randint(0, self.num_classes, size=self.n_samples)
         
         # Add mechanisms at given fraction
         mask_0 = np.ones_like(self.new_labels, dtype=bool)
@@ -113,7 +114,7 @@ class Shapes3D(Dataset):
 
     def one_hot_encode(self):
         """Convert numerical class labels into one-hot encodings."""
-        self.oh_labels = F.one_hot(torch.tensor(self.new_labels).to(torch.int64), num_classes=self.classes)
+        self.oh_labels = F.one_hot(torch.tensor(self.new_labels).to(torch.int64), num_classes=self.num_classes)
 
     def __getitem__(self, idx):
         """Returns:
