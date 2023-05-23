@@ -280,14 +280,14 @@ def get_counterfactual_order_list():
 
 
 
-# plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=NP S1=100 S2=100', 'iii) M=100 S1=R S2=100', 'iv) M=100 S1=100 S2=R', 'v) M=R S1=100 S2=100']
+plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=NP S1=100 S2=100', 'iii) M=100 S1=R S2=100', 'iv) M=100 S1=100 S2=R', 'v) M=R S1=100 S2=100']
 # For shapes
-plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=100 S1=R S2=100', 'iii) M=100 S1=100 S2=R', 'iv) M=R S1=100 S2=100']
+# plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=100 S1=R S2=100', 'iii) M=100 S1=100 S2=R', 'iv) M=R S1=100 S2=100']
 teacher_mechs = ['M=100% S1=0% S2=0%', 'M=100% S1=0% S2=60%', 'M=100% S1=30% S2=60%']
 if __name__ == "__main__":
     use_t_mech = False
 
-    for t_mech in range(1,3):
+    for t_mech in range(3):
         for loss_num in range(2):
             if not use_t_mech:
                 title = f'{loss_dict[loss_num]} Loss, Teacher Mechanism ' + teacher_mechs[t_mech]
@@ -299,5 +299,5 @@ if __name__ == "__main__":
             loss = loss_dict[loss_num]
             # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
             histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes gamma', t_num=1, s_num=1, exp_dict=exp_dict_all, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=t_mech, loss_num=loss_num, use_t_mech=use_t_mech)
-            counterfactual_plot(histories, counterfactual_dict_all, title)
-            # plot_counterfactual_heatmaps(histories, exp_dict=exp_dict_all, loss_num=loss_num)
+            # counterfactual_plot(histories, counterfactual_dict_all, title)
+            plot_counterfactual_heatmaps(histories, exp_dict=exp_dict_all, loss_num=loss_num)

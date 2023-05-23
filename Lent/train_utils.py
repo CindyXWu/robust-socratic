@@ -183,6 +183,7 @@ def train_distill(
     optimizer = optim.SGD(student.parameters(), lr=lr)
     scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
     it = 0
+    its_per_log = 100 # number of iterations between logging
 
     output_dim = len(train_loader.dataset.classes)
     sample = next(iter(train_loader))
@@ -192,7 +193,7 @@ def train_distill(
     dataloaders = get_counterfactual_dataloaders(base_dataset, batch_size)
 
     if N_its is not None:
-        epochs = N_its//len(train_loader)+1
+        epochs = N_its//(len(train_loader)//its_per_log)+1
     for epoch in range(epochs):
         for inputs, labels in tqdm(train_loader):
             inputs, labels = inputs.to(device), labels.to(device)
@@ -228,7 +229,7 @@ def train_distill(
             train_loss = loss.detach().cpu().numpy()
 
             # if it == 0: check_grads(student)
-            if it % 100 == 0:
+            if it % its_per_log == 0:
                 train_acc = evaluate(student, train_loader, batch_size, max_ex=10)
                 test_acc, test_KL, test_top1 = counterfactual_evaluate(teacher, student, test_loader, batch_size, max_ex=N_eval_batches, title=None)
                 # Dictionary holds counterfactual acc, KL and top 1 fidelity for each dataset
