@@ -7,9 +7,9 @@ from info_dicts import *
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-dataset_num = 2 # Defines filename for yaml file
+dataset_num = 1 # Defines filename for yaml file
 s_exp_nums = [1, 3, 4]
-t_exp_nums = [0, 1, 2]
+t_exp_nums = [1, 2]
 teacher_nums = [1]
 student_nums = [1]
 loss_nums = [0, 1]
