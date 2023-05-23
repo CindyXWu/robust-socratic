@@ -176,6 +176,9 @@ def train_distill(
         loss_num: index of loss dictionary (in info_dicts.py) describing which loss fn to use
         base_dataset: tells us which dataset out of CIFAR10, CIFAR100, Dominoes and Shapes to use
     """
+    if N_its is not None:
+        epochs = N_its//(len(train_loader)//its_per_log)+1
+
     teacher.eval()
     student.train()
     # weight_reset(student)
@@ -192,8 +195,6 @@ def train_distill(
 
     dataloaders = get_counterfactual_dataloaders(base_dataset, batch_size)
 
-    if N_its is not None:
-        epochs = N_its//(len(train_loader)//its_per_log)+1
     for epoch in range(epochs):
         for inputs, labels in tqdm(train_loader):
             inputs, labels = inputs.to(device), labels.to(device)
