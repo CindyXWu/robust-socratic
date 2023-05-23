@@ -327,7 +327,7 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
     #     cue_type = 'dominoes'
     
     # Set this to true when first running code
-    download_datasets = False
+    download_datasets = True
     
     if base_dataset == 'Dominoes':
         base_dataset = 'CIFAR10'
@@ -399,7 +399,7 @@ class LR_Scheduler(object):
         return self.current_lr
     
 if __name__ == "__main__":
-    train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes Box', batch_size=64, cue_type='domcues', cue_proportion=0.5, randomize_cue=True, cue_proportions=[1,1], randomize_cues=[False, False])
+    train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes', batch_size=64, cue_type='domcues', cue_proportion=0.5, randomize_cue=True, box_frac=0.5, mnist_frac=0.5, image_frac=1.0, randomize_box=False, randomize_mnist=False, randomize_img=True)
     for i, (x, y) in enumerate(train_loader):
         x = einops.rearrange(x, 'b c h w -> b h w c')
         show_images_grid(x, y, num_images=64)

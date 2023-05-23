@@ -65,9 +65,3 @@ new_mech_map = {"M=100% S1=0% S2=0%": "100 0 0",
                   }
 
 new_mech_list = ["100 0 0", "100 0 60", "100 30 60", "100 60 90", "100 90 60"]
-
-# # Temp to wrestle naming into shape to undo my bug
-# temp_dict = {"M=0% S1=100% S2=100%": "M=100% S1=randomized S2=100%", 
-#              "M=100% S1=randomized S2=100%": "M=100% S1=100% S2=randomized", 
-#              "M=100% S1=100% S2=randomized": "M=randomized S1=100% S2=100% ", 
-#              "M=randomized S1=100% S2=100%": "M=100% S1=randomized S2=100%"}

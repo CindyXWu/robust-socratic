@@ -54,20 +54,16 @@ def wandb_get_data(project_name: str,
     filtered_runs = []
 
     # Filter by above settings and remove any crashed or incomplete runs
-    cutoff_date = datetime.datetime(2023, 5, 17)
+    # cutoff_date = datetime.datetime(2023, 5, 17)
     for run in runs:
-        if "_timestamp" not in run.summary.keys():
-            continue
+        # if "_timestamp" not in run.summary.keys():
+        #     continue
         if (run.config.get('loss') == loss and
-            run.config.get('teacher_mechanism') == t_mech and
+            run.config.get('teacher_mechanism') == t_mech
             # run.state != 'running' and
-            datetime.datetime.fromtimestamp(run.summary["_timestamp"]) >= cutoff_date
+            # datetime.datetime.fromtimestamp(run.summary["_timestamp"]) >= cutoff_date
             ):
             history = run.history()
-            # Rename to fix my bug
-            run_t_mech = run.config.get('teacher_mechanism')
-            # if run_t_mech in temp_dict.keys():
-            #     run.config['teacher_mechanism'] = temp_dict[run_t_mech]
             if '_step' in history.columns and history['_step'].max() >= 10:
                 filtered_runs.append(run)
                 # Clean history of NaNs
@@ -151,18 +147,19 @@ def get_order_list() -> Tuple[List, List]:
 
 def custom_sort(col: str, type: str) -> int:
     """Used to sort the order of the subplots in the grouped plots."""
-    order_list = get_counterfactual_order_list()
+    counterfactual_metric_names = list(counterfactual_dict_all.keys())
     match type:
         case 'acc':
             metric_name = col.replace(' Mean', '')
         case 'kl':
-            metric_name = col.replace(' T_S KL Mean', '')
+            metric_name = col.replace(' T-S KL Mean', '')
         case 'fidelity':
-            metric_name = col.replace(' T_S Top 1 Fidelity Mean', '')
-    if metric_name in order_list:
-        return order_list.index(metric_name)
+            metric_name = col.replace(' T-S Top 1 Fidelity Mean', '')
+    if metric_name in counterfactual_metric_names:
+        return counterfactual_metric_names.index(metric_name)
     else:
-        return len(order_list) + 1
+        print("Metric not found in order list: ", metric_name)
+        return 0
 
 
 def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: str) -> None:
@@ -198,7 +195,6 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
         ax.set_prop_cycle(color=[color_dict[group_name] for group_name in color_dict])
 
     for i, mean_col in enumerate(cols):
-        print("col num", i, mean_col)
         var_col = mean_col.replace(' Mean', ' Var')
         for line_num, history in enumerate(histories):
             group_name = history['Group Name'].iloc[0]
@@ -217,22 +213,22 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
             axs[i].set_ylim(0, 100)
         else:
             axs[i].set_ylim(0, 7)
-        axs[i].set_title(plot_names[i], fontsize=15)
-        labelLines(axs[i].get_lines(), align=False, fontsize=11)
-        axs[i].set_xlabel('Training step/100 iterations', fontsize=15)
+        axs[i].set_title(plot_names[i], fontsize=20)
+        labelLines(axs[i].get_lines(), align=False, fontsize=15)
+        axs[i].set_xlabel('Training step/100 iterations', fontsize=20)
 
     lines, labels = axs[0].get_legend_handles_labels()
     fig.legend(lines, labels, loc='lower center', ncol=num_groups, fontsize=18, bbox_to_anchor=(0.5, -0.05))
     fig.suptitle(title, fontsize=20)
     plt.tight_layout(pad=2)
-    plt.savefig('images/vstime/'+title+'.png', dpi=300, bbox_inches='tight')
+    plt.savefig('images/vstime/'+title.replace('%','')+'.png', dpi=500, bbox_inches='tight')
 
 
-def counterfactual_plot(histories: pd.DataFrame, exp_dict: Dict[str, List], title: str) -> None:
+def counterfactual_plot(histories: pd.DataFrame, counterfactual_dict: Dict[str, List], title: str) -> None:
     """For a given run, plot counterfactual test accuracy, KL and top-1 fidelity on different plots."""
-    acc_mean_cols = [col for col in histories[0].columns if col.replace(' Mean', '') in exp_dict]
-    kl_mean_cols = [col for col in histories[0].columns if col.replace(' T-S KL Mean', '') in exp_dict]
-    top1_mean_cols = [col for col in histories[0].columns if col.replace(' T-S Top 1 Fidelity Mean', '') in exp_dict]
+    acc_mean_cols = [col for col in histories[0].columns if col.replace(' Mean', '') in counterfactual_dict]
+    kl_mean_cols = [col for col in histories[0].columns if col.replace(' T-S KL Mean', '') in counterfactual_dict]
+    top1_mean_cols = [col for col in histories[0].columns if col.replace(' T-S Top 1 Fidelity Mean', '') in counterfactual_dict]
     acc_mean_cols.sort(key=lambda col: custom_sort(col, 'acc'))
     kl_mean_cols.sort(key=lambda col: custom_sort(col, 'kl'))
     top1_mean_cols.sort(key=lambda col: custom_sort(col, 'fidelity'))
@@ -254,7 +250,6 @@ def plot_counterfactual_heatmaps(combined_history: List[pd.DataFrame], exp_dict:
         axes_labels.append(key.replace('_', ' '))
                            
     for history in combined_history:
-        print("cols", history.columns)
         name = history['Group Name'].iloc[0]
         mechs = name.split(', ')
         print(mechs)
@@ -285,12 +280,14 @@ def get_counterfactual_order_list():
 
 
 
-plot_names = ['M=100 S1=100 S2=100', 'M=NP S1=100 S2=100', 'M=100 S1=R S2=100', 'M=100 S1=100 S2=R', 'M=R S1=100 S2=100']
+# plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=NP S1=100 S2=100', 'iii) M=100 S1=R S2=100', 'iv) M=100 S1=100 S2=R', 'v) M=R S1=100 S2=100']
+# For shapes
+plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=100 S1=R S2=100', 'iii) M=100 S1=100 S2=R', 'iv) M=R S1=100 S2=100']
 teacher_mechs = ['M=100% S1=0% S2=0%', 'M=100% S1=0% S2=60%', 'M=100% S1=30% S2=60%']
 if __name__ == "__main__":
     use_t_mech = False
 
-    for t_mech in range(3):
+    for t_mech in range(1,3):
         for loss_num in range(2):
             if not use_t_mech:
                 title = f'{loss_dict[loss_num]} Loss, Teacher Mechanism ' + teacher_mechs[t_mech]
