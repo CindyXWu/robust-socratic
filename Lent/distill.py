@@ -85,11 +85,11 @@ def sweep():
 # Refer to dictionaries in info_dicts.py for what the numbers mean
 #================================================================================================
 is_sweep = args.sweep
-T_EXP_NUM = 0
-S_EXP_NUM = 3
+T_EXP_NUM = 2
+S_EXP_NUM = 4
 STUDENT_NUM = 1
 TEACH_NUM = 1
-LOSS_NUM = 1
+LOSS_NUM = 0
 AUG_NUM = 0
 DATASET_NUM = 2
 exp_dict = exp_dict_all
@@ -120,6 +120,7 @@ epochs = 4
 tau = 0.1 # Contrastive loss temperature
 batch_size = 64
 spurious_corr = 1
+N_its = None # To standardise training length where dataset size can vary from run to run
 
 #==============================================================================
 # Stuff depending on setup params - change less often
@@ -134,6 +135,7 @@ match base_dataset:
         class_num = 10
     case 'Shapes':
         class_num = 8
+        N_its = 50
 
 # Training dynamics settings depending on loss function
 match LOSS_NUM:
@@ -175,6 +177,7 @@ match TEACH_NUM:
 
 # Names for wandb logging
 project = "Distill "+teacher_dict[TEACH_NUM]+" "+student_dict[STUDENT_NUM]+"_"+base_dataset+" gamma"
+project = "test"
 run_name = 'T '+teacher_dict[TEACH_NUM]+', S '+student_dict[STUDENT_NUM]+', S mech '+s_short_exp_name+', T mech '+t_short_exp_name+', Loss: '+loss_dict[LOSS_NUM]
 print('project:', project)
 
@@ -225,4 +228,4 @@ if __name__ == "__main__":
     wandb.config.student = student_dict[STUDENT_NUM]
     wandb.config.loss = loss_dict[LOSS_NUM]
 
-    train_distill(teacher, student, train_loader, test_loader, base_dataset, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha, tau=tau, s_layer=s_layer, t_layer=t_layer)
+    train_distill(teacher, student, train_loader, test_loader, base_dataset, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha, tau=tau, s_layer=s_layer, t_layer=t_layer, N_its=N_its)

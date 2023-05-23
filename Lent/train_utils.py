@@ -165,6 +165,7 @@ def train_distill(
     s_layer: Optional[float] = None, 
     t_layer: Optional[float] = None,
     N_eval_batches: Optional[int] = 10,
+    N_its: Optional[int] = None
     ) -> None:
     """
     Args:
@@ -190,6 +191,8 @@ def train_distill(
 
     dataloaders = get_counterfactual_dataloaders(base_dataset, batch_size)
 
+    if N_its is not None:
+        epochs = N_its//len(train_loader)+1
     for epoch in range(epochs):
         for inputs, labels in tqdm(train_loader):
             inputs, labels = inputs.to(device), labels.to(device)
@@ -234,6 +237,7 @@ def train_distill(
                     title = 'Dominoes_'+name
                     # Currently not plotting datasets
                     cf_evals[name], cf_evals[name+" T-S KL"], cf_evals[name+" T-S Top 1 Fidelity"] = counterfactual_evaluate(teacher, student, dataloaders[name], batch_size, max_ex=N_eval_batches, title=None)
+                print(cf_evals)
                 print('Iteration: %i, %.2f%%' % (it, test_acc), "Epoch: ", epoch, "Loss: ", train_loss)
                 print("Project {}, LR {}, temp {}".format(run_name, lr, temp))
                 results = {**cf_evals, **{
