@@ -176,6 +176,7 @@ def train_distill(
         loss_num: index of loss dictionary (in info_dicts.py) describing which loss fn to use
         base_dataset: tells us which dataset out of CIFAR10, CIFAR100, Dominoes and Shapes to use
     """
+    its_per_log = 100 # number of iterations between logging
     if N_its is not None:
         epochs = N_its//(len(train_loader)//its_per_log)+1
 
@@ -186,7 +187,6 @@ def train_distill(
     optimizer = optim.SGD(student.parameters(), lr=lr)
     scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
     it = 0
-    its_per_log = 100 # number of iterations between logging
 
     output_dim = len(train_loader.dataset.classes)
     sample = next(iter(train_loader))
