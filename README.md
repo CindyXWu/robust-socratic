@@ -1,17 +1,4 @@
 # Robust Socratic
-Repository for all IIB project - robust model distillation.
-
-Model distillation with mechanistic robustness.
-
-## Requirements
-- PyTorch
-- einops
-- h5py
-- seaborn
-- wandb
-- yaml
-- argparse
-- tdqm, matplotlib, numpy, Python 3.10 minimum
 
 ## Lent
 Image datasets for variety of distillation types. Start with ResNet50 and LeNet5 modified for CIFAR-10. Implement:
@@ -45,7 +32,6 @@ I evaluate distillation on counterfactual datasets for image experiments. The sh
   - Initial LR, final LR, epochs, temperature (fix at 20-30), tau (temperature for contrastive distillation, fixed at 0.1 for now), alpha (fraction of contrastive/Jacobian loss to use - in future may automatically set by evaluating both once, and setting alpha such that the size of both normal distillation and other losses is comparable), sweep configurations
   - Layer names for contrastive distillation: in image_models.py there is a function that lists a dictionary of all layer names. I use this to extract a per-model name of the last feature map layer, and set this when initialising the models.
   - Batch size: default 64.
-  - Cue fraction (spurious_corr variable): default 1, though I have set up the distillation file so that it can easily be varied in a sweep.
 
 ## File structure:
 ### Training:
