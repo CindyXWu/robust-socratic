@@ -18,7 +18,6 @@ import seaborn as sns
 from torchvision.utils import make_grid
 import wandb
 from wandb.sdk.wandb_run import Run
-import datetime
 
 warnings.filterwarnings("ignore")
 

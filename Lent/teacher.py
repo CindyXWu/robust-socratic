@@ -1,7 +1,6 @@
 import torch
 import os
 import wandb
-import math
 import argparse
 import yaml
 from time import gmtime, strftime

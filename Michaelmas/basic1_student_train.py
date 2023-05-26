@@ -31,7 +31,7 @@ BATCH_SIZE = 50
 # For train
 MODE = 1
 # Fraction of simple datapoints to randomise
-fracs = [0, 1, 0.5, 0.1]
+fracs = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 # List of complex indices (cols) to do split randomise on (see utils.py)
 X_list = [[1,2], [1,2], [1,2], [1], [1], [1], [2], [2], [2]]
 # For test - start with randomising simple feature (first row)
@@ -40,8 +40,8 @@ SC_list = [[0], [0,1], [0,2], [0], [0,1], [0,2], [0], [0,1], [0,2]]
 # Hyperparameters
 lr = 0.3
 dropout = 0
-epochs = 150
-temps = [5]
+epochs = 100
+temps = [30]
 # For weighted average of scores
 alpha = 0.5
 sweep = "frac" #"lr", "temp"
@@ -91,9 +91,9 @@ for X, SC in zip(X_list, SC_list):
     X = np.array(X)
     SC = np.array(SC)
     # Instantiate networks
-    load_path = "teacher_linear_" + str(exp) + "/"
+    load_path = "Michaelmas/teacher_linear_" + str(exp) + "/"
     big_model = linear_net(NUM_FEATURES).to(device)
-    output_dir = "small_linear_"+str(exp)+"/"
+    output_dir = "Michaelmas/small_linear_"+str(exp)+"/"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     
@@ -114,17 +114,11 @@ for X, SC in zip(X_list, SC_list):
             big_model.load_state_dict(checkpoint['model_state_dict'])
             big_model.eval()
 
-            # Load train data
             X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
             # Reshape y tensor to (datapoints*1)
             y_train = y_train.reshape(-1,1)
             train_dataset = CustomDataset(X_train, y_train)
             train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-
-            # # debug data
-            # print("Length of dataloader: ", len(train_loader))
-            # print("Length of train dataset: ", len(train_dataset))
-            # print("Training dataset shape:", train_dataset[0][0].shape, train_dataset[0][1].shape)
 
             # Test dataset has same number of points as train
             X_test, y_test = my_test_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, sc=SC)
@@ -151,19 +145,8 @@ for X, SC in zip(X_list, SC_list):
                         scores = small_model(features)
                         targets = big_model(features)
 
-                        #loss = my_loss(scores, targets, T=temp)
-                        loss = bceloss_fn(sigmoid(scores), labels)
-                        # if it == 0:
-                        #     print(scores.size())
-                        #     print(scores[0])
-                        #     print(targets[0])
-                        #     soft_pred = softmax_op(scores / temp)
-                        #     soft_targets = softmax_op(targets / temp)
-                        #     print(soft_pred[0])
-                        #     print(soft_targets[0])
-                        #     loss_rep = mseloss_fn(soft_pred, soft_targets)
-                        #     print(loss)
-                        #     print(loss_rep)
+                        loss = my_loss(scores, targets, T=temp)
+                        #loss = bceloss_fn(sigmoid(scores), labels)
                         optimizer.zero_grad()
                         loss.backward()
                         optimizer.step()
@@ -175,7 +158,6 @@ for X, SC in zip(X_list, SC_list):
                             plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
                             print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
                         it += 1
-                #perform last book keeping
                 train_acc.append(evaluate(small_model, train_loader, max_ex=100))
                 test_acc.append(evaluate(small_model, test_loader))
                 plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
@@ -204,7 +186,6 @@ for X, SC in zip(X_list, SC_list):
                                 'test_acc': test_acc,
                                 'iterations': it}
         
-    # Convert to arrays and save
     np.savetxt(output_dir + "train_avg.csv", np.array(exp_train_results), delimiter=",")
     np.savetxt(output_dir + "test_avg.csv", np.array(exp_test_results), delimiter=",")
 

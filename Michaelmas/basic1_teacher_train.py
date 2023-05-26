@@ -31,7 +31,7 @@ NUM_POINTS = 3000
 # For train
 MODE = 1
 # Fraction of simple datapoints to randomise
-fracs = [0, 0.1, 0.5, 1]
+fracs = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 # List of complex indices (cols) to do split randomise on (see utils.py)
 X_list = [[1,2], [1,2], [1,2], [1], [1], [1], [2], [2], [2]]
 # X_list = [[1,2]]
@@ -78,7 +78,7 @@ for X, SC in zip(X_list, SC_list):
     SC = np.array(SC)
 
     # Set output directory by experiment number
-    output_dir = "teacher_linear_"+str(exp)+"/"
+    output_dir = "Michaelmas/teacher_linear_"+str(exp)+"/"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
