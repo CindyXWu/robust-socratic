@@ -148,7 +148,7 @@ def my_train_dataloader(gen=False, filename=None, simple=0, complex=[], num_poin
     #plot_data(dset.dataset, 1, 2)
     return (dset.dataset[:, :-1], dset.dataset[:, -1])
 
-def my_test_dataloader(gen=False, filename=None, simple=0, complex=0, num_points=0,  sc=[]):
+def my_test_dataloader(gen=False, filename=None, simple=0, complex=0, num_points=0,  sc=[], title=''):
     """"Load test dataset.
     
     :param sc: subset of coordinates selected to randomise test distribution wrt to check if invariant
@@ -159,15 +159,13 @@ def my_test_dataloader(gen=False, filename=None, simple=0, complex=0, num_points
             np.random.shuffle(dset.dataset[:, coord])
         name = filename
         np.savetxt(output_dir+name, dset.dataset, delimiter=',')
-    plot_data(dset.dataset, 1, 2)
+    # plot_data(dset.dataset, 1, 2, title=title)
     return (dset.dataset[:, :-1], dset.dataset[:, -1])
 
 class CustomDataset(Dataset):
     def __init__(self, features, labels):
         self.features = features
         self.labels = labels
-        print('data shape: ', self.features.shape)
-        print('labels shape: ', self.labels.shape)
 
     def __getitem__(self, index):
         # None adds extra dimension which hopefully forces dataloader to load correct size
@@ -181,7 +179,6 @@ class CustomDataset(Dataset):
 if __name__ == "__main__":
     #TESTING CODE
     GEN = True
-    # Number of simple features
     NUM_SIMPLE = 1
     # Array defining number of slabs for each complex feature
     COMPLEX = [5, 8]
@@ -193,9 +190,26 @@ if __name__ == "__main__":
     frac = 1
     X = []
     # For test - start with randomising simple feature (first row)
-    SC = [0, 1]
-    FILE_TRAIN = 'file TEST train.csv'
-    FILE_TEST = 'file TEST test.csv'
-    NUM_POINTS = 3000
-    X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
-    X_test, y_test = my_test_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, sc=SC)
+
+    # Used for generating images of dataset
+    data_type = 3
+
+    for data_type in range(4):
+        match data_type:
+            case 0:
+                SC = [0]
+                title = 'randomise none'
+            case 1:
+                SC = [0, 1]
+                title = 'randomise f1'
+            case 2:
+                SC = [0, 2]
+                title = 'randomise f2'
+            case 3:
+                SC = [0, 1, 2]
+                title = 'randomise f1 and f2'
+        FILE_TRAIN = 'file TEST train.csv'
+        FILE_TEST = 'file TEST test.csv'
+        NUM_POINTS = 3000
+        X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
+        X_test, y_test = my_test_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, sc=SC, title=title)

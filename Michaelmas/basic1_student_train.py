@@ -32,8 +32,9 @@ BATCH_SIZE = 50
 MODE = 1
 # Fraction of simple datapoints to randomise
 fracs = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
-# List of complex indices (cols) to do split randomise on (see utils.py)
-X_list = [[1,2], [1,2], [1,2], [1], [1], [1], [2], [2], [2]]
+# # List of complex indices (cols) to do split randomise on (see utils.py)
+# X_list = [[1,2], [1,2], [1,2], [1], [1], [1], [2], [2], [2]]
+X_list = [[1], [1], [2], [2], [2]]
 # For test - start with randomising simple feature (first row)
 SC_list = [[0], [0,1], [0,2], [0], [0,1], [0,2], [0], [0,1], [0,2]]
 

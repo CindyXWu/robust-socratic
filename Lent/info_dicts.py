@@ -65,3 +65,5 @@ new_mech_map = {"M=100% S1=0% S2=0%": "100 0 0",
                   }
 
 new_mech_list = ["100 0 0", "100 0 60", "100 30 60", "100 60 90", "100 90 60"]
+mech_map_names = ["C", "B", "M", "MB", "CM", "CB", "CMB"]
+student_names = ["No mechanisms: M=100% S1=0% S2=0%", "Both spurious mechanisms: M=100% S1=60% S2=90%", "Both spurious mechanisms: M=100% S1=90% S2=60%"]

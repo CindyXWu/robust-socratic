@@ -5,11 +5,12 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+import pandas as pd
+import matplotlib
 from utils import *
 from basic1_models import *
 from error import *
 from plotting import *
-import matplotlib
 
 # Trying to get rid of 'fail to allocate bitmap' error
 matplotlib.use("Agg")
@@ -18,34 +19,11 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device") 
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 
-# Set GEN to True to generate files from scratch for training and testing
-GEN = True
+result_dir = 'Michaelmas/teacher_results/'
+if not os.path.exists(result_dir):
+    os.makedirs(result_dir)
 
-# Number of simple features
-NUM_SIMPLE = 1
-# Array defining number of slabs for each complex feature
-COMPLEX = [5, 8]
-# Total number of features
-num_features = NUM_SIMPLE + len(COMPLEX)
-NUM_POINTS = 3000
-# For train
-MODE = 1
-# Fraction of simple datapoints to randomise
-fracs = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
-# List of complex indices (cols) to do split randomise on (see utils.py)
-X_list = [[1,2], [1,2], [1,2], [1], [1], [1], [2], [2], [2]]
-# X_list = [[1,2]]
-# For test - start with randomising simple feature (first row)
-SC_list = [[0], [0,1], [0,2], [0], [0,1], [0,2], [0], [0,1], [0,2]]
-# SC_list = [[0]]
-# Hyperparameters for training
-lr = 0.3
-dropout = 0
-epochs = 50
-BATCH_SIZE = 100
-exp =  1
-
-# Function to evaluate model accuracy
+@torch.no_grad()
 def evaluate(model, dataset, max_ex=0):
     acc = 0
     for i, (features, labels) in enumerate(dataset):
@@ -57,13 +35,30 @@ def evaluate(model, dataset, max_ex=0):
         acc += torch.sum(torch.eq(pred, labels)).item()
         if max_ex != 0 and i >= max_ex:
             break
-    # Return average accuracy as a percentage
-    # Fraction of data points correctly classified
     return (acc * 100 / ((i+1) * BATCH_SIZE) )
 
 def weight_reset(m):
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
         m.reset_parameters()
+
+# Set GEN to True to generate files from scratch for training and testing
+GEN = True
+# Number of simple features
+NUM_SIMPLE = 1
+# Array defining number of slabs for each complex feature
+COMPLEX = [5, 8]
+# Total number of features
+num_features = NUM_SIMPLE + len(COMPLEX)
+NUM_POINTS = 3000
+# For train
+MODE = 1
+
+
+lr = 0.3
+dropout = 0
+epochs = 50
+BATCH_SIZE = 100
+exp =  1
 
 #TRAIN============================================================
 loss_fn = nn.BCELoss()
@@ -72,10 +67,27 @@ models = {}
 old_test_acc = 0
 net = linear_net(num_features, dropout=dropout).to(device)
 
+# Fraction of simple datapoints to randomise
+fracs = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
+# List of complex indices (cols) to randomise (see utils.py)
+X_list = [[1,2], [1,2], [1,2], [1], [1], [1], [2], [2], [2]]
+# List of test complex indices (cols) to randomise
+SC_list = [[0], [0,1], [0,2], [0], [0,1], [0,2], [0], [0,1], [0,2]]
+
+
 # Outer loop to run all experiments
 for X, SC in zip(X_list, SC_list):
+
+    # For storing results
+    column_names = []
+    for frac in fracs:
+        column_names.append(f'train_{frac}')
+        column_names.append(f'test_{frac}')
+    df = pd.DataFrame(columns=column_names)
+
     X = np.array(X)
     SC = np.array(SC)
+    title = f'train_{X}_test_{SC}'
 
     # Set output directory by experiment number
     output_dir = "Michaelmas/teacher_linear_"+str(exp)+"/"
@@ -89,7 +101,6 @@ for X, SC in zip(X_list, SC_list):
         # Add experiment number to start of file name
         FILE_TEST = "exp" + str(exp) + "test 1 " + str(frac) + ".csv"
         FILE_TRAIN = "exp" + str(exp) + "train 1 " + str(frac) + ".csv"
-        # Train dataset
         X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
         # Reshape y tensor tp (datapoints*1)
         y_train = y_train.reshape(-1,1)
@@ -102,33 +113,22 @@ for X, SC in zip(X_list, SC_list):
         y_test = y_test.reshape(-1,1)
         test_dataset = CustomDataset(X_test, y_test)
         test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
-        
-        # print("Length of dataloader: ", len(train_loader))
-        # print("Length of train dataset: ", len(train_dataset))
 
-        title = 'Fraction simple randomised ' + str(frac)
-        print("\n", title, "\n")
-
-        # Create optimizer
         optimizer = torch.optim.SGD(net.parameters(), lr=lr)
         optimizer.zero_grad()
 
-        # Start training
         train_acc = []
         test_acc = []
         train_loss = [0]  # loss at iteration 0
         it_per_epoch = len(train_loader)
 
         print("Initial train accuracy: ", evaluate(net, train_loader))
-        # Count number of epochs
         it = 0
         for epoch in range(epochs):
             for features, labels in tqdm(train_loader):
-                # Forward pass
                 out = net(features)
                 scores = sigmoid(out)
                 loss = loss_fn(scores, labels)
-                # Backward pass
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -138,18 +138,18 @@ for X, SC in zip(X_list, SC_list):
                     # max_ex is the number of batches to evaluate
                     train_acc.append(evaluate(net, train_loader, max_ex=10))
                     test_acc.append(evaluate(net, test_loader, max_ex=10))
-                    plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
-                    plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
                     print("Iteration: ", it, "Train accuracy: ", train_acc[-1], "Test accuracy: ", test_acc[-1])
                 it += 1
-        # Perform last book keeping
         train_acc.append(evaluate(net, train_loader, max_ex=100))
         test_acc.append(evaluate(net, test_loader))
-        plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
-        plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
+        data = {f'train_{frac}': train_acc, f'test_{frac}': test_acc}
+        # Create a temporary DataFrame and append it to the main DataFrame
+        df_temp = pd.DataFrame(data)
+        df = pd.concat([df, df_temp])
+        # plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
+        # plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
 
-        # Save model to dictionary, titled by dropout (can be changed)
-        models[title] = {'model': net,
+        models[f'frac simple randomised {frac}'] = {'model': net,
                             'model_state_dict': net.state_dict(),
                             'optimizer_state_dict': optimizer.state_dict(),
                             'loss_hist': train_loss,
@@ -171,7 +171,6 @@ for X, SC in zip(X_list, SC_list):
     test_accs = [models[key]['test_acc'] for key in models.keys()]
     xs = [models[key]['simple frac random'] for key in models.keys()]
     keys = [key for key in models.keys()]
-    print(keys)
 
     # Plot summary
     fig = plt.figure(figsize=(8, 4), dpi=100)
@@ -179,8 +178,13 @@ for X, SC in zip(X_list, SC_list):
     plt.title("{0} Epochs".format(epochs))
     plt.ylabel('Test accuracy')
     plt.xlabel('Randomised fraction of simple feature during training')
-    # plt.xscale('log')
-    # plt.xlim([9e-5, 5e-1])
     fig.savefig(output_dir + 'summary_{0}epochs.png'.format(epochs))
 
     exp += 1
+
+    print("Title to save: ", title)
+
+    df.to_csv(f'{result_dir}{title}.csv', index=True)
+    plot_df(df, base_name=result_dir, title=title)
+
+    break

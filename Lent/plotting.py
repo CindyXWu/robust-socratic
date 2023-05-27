@@ -31,7 +31,6 @@ api = wandb.Api(overrides=None, timeout=None, api_key =None)
 # Set the style and color palette
 sns.set_style("whitegrid")
 sns.set_palette("pastel")
-plt.rcParams['figure.facecolor'] = '#C7D9FF'
 
 def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
     fig = plt.figure(figsize=(8, 4), dpi=100)
@@ -174,11 +173,12 @@ def wandb_get_data(project_name: str,
     loss = loss_dict[loss_num]
     filtered_runs = []
 
+    # Don't filter for t_mech when running for heatmap data
     # Filter by above settings and remove any crashed or incomplete runs
     for run in runs:
         if (run.config.get('teacher') == teacher and 
             run.config.get('student') == student and
-            run.config.get('teacher_mechanism') == t_mech and
+            # run.config.get('teacher_mechanism') == t_mech and
             run.config.get('loss') == loss):
             history = run.history()
             if '_step' in history.columns and history['_step'].max() >= 100:
@@ -216,7 +216,7 @@ def wandb_get_data(project_name: str,
 
         # Name each row of the dataframe with the values of the grouped metrics
         # **Use shortened names for mechs**
-        combined['Group Name'] = [('S: ' + mech_map[key[1]])] * len(combined)
+        combined['Group Name'] = [('T: ' + mech_map[key[0]] + ', S: ' + mech_map[key[1]])] * len(combined)
         histories.append(combined)
 
     # histories = get_histories(grouped_runs)
@@ -235,10 +235,9 @@ def plot_counterfactual_heatmaps(combined_history: List[pd.DataFrame], exp_dict:
                            
     for history in combined_history:
         name = history['Group Name'].iloc[0]
-        # Split name
-        mechs= name.split(' ')
-        row = list(exp_dict.keys()).index(mechs[1])
-        col = list(exp_dict.keys()).index(mechs[0])
+        mechs= name.split(', ')
+        row = mech_map_names.index(mechs[1].replace('S: ' , ''))
+        col = mech_map_names.index(mechs[0].replace('T: ', ''))
         for key in exp_dict.keys():
             data_to_plot[key][row, col] = history[f'{key} Mean'].loc[history[f'{key} Mean'].last_valid_index()]
 
@@ -246,39 +245,12 @@ def plot_counterfactual_heatmaps(combined_history: List[pd.DataFrame], exp_dict:
         fig, ax = plt.subplots()
         heatmap = sns.heatmap(data, cmap='mako', annot=True, fmt=".1f", cbar=True, ax=ax)
         
-        ax.set_xticklabels(axes_labels, rotation='vertical', fontsize=8)
-        ax.set_yticklabels(axes_labels, rotation='horizontal', fontsize=8)
-        ax.set_xlabel('Teacher Training Mechanism')
-        ax.set_ylabel('Student Distillation Training Mechanism')
-        ax.set_title(f'Counterfactual {key.replace("_", " ")} Test Accuracy - {loss} Loss')
+        ax.set_xticklabels(axes_labels, rotation='vertical', fontsize=12)
+        ax.set_yticklabels(axes_labels, rotation='horizontal', fontsize=12)
+        ax.set_xlabel('Teacher Training Mechanism', fontsize=15)
+        ax.set_ylabel('Student Distillation Training Mechanism', fontsize=15)
+        # ax.set_title(f'Counterfactual {key.replace("_", " ")} Test Accuracy - {loss} Loss')
         plt.savefig(f'images/heatmaps/{loss}/'+key+'.png', dpi=300, bbox_inches='tight')
-
-
-# def compute_mean_and_variance(run: Run, metric: str):
-#     """Compute the mean and variance for a specific metric in a run."""
-#     metric_values = run.history[[metric]]
-#     mean = metric_values.groupby(metric_values.index)[metric].mean()
-#     mean = mean.reset_index().rename(columns={metric: f'{metric} Mean'})
-#     var = metric_values.groupby(metric_values.index)[metric].var()
-#     var = var.reset_index().rename(columns={metric: f'{metric} Var'})
-#     return mean.merge(var, on=metric_values.index)
-
-
-# def process_runs(runs: List[Run]):
-#     """Compute the mean and variance for all metrics in a group of runs."""
-#     metrics = runs[0].history.columns
-#     means_and_vars = {metric: compute_mean_and_variance(run, metric) for run in runs for metric in metrics}
-#     return reduce(lambda df1, df2: df1.merge(df2, on=df1.index), means_and_vars.values())
-
-
-# def get_histories(grouped_runs: Dict[Tuple[str, ...], List[Run]]) -> List[pd.DataFrame]:
-#     """Compute the mean and variance for all metrics for each group of runs."""
-#     histories = []
-#     for key, runs in grouped_runs.items():
-#         combined = process_runs(runs)
-#         combined['name'] = [' '.join([str(k) for k in key])] * len(combined)
-#         histories.append(combined)
-#     return histories
 
 
 def get_grouped_runs(runs: List[Run], groupby_metrics: List[str]) -> Dict[Tuple[str, ...], List[Run]]:
@@ -393,7 +365,7 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
         labelLines(axs[i].get_lines(), align=False, fontsize=11)
         axs[i].set_xlabel('Training step/100 iterations', fontsize=15)
     lines, labels = axs[0].get_legend_handles_labels()
-    fig.legend(lines, labels, loc='lower center', ncol=num_groups, fontsize=18, bbox_to_anchor=(0.5, -0.02))
+    fig.legend(lines, labels=list(exp_dict_all.keys()), loc='lower center', ncol=num_groups, fontsize=18, bbox_to_anchor=(0.5, -0.02))
     # fig.suptitle(title, fontsize=20)
     plt.tight_layout(pad=5)
     plt.savefig('images/vstime/'+title+'.png', dpi=300, bbox_inches='tight')
@@ -421,11 +393,11 @@ def wandb_plot(histories: List[pd.DataFrame], title: str) -> None:
 
 plot_names = ['M S1 S2', 'S1 S2', 'Rand S1', 'Rand S2', 'Rand M']
 if __name__ == "__main__":
-    title = 'Jacobian Loss'
-    loss_num = 1
+    title = 'Jacobian Matching Distillation'
+    loss_num = 0
     exp_dict = dominoes_exp_dict
     loss = loss_dict[loss_num]
     # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
     histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=2, loss_num=loss_num)
-    wandb_plot(histories, title)
-    # plot_counterfactual_heatmaps(histories, dominoes_exp_dict, loss_num)
+    #wandb_plot(histories, title)
+    plot_counterfactual_heatmaps(histories, dominoes_exp_dict, loss_num)

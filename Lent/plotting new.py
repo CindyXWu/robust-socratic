@@ -41,7 +41,8 @@ def wandb_get_data(project_name: str,
                    s_mech: Optional[int] = None,
                    t_mech: Optional[int] = None,
                    loss_num: Optional[int] = None,
-                   use_t_mech: Optional[bool] = False) -> List[pd.DataFrame]:
+                   plot_tmechs_together: Optional[bool] = False,
+                   plot_loss_together: Optional[bool] = False) -> List[pd.DataFrame]:
     """Get data from wandb for experiment set, filter and group. 
     Calculate mean/var of metrics and return historical information with mean/var interleaved."""
     runs = api.runs(project_name) 
@@ -57,12 +58,16 @@ def wandb_get_data(project_name: str,
     for run in runs:
         # if "_timestamp" not in run.summary.keys():
         #     continue
-        if (run.config.get('loss') == loss and
+        if (
+            run.config.get('loss') == loss and
             run.config.get('teacher_mechanism') == t_mech
-            # run.state != 'running' and
+            # run.state != 'running'
             # datetime.datetime.fromtimestamp(run.summary["_timestamp"]) >= cutoff_date
             ):
-            history = run.history()
+            try:
+                history = run.history()
+            except:
+                history = run.history
             if '_step' in history.columns and history['_step'].max() >= 10:
                 filtered_runs.append(run)
                 # Clean history of NaNs
@@ -98,10 +103,12 @@ def wandb_get_data(project_name: str,
 
         # Name each row of the dataframe with the values of the grouped metrics
         # **Use shortened names for mechs**
-        if use_t_mech:
+        if plot_tmechs_together and not plot_loss_together:
             combined['Group Name'] = [('T: '+new_mech_map[key[0]]+', S: '+new_mech_map[key[1]])] * len(combined)
-        else:
+        elif not plot_tmechs_together and not plot_loss_together:
             combined['Group Name'] = [('S: '+new_mech_map[key[1]])] * len(combined)
+        elif plot_tmechs_together and plot_loss_together:
+            combined['Group Name'] = [('T: '+new_mech_map[key[0]]+', S: '+new_mech_map[key[1]]+', L: '+key[2])] * len(combined)
         histories.append(combined)
     # histories = get_histories(grouped_runs)
     assert len(histories) is not None
@@ -167,9 +174,9 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
 
     # Determine rows and columns for subplots
     n_metrics = len(cols)
-    n_cols = min(3, len(cols))
+    n_cols = min(2, len(cols))
     n_rows = np.ceil(n_metrics / n_cols).astype(int)
-    plot_width, plot_height = 20, 5* n_rows
+    plot_width, plot_height = 15, 4* n_rows
 
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(plot_width, plot_height), sharey=True)
     axs = axs.flatten() # Flatten the axs array so that we can iterate over it with a single loop
@@ -192,6 +199,7 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
 
     for ax in axs:
         ax.set_prop_cycle(color=[color_dict[group_name] for group_name in color_dict])
+        ax.tick_params(axis='both', which='major', labelsize=15)
 
     for i, mean_col in enumerate(cols):
         var_col = mean_col.replace(' Mean', ' Var')
@@ -209,7 +217,7 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
                                     history[mean_col] + history[var_col].apply(np.sqrt),
                                     alpha=0.2)
         if mode == 'acc' or mode == 'fidelity':
-            axs[i].set_ylim(0, 100)
+            axs[i].set_ylim(0, 110)
         else:
             axs[i].set_ylim(0, 7)
         axs[i].set_title(plot_names[i], fontsize=20)
@@ -217,10 +225,10 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
         axs[i].set_xlabel('Training step/100 iterations', fontsize=20)
 
     lines, labels = axs[0].get_legend_handles_labels()
-    fig.legend(lines, labels, loc='lower center', ncol=num_groups, fontsize=18, bbox_to_anchor=(0.5, -0.05))
-    fig.suptitle(title, fontsize=20)
+    fig.legend(lines, labels, loc='lower center', ncol=num_groups, fontsize=18, bbox_to_anchor=(0.5, -0.1))
+    # fig.suptitle(title, fontsize=20)
     plt.tight_layout(pad=2)
-    plt.savefig('images/vstime/'+title.replace('%','')+'.png', dpi=500, bbox_inches='tight')
+    plt.savefig(base_dir+title.replace('%','')+'.png', dpi=500, bbox_inches='tight')
 
 
 def counterfactual_plot(histories: pd.DataFrame, counterfactual_dict: Dict[str, List], title: str) -> None:
@@ -279,24 +287,38 @@ def get_counterfactual_order_list():
 
 
 
-plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=NP S1=100 S2=100', 'iii) M=100 S1=R S2=100', 'iv) M=100 S1=100 S2=R', 'v) M=R S1=100 S2=100']
+# plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=NP S1=100 S2=100', 'iii) M=100 S1=R S2=100', 'iv) M=100 S1=100 S2=R', 'v) M=R S1=100 S2=100']
 # For shapes
-# plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=100 S1=R S2=100', 'iii) M=100 S1=100 S2=R', 'iv) M=R S1=100 S2=100']
+plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=100 S1=R S2=100', 'iii) M=100 S1=100 S2=R', 'iv) M=R S1=100 S2=100']
 teacher_mechs = ['M=100% S1=0% S2=0%', 'M=100% S1=0% S2=60%', 'M=100% S1=30% S2=60%']
+
 if __name__ == "__main__":
-    use_t_mech = False
+    plot_tmechs_together = False
+    plot_loss_together = False
+    dataset = 'Shapes'
+    base_dir = f'images/vstime/{dataset}/'
+    if not os.path.exists(base_dir):
+        os.makedirs(base_dir)
 
     for t_mech in range(3):
         for loss_num in range(2):
-            if not use_t_mech:
+            if not plot_tmechs_together and not plot_loss_together:
                 title = f'{loss_dict[loss_num]} Loss, Teacher Mechanism ' + teacher_mechs[t_mech]
-            else:
+                groupby_metrics=['teacher_mechanism','student_mechanism']
+            elif plot_tmechs_together and not plot_loss_together:
                 title = f'{loss_dict[loss_num]} Loss '
+                groupby_metrics=['teacher_mechanism','student_mechanism']
+            elif not plot_tmechs_together and plot_loss_together:
+                title = f'Teacher Mechanism {teacher_mechs[t_mech]}'
+                groupby_metrics=['teacher_mechanism','student_mechanism','loss']
+            else:
+                title = ''
+                groupby_metrics=['teacher_mechanism','student_mechanism','loss']
 
             metric_names = [x.split(":")[-1].strip() for x in list(exp_dict_all.keys())]
             counterfactual_metric_names = [x.split(":")[-1].strip() for x in list(counterfactual_dict_all.keys())]
             loss = loss_dict[loss_num]
             # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-            histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes gamma', t_num=1, s_num=1, exp_dict=exp_dict_all, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=t_mech, loss_num=loss_num, use_t_mech=use_t_mech)
-            # counterfactual_plot(histories, counterfactual_dict_all, title)
-            plot_counterfactual_heatmaps(histories, exp_dict=exp_dict_all, loss_num=loss_num)
+            histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Shapes delta', t_num=1, s_num=1, exp_dict=exp_dict_all, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=t_mech, loss_num=loss_num, plot_tmechs_together=plot_tmechs_together, plot_loss_together=plot_loss_together)
+            counterfactual_plot(histories, counterfactual_dict_all, title)
+            # plot_counterfactual_heatmaps(histories, exp_dict=exp_dict_all, loss_num=loss_num)

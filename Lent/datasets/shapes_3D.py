@@ -169,10 +169,16 @@ def dataloader_3D_shapes(load_type, batch_size, randomise=False, floor_frac=0, s
 
 
 if __name__ == "__main__":
-    bsize = 32
+    bsize = 4
     shapes_dataloader = dataloader_3D_shapes('train', bsize, floor_frac=0.5, scale_frac=0.5)
+    desired_class = 1  # choose the class you want
+
     for images, labels in shapes_dataloader:
-        print(labels)
-        images = einops.rearrange(images, 'b c h w -> b h w c')
-        show_images_grid(images, labels, bsize)
-        break
+        mask = labels == desired_class
+        if any(mask):
+            images = images[mask]  # get only images of the desired class
+            labels = labels[mask]  # get only labels of the desired class
+            images = einops.rearrange(images, 'b c h w -> b h w c')
+            num_images = len(images)  # update num_images to the number of images after filtering
+            show_images_grid(images, labels, num_images)
+            break
