@@ -70,121 +70,112 @@ net = linear_net(num_features, dropout=dropout).to(device)
 # Fraction of simple datapoints to randomise
 fracs = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 # List of complex indices (cols) to randomise (see utils.py)
-X_list = [[1,2], [1,2], [1,2], [1], [1], [1], [2], [2], [2]]
+X_list = [[1,2], [1], [2]]
 # List of test complex indices (cols) to randomise
-SC_list = [[0], [0,1], [0,2], [0], [0,1], [0,2], [0], [0,1], [0,2]]
+SC_list = [[0], [0,1], [0,2]]
 
 
 # Outer loop to run all experiments
-for X, SC in zip(X_list, SC_list):
+for X in X_list:
+    for SC in SC_list:
 
-    # For storing results
-    column_names = []
-    for frac in fracs:
-        column_names.append(f'train_{frac}')
-        column_names.append(f'test_{frac}')
-    df = pd.DataFrame(columns=column_names)
+        # For storing results
+        column_names = []
+        for frac in fracs:
+            column_names.append(f'train_{frac}')
+            column_names.append(f'test_{frac}')
+        df = pd.DataFrame(columns=column_names)
 
-    X = np.array(X)
-    SC = np.array(SC)
-    title = f'train_{X}_test_{SC}'
+        X = np.array(X)
+        SC = np.array(SC)
+        title = f'train_{X}_test_{SC}'
 
-    # Set output directory by experiment number
-    output_dir = "Michaelmas/teacher_linear_"+str(exp)+"/"
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+        for frac in fracs:
+            net.apply(weight_reset)
+            net = linear_net(num_features, dropout=dropout).to(device)
+            # Train and test dataset names
+            # Add experiment number to start of file name
+            FILE_TEST = "exp" + str(exp) + "test 1 " + str(frac) + ".csv"
+            FILE_TRAIN = "exp" + str(exp) + "train 1 " + str(frac) + ".csv"
+            X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
+            # Reshape y tensor tp (datapoints*1)
+            y_train = y_train.reshape(-1,1)
+            train_dataset = CustomDataset(X_train, y_train)
+            train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-    for frac in fracs:
-        net.apply(weight_reset)
-        net = linear_net(num_features, dropout=dropout).to(device)
-        # Train and test dataset names
-        # Add experiment number to start of file name
-        FILE_TEST = "exp" + str(exp) + "test 1 " + str(frac) + ".csv"
-        FILE_TRAIN = "exp" + str(exp) + "train 1 " + str(frac) + ".csv"
-        X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
-        # Reshape y tensor tp (datapoints*1)
-        y_train = y_train.reshape(-1,1)
-        train_dataset = CustomDataset(X_train, y_train)
-        train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+            # Test dataset has same number of points as train
+            X_test, y_test = my_test_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, sc=SC)
+            # Reshape y tensor
+            y_test = y_test.reshape(-1,1)
+            test_dataset = CustomDataset(X_test, y_test)
+            test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-        # Test dataset has same number of points as train
-        X_test, y_test = my_test_dataloader(gen=GEN, filename=FILE_TEST, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, sc=SC)
-        # Reshape y tensor
-        y_test = y_test.reshape(-1,1)
-        test_dataset = CustomDataset(X_test, y_test)
-        test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
+            optimizer = torch.optim.SGD(net.parameters(), lr=lr)
+            optimizer.zero_grad()
 
-        optimizer = torch.optim.SGD(net.parameters(), lr=lr)
-        optimizer.zero_grad()
+            train_acc = []
+            test_acc = []
+            train_loss = [0]  # loss at iteration 0
+            it_per_epoch = len(train_loader)
 
-        train_acc = []
-        test_acc = []
-        train_loss = [0]  # loss at iteration 0
-        it_per_epoch = len(train_loader)
+            print("Initial train accuracy: ", evaluate(net, train_loader))
+            it = 0
+            for epoch in range(epochs):
+                for features, labels in tqdm(train_loader):
+                    out = net(features)
+                    scores = sigmoid(out)
+                    loss = loss_fn(scores, labels)
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+                    train_loss.append(loss.item())
+                    # Evaluate model at this iteration
+                    if it % 100 == 0:
+                        # max_ex is the number of batches to evaluate
+                        train_acc.append(evaluate(net, train_loader, max_ex=10))
+                        test_acc.append(evaluate(net, test_loader, max_ex=10))
+                        print("Iteration: ", it, "Train accuracy: ", train_acc[-1], "Test accuracy: ", test_acc[-1])
+                    it += 1
+            train_acc.append(evaluate(net, train_loader, max_ex=100))
+            test_acc.append(evaluate(net, test_loader))
+            data = {f'train_{frac}': train_acc, f'test_{frac}': test_acc}
+            # Create a temporary DataFrame and append it to the main DataFrame
+            df_temp = pd.DataFrame(data)
+            df = pd.concat([df, df_temp])
 
-        print("Initial train accuracy: ", evaluate(net, train_loader))
-        it = 0
-        for epoch in range(epochs):
-            for features, labels in tqdm(train_loader):
-                out = net(features)
-                scores = sigmoid(out)
-                loss = loss_fn(scores, labels)
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                train_loss.append(loss.item())
-                # Evaluate model at this iteration
-                if it % 100 == 0:
-                    # max_ex is the number of batches to evaluate
-                    train_acc.append(evaluate(net, train_loader, max_ex=10))
-                    test_acc.append(evaluate(net, test_loader, max_ex=10))
-                    print("Iteration: ", it, "Train accuracy: ", train_acc[-1], "Test accuracy: ", test_acc[-1])
-                it += 1
-        train_acc.append(evaluate(net, train_loader, max_ex=100))
-        test_acc.append(evaluate(net, test_loader))
-        data = {f'train_{frac}': train_acc, f'test_{frac}': test_acc}
-        # Create a temporary DataFrame and append it to the main DataFrame
-        df_temp = pd.DataFrame(data)
-        df = pd.concat([df, df_temp])
-        # plot_loss(train_loss, it, it_per_epoch, base_name=output_dir + "loss_"+title, title=title)
-        # plot_acc(train_acc, test_acc, it, base_name=output_dir + "acc_"+title, title=title)
 
-        models[f'frac simple randomised {frac}'] = {'model': net,
-                            'model_state_dict': net.state_dict(),
-                            'optimizer_state_dict': optimizer.state_dict(),
-                            'loss_hist': train_loss,
-                            'simple frac random': frac,
-                            'lr':lr,
-                            'test_acc': test_acc[-1]}
+            models[f'frac simple randomised {frac}'] = {'model': net,
+                                'model_state_dict': net.state_dict(),
+                                'optimizer_state_dict': optimizer.state_dict(),
+                                'loss_hist': train_loss,
+                                'simple frac random': frac,
+                                'lr':lr,
+                                'test_acc': test_acc[-1]}
 
-    for key in models.keys():
-        print("frac randomised: %s, test_acc: %s" % (models[key]['simple frac random'], models[key]['test_acc']))
+        for key in models.keys():
+            print("frac randomised: %s, test_acc: %s" % (models[key]['simple frac random'], models[key]['test_acc']))
 
-        # Save every model trained on different training data
-        # Means teacher models need to be retrained if fracs change for student model
-        torch.save({'epoch': epoch,
-                'model_state_dict': models[key]['model_state_dict'],
-                'optimizer_state_dict': optimizer.state_dict(),
-                'loss_hist': train_loss},
-                output_dir + "teacher_"+ key)
+            # Save every model trained on different training data
+            # Means teacher models need to be retrained if fracs change for student model
+            torch.save({'epoch': epoch,
+                    'model_state_dict': models[key]['model_state_dict'],
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss_hist': train_loss},
+                    result_dir+title)
 
-    test_accs = [models[key]['test_acc'] for key in models.keys()]
-    xs = [models[key]['simple frac random'] for key in models.keys()]
-    keys = [key for key in models.keys()]
+        test_accs = [models[key]['test_acc'] for key in models.keys()]
+        xs = [models[key]['simple frac random'] for key in models.keys()]
+        keys = [key for key in models.keys()]
 
-    # Plot summary
-    fig = plt.figure(figsize=(8, 4), dpi=100)
-    plt.scatter(xs, test_accs)
-    plt.title("{0} Epochs".format(epochs))
-    plt.ylabel('Test accuracy')
-    plt.xlabel('Randomised fraction of simple feature during training')
-    fig.savefig(output_dir + 'summary_{0}epochs.png'.format(epochs))
+        # Plot summary
+        fig = plt.figure(figsize=(8, 4), dpi=100)
+        plt.scatter(xs, test_accs)
+        plt.title("{0} Epochs".format(epochs))
+        plt.ylabel('Test accuracy')
+        plt.xlabel('Randomised fraction of simple feature during training')
+        fig.savefig(result_dir + 'summary_{0}epochs.png'.format(epochs))
 
-    exp += 1
+        exp += 1
 
-    print("Title to save: ", title)
-
-    df.to_csv(f'{result_dir}{title}.csv', index=True)
-    plot_df(df, base_name=result_dir, title=title)
-
-    break
+        df.to_csv(f'{result_dir}{title}.csv', index=True)
+        plot_df(df, base_name=result_dir, title=title)

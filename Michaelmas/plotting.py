@@ -53,7 +53,7 @@ def plot_df(df: pd.DataFrame, base_name: Optional[str] = '', title: Optional[str
 
     # Use colormap to assign colors based on unique fractions
     unique_fracs = df_melt['Fraction'].unique()
-    cmap = plt.cm.get_cmap('winter', len(unique_fracs))
+    cmap = plt.cm.get_cmap('viridis', len(unique_fracs))
     frac_colors = {frac: cmap(i) for i, frac in enumerate(unique_fracs)}
 
     lines = []
@@ -119,7 +119,13 @@ def plot_data(data_arr, d1, d2, title=''):
     plt.savefig('data '+title+'.png')
 
 if __name__ == '__main__':
-    base_dir = 'Michaelmas/teacher_results/'
-    filename = 'train_[1 2]_test_[0]'
-    df = pd.read_csv(base_dir+filename+'.csv', index_col=0)
-    plot_df(df, base_name=base_dir, title=filename)
+    # List of complex indices (cols) to randomise (see utils.py)
+    X_list = [[1,2], [1], [2]]
+    # List of test complex indices (cols) to randomise
+    SC_list = [[0], [0,1], [0,2]]
+    for X in X_list:
+        for SC in SC_list:
+            filename = f'train_{X}_test_{SC}'
+            base_dir = 'Michaelmas/teacher_results/'
+            df = pd.read_csv(base_dir+filename+'.csv', index_col=0)
+            plot_df(df, base_name=base_dir, title=filename)
