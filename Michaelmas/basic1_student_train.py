@@ -75,7 +75,7 @@ train_results_df = pd.DataFrame(columns=['X', 'SC', 'temp', 'frac', 'avg_accurac
 test_results_df = pd.DataFrame(columns=['X', 'SC', 'temp', 'frac', 'avg_accuracy'])
 
 # Fraction of simple datapoints to randomise
-fracs = [0, 1]
+fracs = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
 # # List of complex indices (cols) to do split randomise on (see utils.py)
 # X_list = [[1, 2], [1], [2]]
 # # For test - start with randomising simple feature (first row)
@@ -221,12 +221,10 @@ for (X, SC) in product(X_list, SC_list):
     subset_df = train_results_df[(train_results_df['X'] == str(X).replace(',','')) & (train_results_df['SC'] == str(SC))]
     subset_df = subset_df.pivot_table(index='frac', columns='temp', values='avg_accuracy')
     assert not subset_df.empty, 'No data for X={}, SC={}'.format(str(X), str(SC))
-    plot_df(subset_df, base_name='train_X{}_SC{}_'.format(str(X), str(SC)), title='Training Accuracy')
 
     # Plotting for testing data
     subset_df = test_results_df[(test_results_df['X'] == str(X).replace(',','')) & (test_results_df['SC'] == str(SC))]
     subset_df = subset_df.pivot_table(index='frac', columns='temp', values='avg_accuracy')
-    plot_df(subset_df, base_name='test_X{}_SC{}_'.format(str(X), str(SC)), title='Testing Accuracy')
 
 
 # Save the DataFrames to csv

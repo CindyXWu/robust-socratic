@@ -63,7 +63,7 @@ exp =  1
 #TRAIN============================================================
 loss_fn = nn.BCELoss()
 sigmoid = nn.Sigmoid()
-models = {}
+
 old_test_acc = 0
 net = linear_net(num_features, dropout=dropout).to(device)
 
@@ -78,7 +78,7 @@ SC_list = [[0], [0,1], [0,2]]
 # Outer loop to run all experiments
 for X in X_list:
     for SC in SC_list:
-
+        models = {}
         # For storing results
         column_names = []
         for frac in fracs:
@@ -94,8 +94,8 @@ for X in X_list:
             net.apply(weight_reset)
             net = linear_net(num_features, dropout=dropout).to(device)
             # Train and test dataset names
-            FILE_TEST = 'train' + title + '.csv'
-            FILE_TRAIN = 'test' + title + '.csv'
+            FILE_TEST = 'train' + title + str(frac) + '.csv'
+            FILE_TRAIN = 'test' + title + str(frac) + '.csv'
             X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
             # Reshape y tensor tp (datapoints*1)
             y_train = y_train.reshape(-1,1)
@@ -142,25 +142,15 @@ for X in X_list:
             df_temp = pd.DataFrame(data)
             df = pd.concat([df, df_temp])
 
-
-            models[f'frac simple randomised {frac}'] = {'model': net,
-                                'model_state_dict': net.state_dict(),
-                                'optimizer_state_dict': optimizer.state_dict(),
-                                'loss_hist': train_loss,
-                                'simple frac random': frac,
-                                'lr':lr,
-                                'test_acc': test_acc[-1]}
-
-        for key in models.keys():
-            print("frac randomised: %s, test_acc: %s" % (models[key]['simple frac random'], models[key]['test_acc']))
-
             # Save every model trained on different training data
             # Means teacher models need to be retrained if fracs change for student model
-            torch.save({'epoch': epoch,
-                    'model_state_dict': models[key]['model_state_dict'],
+            # Note save name includes X, SC and frac
+            torch.save({'model': net,
+                    'epoch': epoch,
+                    'model_state_dict': net.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss_hist': train_loss},
-                    result_dir+title)
+                    f'{result_dir}{title}_{frac}')
 
         test_accs = [models[key]['test_acc'] for key in models.keys()]
         xs = [models[key]['simple frac random'] for key in models.keys()]

@@ -155,6 +155,69 @@ def plot_images(dataloader: DataLoader, num_images: int, title: Optional[str] = 
         break
 
 
+def heatmap_get_data(project_name: str, 
+                   t_num: int, 
+                   s_num: int, 
+                   exp_dict: dict[str, List],
+                   groupby_metrics: List[str],
+                   s_mech: Optional[int] = None,
+                   t_mech: Optional[int] = None,
+                   loss_num: Optional[int] = None) -> List[pd.DataFrame]:
+    """Get data from wandb for experiment set, filter and group. 
+    Calculate mean/var of metrics and return historical information with mean/var interleaved."""
+    runs = api.runs(project_name) 
+    teacher = teacher_dict[t_num]
+    student = student_dict[s_num]
+    t_mech = list(exp_dict.keys())[t_mech] if t_mech else None
+    s_mech = list(exp_dict.keys())[s_mech] if s_mech else None
+    loss = loss_dict[loss_num]
+    filtered_runs = []
+
+    # Don't filter for t_mech when running for heatmap data
+    # Filter by above settings and remove any crashed or incomplete runs
+    for run in runs:
+        if run.config.get('loss') == loss:
+            history = run.history()
+            if '_step' in history.columns and history['_step'].max() >= 50:
+                filtered_runs.append(run)
+                # Clean history of NaNs
+                history = clean_history(history)
+                # Filter history
+                run.history = smooth_history(history)
+
+    assert(len(filtered_runs) > 0), "No runs found with the given settings"
+    grouped_runs = get_grouped_runs(filtered_runs, groupby_metrics)
+
+    # Compute the means and variances for all of the metrics for each group of runs
+    histories = []
+    for key, runs in grouped_runs.items():
+        metrics = defaultdict(list)
+        for run in runs:
+            history = run.history
+            for metric in history.columns:
+                metrics[metric].append(history[[metric]])
+
+        # Calculate the mean and variance for each metric between repeat runs
+        means_and_vars = {}
+        for metric, metric_values in metrics.items():
+            combined = pd.concat(metric_values)
+            mean = combined.groupby(combined.index)[metric].mean().reset_index().rename(columns={metric: f'{metric} Mean'})
+            var = combined.groupby(combined.index)[metric].var().reset_index().rename(columns={metric: f'{metric} Var'})
+            means_and_vars[metric] = mean.merge(var, left_index=True, right_index=True)
+
+        # Combine the means and vars for each metric into a single dataframe
+        first_metric = list(means_and_vars.keys())[0]
+        combined = means_and_vars[first_metric]
+        for metric in list(means_and_vars.keys())[1:]:
+            combined = combined.merge(means_and_vars[metric], left_index=True, right_index=True)
+
+        combined['Group Name'] = [('T: '+mech_map[key[0]]+', S: '+mech_map[key[1]])] * len(combined)
+        histories.append(combined)
+
+    # histories = get_histories(grouped_runs)
+    return histories
+
+
 def wandb_get_data(project_name: str, 
                    t_num: int, 
                    s_num: int, 
@@ -179,7 +242,7 @@ def wandb_get_data(project_name: str,
     for run in runs:
         if (run.config.get('teacher') == teacher and 
             run.config.get('student') == student and
-            run.config.get('teacher_mechanism') == t_mech and
+            # run.config.get('teacher_mechanism') == t_mech and
             run.config.get('loss') == loss):
             history = run.history()
             if '_step' in history.columns and history['_step'].max() >= 100:
@@ -398,14 +461,15 @@ def wandb_plot(histories: List[pd.DataFrame], title: str) -> None:
 plot_names = ['M S1 S2', 'S1 S2', 'Rand S1', 'Rand S2', 'Rand M']
 if __name__ == "__main__":
     title = 'Jacobian Matching Distillation'
-    mode = 1 # 0 for heatmap, 1 for plots
+    mode = 0 # 0 for heatmap, 1 for plots
+    loss_num = 1
 
-    loss_num = 0
     exp_dict = dominoes_exp_dict 
     loss = loss_dict[loss_num]
+
     if mode == 0:
         # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-        histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=2, loss_num=loss_num, plot_tmechs_together=True)
+        histories = heatmap_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=2, loss_num=loss_num)
         plot_counterfactual_heatmaps(histories, dominoes_exp_dict, loss_num)
     elif mode == 1:
         # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
