@@ -89,14 +89,13 @@ for X in X_list:
         X = np.array(X)
         SC = np.array(SC)
         title = f'train_{X}_test_{SC}'
-
+  
         for frac in fracs:
             net.apply(weight_reset)
             net = linear_net(num_features, dropout=dropout).to(device)
             # Train and test dataset names
-            # Add experiment number to start of file name
-            FILE_TEST = "exp" + str(exp) + "test 1 " + str(frac) + ".csv"
-            FILE_TRAIN = "exp" + str(exp) + "train 1 " + str(frac) + ".csv"
+            FILE_TEST = 'train' + title + '.csv'
+            FILE_TRAIN = 'test' + title + '.csv'
             X_train, y_train = my_train_dataloader(gen=GEN, filename=FILE_TRAIN, simple=NUM_SIMPLE, complex=COMPLEX, num_points=NUM_POINTS, mode=MODE, frac=frac, x=X)
             # Reshape y tensor tp (datapoints*1)
             y_train = y_train.reshape(-1,1)

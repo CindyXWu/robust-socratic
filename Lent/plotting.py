@@ -162,7 +162,8 @@ def wandb_get_data(project_name: str,
                    groupby_metrics: List[str],
                    s_mech: Optional[int] = None,
                    t_mech: Optional[int] = None,
-                   loss_num: Optional[int] = None) -> List[pd.DataFrame]:
+                   loss_num: Optional[int] = None,
+                   plot_tmechs_together: Optional[bool] = False) -> List[pd.DataFrame]:
     """Get data from wandb for experiment set, filter and group. 
     Calculate mean/var of metrics and return historical information with mean/var interleaved."""
     runs = api.runs(project_name) 
@@ -178,7 +179,7 @@ def wandb_get_data(project_name: str,
     for run in runs:
         if (run.config.get('teacher') == teacher and 
             run.config.get('student') == student and
-            # run.config.get('teacher_mechanism') == t_mech and
+            run.config.get('teacher_mechanism') == t_mech and
             run.config.get('loss') == loss):
             history = run.history()
             if '_step' in history.columns and history['_step'].max() >= 100:
@@ -216,7 +217,10 @@ def wandb_get_data(project_name: str,
 
         # Name each row of the dataframe with the values of the grouped metrics
         # **Use shortened names for mechs**
-        combined['Group Name'] = [('T: ' + mech_map[key[0]] + ', S: ' + mech_map[key[1]])] * len(combined)
+        if plot_tmechs_together:
+            combined['Group Name'] = [('T: '+mech_map[key[0]]+', S: '+mech_map[key[1]])] * len(combined)
+        else:
+            combined['Group Name'] = [('S: '+mech_map[key[1]])] * len(combined)
         histories.append(combined)
 
     # histories = get_histories(grouped_runs)
@@ -365,10 +369,10 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
         labelLines(axs[i].get_lines(), align=False, fontsize=11)
         axs[i].set_xlabel('Training step/100 iterations', fontsize=15)
     lines, labels = axs[0].get_legend_handles_labels()
-    fig.legend(lines, labels=list(exp_dict_all.keys()), loc='lower center', ncol=num_groups, fontsize=18, bbox_to_anchor=(0.5, -0.02))
+    fig.legend(lines, labels=student_names, loc='lower center', ncol=num_groups, fontsize=18, bbox_to_anchor=(0.5, -0.02))
     # fig.suptitle(title, fontsize=20)
     plt.tight_layout(pad=5)
-    plt.savefig('images/vstime/'+title+'.png', dpi=300, bbox_inches='tight')
+    plt.savefig('images/exhaustivevstime/'+title+'.png', dpi=300, bbox_inches='tight')
 
 
 def counterfactual_plot(histories: pd.DataFrame, exp_dict: Dict[str, List], title: str) -> None:
@@ -389,15 +393,21 @@ def counterfactual_plot(histories: pd.DataFrame, exp_dict: Dict[str, List], titl
 def wandb_plot(histories: List[pd.DataFrame], title: str) -> None:
     mean_cols = [col for col in histories[0].columns if col.replace(' Mean', '') in list(dominoes_exp_dict.keys())] 
     mean_cols.sort(key=lambda col: custom_sort(col, 'acc'))
-    make_plot(histories, mean_cols, title)
+    make_plot(histories, mean_cols, title, 'acc')
 
 plot_names = ['M S1 S2', 'S1 S2', 'Rand S1', 'Rand S2', 'Rand M']
 if __name__ == "__main__":
     title = 'Jacobian Matching Distillation'
+    mode = 1 # 0 for heatmap, 1 for plots
+
     loss_num = 0
-    exp_dict = dominoes_exp_dict
+    exp_dict = dominoes_exp_dict 
     loss = loss_dict[loss_num]
-    # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-    histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=2, loss_num=loss_num)
-    #wandb_plot(histories, title)
-    plot_counterfactual_heatmaps(histories, dominoes_exp_dict, loss_num)
+    if mode == 0:
+        # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
+        histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=2, loss_num=loss_num, plot_tmechs_together=True)
+        plot_counterfactual_heatmaps(histories, dominoes_exp_dict, loss_num)
+    elif mode == 1:
+        # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
+        histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=2, loss_num=loss_num, plot_tmechs_together=False)
+        wandb_plot(histories, title)

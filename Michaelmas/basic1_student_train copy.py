@@ -98,7 +98,14 @@ for X in X_list:
     for SC in SC_list:
         X = np.array(X)
         SC = np.array(SC)
-         
+        
+        # For storing results
+        column_names = []
+        for frac in fracs:
+            column_names.append(f'train_{frac}')
+            column_names.append(f'test_{frac}')
+        df = pd.DataFrame(columns=column_names)
+        
         load_path = "Michaelmas/teacher_results/"
         big_model = linear_net(NUM_FEATURES).to(device)
 
@@ -136,61 +143,59 @@ for X in X_list:
                 # Title for saving and plotting
                 title = f'train_{X}_test_{SC}_{temp}'
 
-                for rep in range(repeats):
-                    small_model = small_linear_net(NUM_FEATURES).to(device)
-                    small_model.apply(weight_reset)
-                    optimizer = torch.optim.SGD(small_model.parameters(), lr=lr)
-                    optimizer.zero_grad()
-                    it = 0
-                    train_acc = []
-                    test_acc = []
-                    train_loss = [0]
-                    it_per_epoch = len(train_loader)
-                    for epoch in range(epochs):
-                        for features, labels in tqdm(train_loader):
-                            scores = small_model(features)
-                            targets = big_model(features)
+                small_model = small_linear_net(NUM_FEATURES).to(device)
+                small_model.apply(weight_reset)
+                optimizer = torch.optim.SGD(small_model.parameters(), lr=lr)
+                optimizer.zero_grad()
+                it = 0
+                train_acc = []
+                test_acc = []
 
-                            loss = my_loss(scores, targets, T=temp)
-                            #loss = bceloss_fn(sigmoid(scores), labels)
-                            optimizer.zero_grad()
-                            loss.backward()
-                            optimizer.step()
-                            train_loss.append(loss.item())
-                            if it % 100 == 0:
-                                train_acc.append(evaluate(small_model, train_loader, max_ex=100))
-                                test_acc.append(evaluate(small_model, test_loader))
-                                print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
-                            it += 1
-                    train_acc.append(evaluate(small_model, train_loader, max_ex=100))
-                    test_acc.append(evaluate(small_model, test_loader))
-                    exp_test_results[-1] += np.mean(test_acc[-3:])
-                    exp_train_results[-1] += np.mean(train_acc[-3:])
-                    # Once all repeats are done, divide by repeats to get average
-                    if rep == repeats - 1:
-                        avg_train_accuracy = exp_train_results[-1] / repeats
-                        avg_test_accuracy = exp_test_results[-1] / repeats
+                it_per_epoch = len(train_loader)
+                for epoch in range(epochs):
+                    for features, labels in tqdm(train_loader):
+                        scores = small_model(features)
+                        targets = big_model(features)
 
-                        # Add a row to each DataFrame
-                        train_results_df = train_results_df.append({
-                        'X': str(X),
-                        'SC': str(SC),
-                        'temp': temp,
-                        'frac': frac,
-                        'avg_accuracy': avg_train_accuracy
-                        }, ignore_index=True)
+                        loss = my_loss(scores, targets, T=temp)
+                        optimizer.zero_grad()
+                        loss.backward()
+                        optimizer.step()
+    
+                        if it % 100 == 0:
+                            train_acc.append(evaluate(small_model, train_loader, max_ex=100))
+                            test_acc.append(evaluate(small_model, test_loader))
+                            print('Iteration: %i, %.2f%%' % (it, test_acc[-1]))
+                        it += 1
+                train_acc.append(evaluate(small_model, train_loader, max_ex=100))
+                test_acc.append(evaluate(small_model, test_loader))
 
-                        test_results_df = test_results_df.append({
-                            'X': str(X),
-                            'SC': str(SC),
-                            'temp': temp,
-                            'frac': frac,
-                            'avg_accuracy': avg_test_accuracy
-                        }, ignore_index=True)
+                data = {f'train_{frac}': train_acc, f'test_{frac}': test_acc}
+                df_temp = pd.DataFrame(data)
+                df = pd.concat([df, df_temp])
+                df.to_csv(f'{output_dir}{title}.csv', index=True)
+                plot_df(df, base_name=output_dir, title=title)
 
-                        # Add new element to account for next frac
-                        exp_test_results.append(0)
-                        exp_train_results.append(0)
+                # Add a row to each DataFrame
+                train_results_df = train_results_df.append({
+                'X': str(X),
+                'SC': str(SC),
+                'temp': temp,
+                'frac': frac,
+                'acc': train_acc[-1]
+                }, ignore_index=True)
+
+                test_results_df = test_results_df.append({
+                    'X': str(X),
+                    'SC': str(SC),
+                    'temp': temp,
+                    'frac': frac,
+                    'acc': test_acc[-1]
+                }, ignore_index=True)
+
+                # Add new element to account for next frac
+                exp_test_results.append(0)
+                exp_train_results.append(0)
 
                 # Only output stats to console of last model
                 print(test_acc[-1])
@@ -199,13 +204,9 @@ for X in X_list:
                                     'optimizer_state_dict': optimizer.state_dict(),
                                     'lr': lr,
                                     'simple frac random': frac,
-                                    'loss_hist': train_loss,
                                     'train_acc': train_acc,
                                     'test_acc': test_acc,
                                     'iterations': it}
-            
-        # np.savetxt(output_dir + "train_avg.csv", np.array(exp_train_results), delimiter=",")
-        # np.savetxt(output_dir + "test_avg.csv", np.array(exp_test_results), delimiter=",")
 
         for key in models.keys():
             print("frac randomised: %s, test_acc: %s" % (models[key]['simple frac random'], models[key]['test_acc']))
@@ -229,6 +230,5 @@ for (X, SC) in product(X_list, SC_list):
     plot_df(subset_df, base_name='test_X{}_SC{}_'.format(str(X), str(SC)), title='Testing Accuracy')
 
 
-# Save the DataFrames to csv
 train_results_df.to_csv(output_dir + "train_avg.csv", index=False)
 test_results_df.to_csv(output_dir + "test_avg.csv", index=False)
