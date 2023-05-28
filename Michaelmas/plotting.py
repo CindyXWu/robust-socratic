@@ -128,4 +128,5 @@ if __name__ == '__main__':
             filename = f'train_{X}_test_{SC}'
             base_dir = 'Michaelmas/teacher_results/'
             df = pd.read_csv(base_dir+filename+'.csv', index_col=0)
+            print(df.head())
             plot_df(df, base_name=base_dir, title=filename)

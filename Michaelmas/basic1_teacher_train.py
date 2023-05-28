@@ -78,7 +78,6 @@ SC_list = [[0], [0,1], [0,2]]
 # Outer loop to run all experiments
 for X in X_list:
     for SC in SC_list:
-        models = {}
         # For storing results
         column_names = []
         for frac in fracs:
@@ -114,7 +113,6 @@ for X in X_list:
 
             train_acc = []
             test_acc = []
-            train_loss = [0]  # loss at iteration 0
             it_per_epoch = len(train_loader)
 
             print("Initial train accuracy: ", evaluate(net, train_loader))
@@ -127,10 +125,8 @@ for X in X_list:
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
-                    train_loss.append(loss.item())
-                    # Evaluate model at this iteration
+
                     if it % 100 == 0:
-                        # max_ex is the number of batches to evaluate
                         train_acc.append(evaluate(net, train_loader, max_ex=10))
                         test_acc.append(evaluate(net, test_loader, max_ex=10))
                         print("Iteration: ", it, "Train accuracy: ", train_acc[-1], "Test accuracy: ", test_acc[-1])
@@ -148,21 +144,8 @@ for X in X_list:
             torch.save({'model': net,
                     'epoch': epoch,
                     'model_state_dict': net.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'loss_hist': train_loss},
+                    'optimizer_state_dict': optimizer.state_dict()},
                     f'{result_dir}{title}_{frac}')
-
-        test_accs = [models[key]['test_acc'] for key in models.keys()]
-        xs = [models[key]['simple frac random'] for key in models.keys()]
-        keys = [key for key in models.keys()]
-
-        # Plot summary
-        fig = plt.figure(figsize=(8, 4), dpi=100)
-        plt.scatter(xs, test_accs)
-        plt.title("{0} Epochs".format(epochs))
-        plt.ylabel('Test accuracy')
-        plt.xlabel('Randomised fraction of simple feature during training')
-        fig.savefig(result_dir + 'summary_{0}epochs.png'.format(epochs))
 
         exp += 1
 
