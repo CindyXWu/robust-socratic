@@ -107,7 +107,7 @@ for x_i, X in enumerate(X_list):
         load_path = "Michaelmas/teacher_results/"
         teacher = linear_net(NUM_FEATURES).to(device)
 
-        output_dir = "Michaelmas/large_student_results/"
+        output_dir = "Michaelmas/medium_student_results/"
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -122,7 +122,7 @@ for x_i, X in enumerate(X_list):
             teacher.load_state_dict(checkpoint['model_state_dict'])
             teacher.eval()
 
-            student = small_linear_net(NUM_FEATURES).to(device)
+            student = medium_linear_net(NUM_FEATURES).to(device)
             student.apply(weight_reset)
             student.train()
 
