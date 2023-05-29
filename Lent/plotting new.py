@@ -169,6 +169,7 @@ def custom_sort(col: str, type: str) -> int:
 
 
 def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: str) -> None:
+    """Adjust legend location as necessary."""
     sns.set(style='whitegrid', context='paper', font_scale=1)
     num_groups = len(set([history['Group Name'].iloc[0] for history in histories]))
 
@@ -200,11 +201,12 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
     for ax in axs:
         ax.set_prop_cycle(color=[color_dict[group_name] for group_name in color_dict])
         ax.tick_params(axis='both', which='major', labelsize=15)
-
+    legend_handles = []
     for i, mean_col in enumerate(cols):
         var_col = mean_col.replace(' Mean', ' Var')
         for line_num, history in enumerate(histories):
             group_name = history['Group Name'].iloc[0]
+            print("line", line_num, "group", group_name)
             if mean_col in history.columns and var_col in history.columns:
                 line = axs[i].plot(history.index, 
                                    history[mean_col], 
@@ -216,6 +218,12 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
                                     history[mean_col] - history[var_col].apply(np.sqrt),
                                     history[mean_col] + history[var_col].apply(np.sqrt),
                                     alpha=0.2)
+                if i == 0:  # Only add legend handles once per group
+                    legend_handles.append(mpl.lines.Line2D([0], [0], 
+                                                           color=color_dict[group_name], 
+                                                           linestyle=line_styles[line_num%len(line_styles)], 
+                                                           label=student_names[line_num],
+                                                           linewidth=2))
         if mode == 'acc' or mode == 'fidelity':
             axs[i].set_ylim(0, 110)
         else:
@@ -225,7 +233,7 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
         axs[i].set_xlabel('Training step/100 iterations', fontsize=20)
 
     lines, labels = axs[0].get_legend_handles_labels()
-    fig.legend(lines, labels, loc='lower center', ncol=num_groups, fontsize=18, bbox_to_anchor=(0.5, -0.1))
+    fig.legend(handles=legend_handles, loc='lower center', ncol=num_groups, bbox_to_anchor=(0.5, -0.1), fontsize=17, frameon=False)
     # fig.suptitle(title, fontsize=20)
     plt.tight_layout(pad=2)
     plt.savefig(base_dir+title.replace('%','')+'.png', dpi=500, bbox_inches='tight')
@@ -285,20 +293,51 @@ def get_counterfactual_order_list():
     order_list = counterfactual_metric_names + const_graph_list
     return order_list
 
-
-
-# plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=NP S1=100 S2=100', 'iii) M=100 S1=R S2=100', 'iv) M=100 S1=100 S2=R', 'v) M=R S1=100 S2=100']
-# For shapes
-plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=100 S1=R S2=100', 'iii) M=100 S1=100 S2=R', 'iv) M=R S1=100 S2=100']
+# Use shortening for legends in plots
+mech_map = {"CIFAR10": "C", 
+            "Box": "B", 
+            "MNIST": "M", 
+            "MNIST_Box": "MB", 
+            "CIFAR10_MNIST": "CM", 
+            "CIFAR10_Box": "CB", 
+            "CIFAR10_MNIST_Box": "CMB"}
+new_mech_map = {"M=100% S1=0% S2=0%": "100 0 0", 
+                  "M=100% S1=0% S2=60%": "100 0 60", 
+                  "M=100% S1=30% S2=60%": "100 30 60",
+                  "M=100% S1=60% S2=90%": "100 60 90",
+                  "M=100% S1=90% S2=60%": "100 90 60"
+                  }
+new_mech_list = ["100 0 0", "100 0 60", "100 30 60", "100 60 90", "100 90 60"]
+mech_map_names = ["C", "B", "M", "MB", "CM", "CB", "CMB"]
 teacher_mechs = ['M=100% S1=0% S2=0%', 'M=100% S1=0% S2=60%', 'M=100% S1=30% S2=60%']
 
 if __name__ == "__main__":
     plot_tmechs_together = False
     plot_loss_together = False
     dataset = 'Shapes'
+    version = 'delta'
     base_dir = f'images/vstime/{dataset}/'
-    if not os.path.exists(base_dir):
-        os.makedirs(base_dir)
+
+    if dataset == 'Dominoes':
+        plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=NP S1=100 S2=100', 'iii) M=100 S1=R S2=100', 'iv) M=100 S1=100 S2=R', 'v) M=R S1=100 S2=100']
+        counterfactual_dict_all = {"All mechanisms: M=100% S1=100% S2=100%": 
+                           [1, 1, 1, False, False, False], 
+                           "Only spurious mechanisms: M=0% S1=100% S2=100%": [0, 1, 1, False, False, False], 
+                           "Randomize spurious mechanisms: M=100% S1=randomized S2=100%": [1, 1, 1, False, True, False], 
+                           "Randomize spurious mechanisms: M=100% S1=100% S2=randomized": [1, 1, 1, False, False, True], 
+                           "Randomize image: M=randomized S1=100% S2=100%": [1, 1, 1, True, False, False]
+                           }
+        student_names = ["Both spurious mechanisms: M=100% S1=90% S2=60%", "No mechanisms: M=100% S1=0% S2=0%", "Both spurious mechanisms: M=100% S1=60% S2=90%", ]
+
+    elif dataset == 'Shapes':
+        plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=100 S1=R S2=100', 'iii) M=100 S1=100 S2=R', 'iv) M=R S1=100 S2=100']
+        counterfactual_dict_all = {"All mechanisms: M=100% S1=100% S2=100%": 
+                           [1, 1, 1, False, False, False], 
+                           "Randomize spurious mechanisms: M=100% S1=randomized S2=100%": [1, 1, 1, False, True, False], 
+                           "Randomize spurious mechanisms: M=100% S1=100% S2=randomized": [1, 1, 1, False, False, True], 
+                           "Randomize image: M=randomized S1=100% S2=100%": [1, 1, 1, True, False, False]
+                           }
+        student_names = ["No mechanisms: M=100% S1=0% S2=0%", "Both spurious mechanisms: M=100% S1=90% S2=60%", "Both spurious mechanisms: M=100% S1=60% S2=90%", "One spurious mechanism: M=100% S1=0% S2=60%"]
 
     for t_mech in range(3):
         for loss_num in range(2):
@@ -319,6 +358,6 @@ if __name__ == "__main__":
             counterfactual_metric_names = [x.split(":")[-1].strip() for x in list(counterfactual_dict_all.keys())]
             loss = loss_dict[loss_num]
             # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-            histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Shapes delta', t_num=1, s_num=1, exp_dict=exp_dict_all, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=t_mech, loss_num=loss_num, plot_tmechs_together=plot_tmechs_together, plot_loss_together=plot_loss_together)
+            histories = wandb_get_data(f'Distill ResNet18_AP ResNet18_AP_{dataset} {version}', t_num=1, s_num=1, exp_dict=exp_dict_all, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=t_mech, loss_num=loss_num, plot_tmechs_together=plot_tmechs_together, plot_loss_together=plot_loss_together)
             counterfactual_plot(histories, counterfactual_dict_all, title)
             # plot_counterfactual_heatmaps(histories, exp_dict=exp_dict_all, loss_num=loss_num)

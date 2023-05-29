@@ -168,8 +168,8 @@ def heatmap_get_data(project_name: str,
     runs = api.runs(project_name) 
     teacher = teacher_dict[t_num]
     student = student_dict[s_num]
-    t_mech = list(exp_dict.keys())[t_mech] if t_mech else None
-    s_mech = list(exp_dict.keys())[s_mech] if s_mech else None
+    t_mech = list(exp_dict.keys())[t_mech] if t_mech != None else None
+    s_mech = list(exp_dict.keys())[s_mech] if s_mech != None else None
     loss = loss_dict[loss_num]
     filtered_runs = []
 
@@ -232,27 +232,28 @@ def wandb_get_data(project_name: str,
     runs = api.runs(project_name) 
     teacher = teacher_dict[t_num]
     student = student_dict[s_num]
-    t_mech = list(exp_dict.keys())[t_mech] if t_mech else None
-    s_mech = list(exp_dict.keys())[s_mech] if s_mech else None
+    t_mech = list(exp_dict.keys())[t_mech] if t_mech != None else None
+    s_mech = list(exp_dict.keys())[s_mech] if s_mech != None else None
     loss = loss_dict[loss_num]
     filtered_runs = []
 
-    # Don't filter for t_mech when running for heatmap data
-    # Filter by above settings and remove any crashed or incomplete runs
     for run in runs:
         if (run.config.get('teacher') == teacher and 
             run.config.get('student') == student and
-            # run.config.get('teacher_mechanism') == t_mech and
+            run.config.get('teacher_mechanism') == t_mech and
             run.config.get('loss') == loss):
-            history = run.history()
-            if '_step' in history.columns and history['_step'].max() >= 100:
+            try:
+                history = run.history()
+            except:
+                history = run.history
+            if '_step' in history.columns and history['_step'].max() >= 10:
                 filtered_runs.append(run)
                 # Clean history of NaNs
                 history = clean_history(history)
                 # Filter history
                 run.history = smooth_history(history)
 
-    assert(len(filtered_runs) > 0), "No runs found with the given settings"
+    assert(len(filtered_runs) > 0), f'No runs found: tmech {t_mech} loss {loss}'
     grouped_runs = get_grouped_runs(filtered_runs, groupby_metrics)
 
     # Compute the means and variances for all of the metrics for each group of runs
@@ -379,9 +380,9 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
 
     # Determine rows and columns for subplots
     n_metrics = len(cols)
-    n_cols = min(3, len(cols))
+    n_cols = min(2, len(cols))
     n_rows = np.ceil(n_metrics / n_cols).astype(int)
-    plot_width, plot_height = 20, 5* n_rows
+    plot_width, plot_height = 14, 4* n_rows
 
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(plot_width, plot_height), sharey=True)
     axs = axs.flatten() # Flatten the axs array so that we can iterate over it with a single loop
@@ -404,7 +405,7 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
 
     for ax in axs:
         ax.set_prop_cycle(color=[color_dict[group_name] for group_name in color_dict])
-
+    legend_handles = []
     for i, mean_col in enumerate(cols):
         var_col = mean_col.replace(' Mean', ' Var')
         for line_num, history in enumerate(histories):
@@ -420,8 +421,16 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
                                     history[mean_col] - history[var_col].apply(np.sqrt),
                                     history[mean_col] + history[var_col].apply(np.sqrt),
                                     alpha=0.2)
-        axs[i].set_ylim(0, 100)
+                if i == 0:  # Only add legend handles once per group
+                    legend_handles.append(mpl.lines.Line2D([0], [0], 
+                                                           color=color_dict[group_name], 
+                                                           linestyle=line_styles[line_num%len(line_styles)], 
+                                                           label=list(dominoes_exp_dict.keys())[line_num].replace('_', ' '),
+                                                           linewidth=2))
         axs[i].set_title(mean_col.replace(' Mean', '').replace('_', ' '), fontsize=18)
+        axs[i].tick_params(axis='both', which='major', labelsize=15)
+        axs[i].tick_params(axis='both', which='minor', labelsize=12)
+        axs[i].set_ylim(0, 110)
         match mode:
             case 'acc':
                 axs[i].set_ylabel('Test accuracy/percent', fontsize=15)
@@ -429,13 +438,13 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
                 axs[i].set_ylabel('KL divergence', fontsize=15)
             case 'fidelity':
                 axs[i].set_ylabel('Top-1 fidelity/percent', fontsize=15)
-        labelLines(axs[i].get_lines(), align=False, fontsize=11)
+        labelLines(axs[i].get_lines(), align=False, fontsize=13)
         axs[i].set_xlabel('Training step/100 iterations', fontsize=15)
     lines, labels = axs[0].get_legend_handles_labels()
-    fig.legend(lines, labels=student_names, loc='lower center', ncol=num_groups, fontsize=18, bbox_to_anchor=(0.5, -0.02))
+    fig.legend(handles=legend_handles, loc='lower right', ncol=2, bbox_to_anchor=(0.9, 0.1), fontsize=15, frameon=False)
     # fig.suptitle(title, fontsize=20)
     plt.tight_layout(pad=5)
-    plt.savefig('images/exhaustivevstime/'+title+'.png', dpi=300, bbox_inches='tight')
+    plt.savefig('images/exhaustivevstime/'+title+'.png', dpi=500, bbox_inches='tight')
 
 
 def counterfactual_plot(histories: pd.DataFrame, exp_dict: Dict[str, List], title: str) -> None:
@@ -461,7 +470,7 @@ def wandb_plot(histories: List[pd.DataFrame], title: str) -> None:
 plot_names = ['M S1 S2', 'S1 S2', 'Rand S1', 'Rand S2', 'Rand M']
 if __name__ == "__main__":
     title = 'Jacobian Matching Distillation'
-    mode = 0 # 0 for heatmap, 1 for plots
+    mode = 1 # 0 for heatmap, 1 for plots
     loss_num = 1
 
     exp_dict = dominoes_exp_dict 
@@ -472,6 +481,8 @@ if __name__ == "__main__":
         histories = heatmap_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=2, loss_num=loss_num)
         plot_counterfactual_heatmaps(histories, dominoes_exp_dict, loss_num)
     elif mode == 1:
-        # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-        histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=2, loss_num=loss_num, plot_tmechs_together=False)
-        wandb_plot(histories, title)
+        for t_mech in range(7):
+            title = f'Base {list(dominoes_exp_dict.keys())[t_mech]}'
+            # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
+            histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=t_mech, loss_num=loss_num, plot_tmechs_together=False)
+            wandb_plot(histories, title)

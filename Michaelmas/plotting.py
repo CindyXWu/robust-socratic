@@ -131,7 +131,8 @@ def heatmap_df(dataset_names: List[str], student):
 def heatmap_diff_df(dataset_names: List[str], student):
     """Student teacher difference heatmap."""
     # Initialize an empty list to store all dataframes
-    all_data = []
+    all_student_data = []
+    all_teacher_data = []
 
     # Load each dataset, process it and append to all_data
     for dataset_name in dataset_names:
@@ -145,31 +146,38 @@ def heatmap_diff_df(dataset_names: List[str], student):
         # Split the 'a' column into 'Type', 'Fraction'
         df_student_melt[['Type', 'Fraction']] = df_student_melt['a'].str.split('_', expand=True)
         df_teacher_melt[['Type', 'Fraction']] = df_teacher_melt['a'].str.split('_', expand=True)
-        print(df_teacher_melt.head())
-        print(df_student_melt.head())
-        # Calculate the accuracy difference between student and teacher
-        df_diff = df_student_melt.copy()
-        df_diff['accuracy'] = df_student_melt['accuracy'] - df_teacher_melt['accuracy']
         # Add a 'Dataset' column
-        df_diff['Dataset'] = dataset_name
+        df_student_melt['Dataset'] = dataset_name
+        df_teacher_melt['Dataset'] = dataset_name
         # Drop the 'a' column
-        df_diff = df_diff.drop(columns=['a'])
+        df_student_melt = df_student_melt.drop(columns=['a'])
+        df_teacher_melt = df_teacher_melt.drop(columns=['a'])
         # Drop NaNs
-        df_diff = df_diff.dropna()
+        df_student_melt = df_student_melt.dropna()
+        df_teacher_melt = df_teacher_melt.dropna()
         # Convert Fraction to float
-        df_diff['Fraction'] = df_diff['Fraction'].astype(float)
+        df_student_melt['Fraction'] = df_student_melt['Fraction'].astype(float)
+        df_teacher_melt['Fraction'] = df_teacher_melt['Fraction'].astype(float)
         # Append the processed dataframe to all_data
-        all_data.append(df_diff)
+        all_student_data.append(df_student_melt)
+        all_teacher_data.append(df_teacher_melt)
 
     # Concatenate all dataframes in all_data into a single dataframe
-    df_all = pd.concat(all_data, ignore_index=True)
+    df_all_student = pd.concat(all_student_data, ignore_index=True)
+    df_all_teacher = pd.concat(all_teacher_data, ignore_index=True)
+
+    # Merge the two dataframes on 'Dataset', 'Type', and 'Fraction'
+    df_all = pd.merge(df_all_student, df_all_teacher, on=['Dataset', 'Type', 'Fraction'], suffixes=('_student', '_teacher'))
+
+    # Calculate the accuracy difference between student and teacher
+    df_all['accuracy_diff'] = df_all['accuracy_student'] - df_all['accuracy_teacher']
 
     # Create a heatmap for each dataset
     for dataset_name in dataset_names:
         # Filter the dataframe for the current dataset
         df_dataset = df_all[df_all['Dataset'] == dataset_name]
         # Pivot the dataframe to create a matrix suitable for a heatmap
-        df_pivot = df_dataset.pivot_table(index='Type', columns='Fraction', values='accuracy', aggfunc='mean')
+        df_pivot = df_dataset.pivot_table(index='Type', columns='Fraction', values='accuracy_diff', aggfunc='mean')
 
         plt.figure(figsize=(5, 2))  # Adjust the figure size
         sns.set(font_scale=1)  # Increase the font size
@@ -229,7 +237,7 @@ if __name__ == '__main__':
                 print(df.head())
                 plot_df(df, base_name=base_dir, title=dataset)
         case 1:
-            heatmap_df(dataset_names, student='large')
+            heatmap_df(dataset_names, student='medium')
         case 2:
-            heatmap_diff_df(dataset_names, student='large')
+            heatmap_diff_df(dataset_names, student='small')
         

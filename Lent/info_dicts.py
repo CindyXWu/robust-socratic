@@ -42,28 +42,8 @@ exp_dict_all = {"No mechanisms (baseline): M=100% S1=0% S2=0%": [1, 0, 0, False,
 # List elements: image frac, mech 1 frac, mech 2 frac, random image, random mech 1, random mech 2
 counterfactual_dict_all = {"All mechanisms: M=100% S1=100% S2=100%": 
                            [1, 1, 1, False, False, False], 
-                           #"Only spurious mechanisms: M=0% S1=100% S2=100%": [0, 1, 1, False, False, False], 
+                           "Only spurious mechanisms: M=0% S1=100% S2=100%": [0, 1, 1, False, False, False], 
                            "Randomize spurious mechanisms: M=100% S1=randomized S2=100%": [1, 1, 1, False, True, False], 
                            "Randomize spurious mechanisms: M=100% S1=100% S2=randomized": [1, 1, 1, False, False, True], 
                            "Randomize image: M=randomized S1=100% S2=100%": [1, 1, 1, True, False, False]
                            }
-
-# Use shortening for legends in plots
-mech_map = {"CIFAR10": "C", 
-            "Box": "B", 
-            "MNIST": "M", 
-            "MNIST_Box": "MB", 
-            "CIFAR10_MNIST": "CM", 
-            "CIFAR10_Box": "CB", 
-            "CIFAR10_MNIST_Box": "CMB"}
-
-new_mech_map = {"M=100% S1=0% S2=0%": "100 0 0", 
-                  "M=100% S1=0% S2=60%": "100 0 60", 
-                  "M=100% S1=30% S2=60%": "100 30 60",
-                  "M=100% S1=60% S2=90%": "100 60 90",
-                  "M=100% S1=90% S2=60%": "100 90 60"
-                  }
-
-new_mech_list = ["100 0 0", "100 0 60", "100 30 60", "100 60 90", "100 90 60"]
-mech_map_names = ["C", "B", "M", "MB", "CM", "CB", "CMB"]
-student_names = ["No mechanisms: M=100% S1=0% S2=0%", "Both spurious mechanisms: M=100% S1=60% S2=90%", "Both spurious mechanisms: M=100% S1=90% S2=60%"]
