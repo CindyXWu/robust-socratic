@@ -6,43 +6,6 @@ import numpy as np
 from labellines import labelLine, labelLines
 
 
-def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
-    fig = plt.figure(figsize=(8, 4), dpi=100)
-    plt.plot(loss)
-    plt.plot(smooth_loss)
-    epochs = [i * int(it_per_epoch) for i in range(int(it / it_per_epoch) + 1)]
-    plt.plot(epochs, [loss[i] for i in epochs], linestyle='', marker='o')
-    plt.title(title)
-    plt.ylabel('Loss')
-    plt.xlabel('Iteration')
-    if base_name != '':
-        fig.savefig(base_name + '.png')
-    else:
-        plt.show()
-    plt.close("all")
-
-
-def plot_acc(train_acc: List[float], test_acc: List[float], it: int, base_name: Optional[str] = '', title: Optional[str] = ''):
-    fig = plt.figure(figsize=(8, 4), dpi=100)
-    if it !=0:
-        inter = it//(len(train_acc) -1)
-        x_axis = [i * inter for i in range(len(train_acc))]
-    else:
-        x_axis = [0]
-    plt.plot(x_axis, train_acc, label="Train")
-    plt.plot(x_axis, test_acc, label="Test")
-    plt.legend()
-    plt.title(title)
-    plt.ylabel('Accuracy')
-    plt.xlabel('Iteration')
-    plt.ylim([20, 110])
-    if base_name != '':
-        fig.savefig(base_name + '.png')
-    else:
-        plt.show()
-    plt.close("all")
-
-
 def plot_df(df: pd.DataFrame, base_name: Optional[str] = '', title: Optional[str] = ''):
     fig, ax = plt.subplots(figsize=(6, 4), dpi=200)
     
@@ -63,7 +26,7 @@ def plot_df(df: pd.DataFrame, base_name: Optional[str] = '', title: Optional[str
         line, = ax.plot(data["index"], data["acc"], linestyle=type_styles[typ], color=frac_colors[frac], label=str(frac))
         lines.append(line)
 
-    labelLines(lines, align=False, fontsize=11)
+    labelLines(lines, align=False, fontsize=14)
 
     # Remove box around the graph (except bottom and left axes)
     ax.spines['top'].set_visible(False)
@@ -71,16 +34,17 @@ def plot_df(df: pd.DataFrame, base_name: Optional[str] = '', title: Optional[str
 
     # Legend for 'Type'
     custom_lines = [plt.Line2D([0], [0], color='black', linestyle=style) for style in line_styles]
-    ax.legend(custom_lines, df_melt['Type'].unique(), loc='upper center', bbox_to_anchor=(0.5, -0.15), fancybox=False, shadow=False, ncol=len(df.columns), frameon=False)
+    ax.legend(custom_lines, df_melt['Type'].unique(), loc='upper center', bbox_to_anchor=(0.5, -0.2), fancybox=False, shadow=False, ncol=len(df.columns), frameon=False, fontsize=18)
 
-    plt.ylabel('Accuracy')
-    plt.xlabel('Iteration/100')
+    plt.ylabel('Accuracy', fontsize=18)
+    plt.xlabel('Iteration/100', fontsize=18)
     plt.ylim([20, 110])
     plt.grid(False)
     plt.tight_layout()
-    
+    # Change tick label size
+    ax.tick_params(axis='both', which='major', labelsize=14)
     if base_name != '':
-        fig.savefig(base_name + title + '.png', bbox_inches='tight')
+        fig.savefig(base_name + title + '.png', bbox_inches='tight', dpi=200)
     else:
         plt.show()
 
@@ -110,7 +74,6 @@ def heatmap_df(dataset_names: List[str], student):
         # Append the processed dataframe to all_data
         all_data.append(df_melt)
     
-    print(df_melt.head())
     # Concatenate all dataframes in all_data into a single dataframe
     df_all = pd.concat(all_data, ignore_index=True)
 
@@ -121,10 +84,12 @@ def heatmap_df(dataset_names: List[str], student):
         # Pivot the dataframe to create a matrix suitable for a heatmap
         df_pivot = df_dataset.pivot_table(index='Type', columns='Fraction', values='accuracy', aggfunc='mean')
 
-        plt.figure(figsize=(5, 2))  # Adjust the figure size
-        sns.set(font_scale=1)  # Increase the font size
+        plt.figure(figsize=(5, 1.5))  # Adjust the figure size
+        sns.set(font_scale=1.2)  # Increase the font size
+        # Increase x-axis and y-axis tick label size
+        plt.xticks(fontsize=14)  # Increase x-axis tick label size
+        plt.yticks(fontsize=14)  # Increase y-axis tick label size
         sns.heatmap(df_pivot, cmap='YlGnBu', annot=True, fmt=".1f", cbar_kws={'label': 'Accuracy'}, linewidths=.5)
-        # plt.title(f'Accuracy for {dataset_name}')
         plt.savefig(f'Michaelmas/images/heatmaps/{student}/{dataset_name}.png', bbox_inches='tight')
 
 
@@ -179,9 +144,12 @@ def heatmap_diff_df(dataset_names: List[str], student):
         # Pivot the dataframe to create a matrix suitable for a heatmap
         df_pivot = df_dataset.pivot_table(index='Type', columns='Fraction', values='accuracy_diff', aggfunc='mean')
 
-        plt.figure(figsize=(5, 2))  # Adjust the figure size
-        sns.set(font_scale=1)  # Increase the font size
-        sns.heatmap(df_pivot, cmap='YlGnBu', annot=True, fmt=".1f", cbar_kws={'label': 'Accuracy Difference'}, linewidths=.5)
+        plt.figure(figsize=(5, 1.5))  # Adjust the figure size
+        sns.set(font_scale=1.2)  # Increase the font size
+        # Increase x-axis and y-axis tick label size
+        plt.xticks(fontsize=14)  # Increase x-axis tick label size
+        plt.yticks(fontsize=14)  # Increase y-axis tick label size
+        sns.heatmap(df_pivot, cmap='YlGnBu', annot=True, fmt=".1f", cbar_kws={'label': 'Accuracy Diff'}, linewidths=.5)
         plt.savefig(f'Michaelmas/images/diffheatmaps/{student}/{dataset_name}_diff.png', bbox_inches='tight')
 
 
@@ -218,7 +186,7 @@ def plot_data(data_arr, d1, d2, title=''):
 if __name__ == '__main__':
 
     fig_type = 1 # 0: plot data, 1: plot heatmap, 2: plot heatmap difference
-    base_dir = 'Michaelmas/large_student_results/'
+    base_dir = 'Michaelmas/teacher_results/'
 
     dataset_names = []
     # List of complex indices (cols) to randomise (see utils.py)
@@ -237,7 +205,7 @@ if __name__ == '__main__':
                 print(df.head())
                 plot_df(df, base_name=base_dir, title=dataset)
         case 1:
-            heatmap_df(dataset_names, student='medium')
+            heatmap_df(dataset_names, student='large')
         case 2:
-            heatmap_diff_df(dataset_names, student='small')
+            heatmap_diff_df(dataset_names, student='large')
         

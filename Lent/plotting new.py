@@ -73,7 +73,8 @@ def wandb_get_data(project_name: str,
                 # Clean history of NaNs
                 history = clean_history(history)
                 # Filter history
-                run.history = smooth_history(history)
+                # history = smooth_history(history)
+                run.history =  history
 
     assert(len(filtered_runs) > 0), "No runs found with the given settings"
     grouped_runs = get_grouped_runs(filtered_runs, groupby_metrics)
@@ -136,7 +137,7 @@ def clean_history(history: pd.DataFrame) -> pd.DataFrame:
     return history_clean
 
 
-def smooth_history(history: pd.DataFrame, window_length: Optional[int]=5, polyorder: Optional[int] = 3) -> pd.DataFrame:
+def smooth_history(history: pd.DataFrame, window_length: Optional[int]=3, polyorder: Optional[int] = 2) -> pd.DataFrame:
     nan_mask = history.isna()
     # Smooth each column in the DataFrame, interpolating for NaNs
     filtered_history = history.interpolate().apply(lambda x: savgol_filter(x, window_length, polyorder, mode='mirror'))
@@ -175,9 +176,9 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
 
     # Determine rows and columns for subplots
     n_metrics = len(cols)
-    n_cols = min(2, len(cols))
+    n_cols = min(3, len(cols))
     n_rows = np.ceil(n_metrics / n_cols).astype(int)
-    plot_width, plot_height = 15, 4* n_rows
+    plot_width, plot_height = 15, 3.5* n_rows
 
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(plot_width, plot_height), sharey=True)
     axs = axs.flatten() # Flatten the axs array so that we can iterate over it with a single loop
@@ -206,7 +207,7 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
         var_col = mean_col.replace(' Mean', ' Var')
         for line_num, history in enumerate(histories):
             group_name = history['Group Name'].iloc[0]
-            print("line", line_num, "group", group_name)
+            # print("line", line_num, "group", group_name)
             if mean_col in history.columns and var_col in history.columns:
                 line = axs[i].plot(history.index, 
                                    history[mean_col], 
@@ -222,21 +223,20 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
                     legend_handles.append(mpl.lines.Line2D([0], [0], 
                                                            color=color_dict[group_name], 
                                                            linestyle=line_styles[line_num%len(line_styles)], 
-                                                           label=student_names[line_num],
+                                                           label=student_names[group_name.split(':')[1].strip()],
                                                            linewidth=2))
         if mode == 'acc' or mode == 'fidelity':
-            axs[i].set_ylim(0, 110)
+            axs[i].set_ylim(-10, 110)
         else:
             axs[i].set_ylim(0, 7)
         axs[i].set_title(plot_names[i], fontsize=20)
-        labelLines(axs[i].get_lines(), align=False, fontsize=15)
-        axs[i].set_xlabel('Training step/100 iterations', fontsize=20)
+        labelLines(axs[i].get_lines(), align=False, fontsize=13)
+        axs[i].set_xlabel('Training step/100 iterations', fontsize=15)
 
-    lines, labels = axs[0].get_legend_handles_labels()
-    fig.legend(handles=legend_handles, loc='lower center', ncol=num_groups, bbox_to_anchor=(0.5, -0.1), fontsize=17, frameon=False)
-    # fig.suptitle(title, fontsize=20)
+    legend = fig.legend(handles=legend_handles, loc='lower center', ncol=1, bbox_to_anchor=(0.8, 0.2), fontsize=15, frameon=False)
+    legend.set_title("Distillation dataset mechanism", prop={"size": 15})
     plt.tight_layout(pad=2)
-    plt.savefig(base_dir+title.replace('%','')+'.png', dpi=500, bbox_inches='tight')
+    plt.savefig(base_dir+title.replace('%','')+'.png', dpi=300, bbox_inches='tight')
 
 
 def counterfactual_plot(histories: pd.DataFrame, counterfactual_dict: Dict[str, List], title: str) -> None:
@@ -293,29 +293,12 @@ def get_counterfactual_order_list():
     order_list = counterfactual_metric_names + const_graph_list
     return order_list
 
-# Use shortening for legends in plots
-mech_map = {"CIFAR10": "C", 
-            "Box": "B", 
-            "MNIST": "M", 
-            "MNIST_Box": "MB", 
-            "CIFAR10_MNIST": "CM", 
-            "CIFAR10_Box": "CB", 
-            "CIFAR10_MNIST_Box": "CMB"}
-new_mech_map = {"M=100% S1=0% S2=0%": "100 0 0", 
-                  "M=100% S1=0% S2=60%": "100 0 60", 
-                  "M=100% S1=30% S2=60%": "100 30 60",
-                  "M=100% S1=60% S2=90%": "100 60 90",
-                  "M=100% S1=90% S2=60%": "100 90 60"
-                  }
-new_mech_list = ["100 0 0", "100 0 60", "100 30 60", "100 60 90", "100 90 60"]
-mech_map_names = ["C", "B", "M", "MB", "CM", "CB", "CMB"]
-teacher_mechs = ['M=100% S1=0% S2=0%', 'M=100% S1=0% S2=60%', 'M=100% S1=30% S2=60%']
 
 if __name__ == "__main__":
     plot_tmechs_together = False
     plot_loss_together = False
-    dataset = 'Shapes'
-    version = 'delta'
+    dataset = 'Dominoes'
+    version = 'gamma'
     base_dir = f'images/vstime/{dataset}/'
 
     if dataset == 'Dominoes':
@@ -327,7 +310,7 @@ if __name__ == "__main__":
                            "Randomize spurious mechanisms: M=100% S1=100% S2=randomized": [1, 1, 1, False, False, True], 
                            "Randomize image: M=randomized S1=100% S2=100%": [1, 1, 1, True, False, False]
                            }
-        student_names = ["Both spurious mechanisms: M=100% S1=90% S2=60%", "No mechanisms: M=100% S1=0% S2=0%", "Both spurious mechanisms: M=100% S1=60% S2=90%", ]
+        student_names = {"100 90 60": "M=100% S1=90% S2=60%", "100 0 0": "M=100% S1=0% S2=0%", "100 60 90": "M=100% S1=60% S2=90%"}
 
     elif dataset == 'Shapes':
         plot_names = ['i) M=100 S1=100 S2=100', 'ii) M=100 S1=R S2=100', 'iii) M=100 S1=100 S2=R', 'iv) M=R S1=100 S2=100']

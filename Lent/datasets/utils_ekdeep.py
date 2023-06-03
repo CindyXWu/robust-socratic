@@ -358,7 +358,7 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
         dset = torch.utils.data.Subset(dset, subset_ids)
 
     # define dataloader
-    dataloader = DataLoader(dset, batch_size=batch_size, shuffle=True, drop_last=True)
+    dataloader = DataLoader(dset, batch_size=batch_size, shuffle=(load_type=='train'), drop_last=True)
     return dataloader
 
 
@@ -399,8 +399,18 @@ class LR_Scheduler(object):
         return self.current_lr
     
 if __name__ == "__main__":
-    train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes', batch_size=64, cue_type='domcues', cue_proportion=0.5, randomize_cue=True, box_frac=0.5, mnist_frac=0.5, image_frac=1.0, randomize_box=False, randomize_mnist=False, randomize_img=True)
+    batch_size=200
+    class_label = 9
+    train_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, cue_type='domcues', cue_proportion=0.5, randomize_cue=False, box_frac=0, mnist_frac=1.0, image_frac=0, randomize_box=False, randomize_mnist=True, randomize_img=False)
     for i, (x, y) in enumerate(train_loader):
-        x = einops.rearrange(x, 'b c h w -> b h w c')
-        show_images_grid(x, y, num_images=64)
+        # Filter out images of a certain class
+        mask = (y == class_label)
+        x, y = x[mask], y[mask]
+        
+        if len(x) > 0:  # check if there are any images of the desired class in the batch
+            x = einops.rearrange(x, 'b c h w -> b h w c')
+            show_images_grid(x, y, num_images=min(batch_size, len(x)))  # number of images should not exceed the batch size or the number of images of the desired class
+        else:
+            print(f"No images of class {class_label} in batch {i}")
+            
         break

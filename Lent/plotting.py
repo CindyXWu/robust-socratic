@@ -31,63 +31,6 @@ api = wandb.Api(overrides=None, timeout=None, api_key =None)
 # Set the style and color palette
 sns.set_style("whitegrid")
 sns.set_palette("pastel")
-
-def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
-    fig = plt.figure(figsize=(8, 4), dpi=100)
-    plt.plot(loss)
-    plt.plot(smooth_loss)
-    # The iteration marking the start of each epoch
-    epochs = [i * int(it_per_epoch) for i in range(int(it / it_per_epoch) + 1)]
-    try:
-        loss_for_epochs = [loss[i] for i in epochs]
-        plt.plot(epochs, loss_for_epochs, linestyle='', marker='o')
-    except IndexError:
-        pass
-    plt.title(title)
-    plt.ylabel('Loss')
-    plt.xlabel('Iteration')
-    if base_name != '':
-        fig.savefig(base_name + '.png')
-    else:
-        plt.show()
-    plt.close("all")
-
-
-def plot_loss(loss, it, it_per_epoch, smooth_loss=[], base_name='', title=''):
-    fig = plt.figure(figsize=(8, 4), dpi=100)
-    plt.plot(loss)
-    plt.plot(smooth_loss)
-    epochs = [i * int(it_per_epoch) for i in range(int(it / it_per_epoch) + 1)]
-    plt.plot(epochs, [loss[i] for i in epochs], linestyle='', marker='o')
-    plt.title(title)
-    plt.ylabel('Loss')
-    plt.xlabel('Iteration')
-    if base_name != '':
-        fig.savefig(base_name + '.png')
-    else:
-        plt.show()
-    plt.close("all")
-
-
-def plot_acc(train_acc, test_acc, it, base_name='', title=''):
-    fig = plt.figure(figsize=(8, 4), dpi=100)
-    if it !=0:
-        inter = it//(len(train_acc) -1)
-        x_axis = [i * inter for i in range(len(train_acc))]
-    else:
-        x_axis = [0]
-    plt.plot(x_axis, train_acc, label="Train")
-    plt.plot(x_axis, test_acc, label="Test")
-    plt.legend()
-    plt.title(title)
-    plt.ylabel('Accuracy')
-    plt.xlabel('Iteration')
-    plt.ylim([20, 110])
-    if base_name != '':
-        fig.savefig(base_name + '.png')
-    else:
-        plt.show()
-    plt.close("all")
     
 
 def show_images_grid(imgs_, class_labels, num_images, title=None):
@@ -183,8 +126,8 @@ def heatmap_get_data(project_name: str,
                 # Clean history of NaNs
                 history = clean_history(history)
                 # Filter history
-                run.history = smooth_history(history)
-
+                #history = smooth_history(history)
+                run.history  = history
     assert(len(filtered_runs) > 0), "No runs found with the given settings"
     grouped_runs = get_grouped_runs(filtered_runs, groupby_metrics)
 
@@ -297,9 +240,9 @@ def plot_counterfactual_heatmaps(combined_history: List[pd.DataFrame], exp_dict:
     num_keys = len(exp_dict.keys())
     loss = loss_dict[loss_num]
 
-    for key in exp_dict.keys():
+    for i, key in enumerate(list(exp_dict.keys())):
         data_to_plot[key] = np.zeros((num_keys, num_keys))
-        axes_labels.append(key.replace('_', ' '))
+        axes_labels.append(mech_map_names[i])
                            
     for history in combined_history:
         name = history['Group Name'].iloc[0]
@@ -311,12 +254,12 @@ def plot_counterfactual_heatmaps(combined_history: List[pd.DataFrame], exp_dict:
 
     for key, data in data_to_plot.items():
         fig, ax = plt.subplots()
-        heatmap = sns.heatmap(data, cmap='mako', annot=True, fmt=".1f", cbar=True, ax=ax)
+        heatmap = sns.heatmap(data, cmap='mako', annot=True, fmt=".1f", cbar=True, ax=ax, vmax=100, vmin=0)
         
-        ax.set_xticklabels(axes_labels, rotation='vertical', fontsize=12)
-        ax.set_yticklabels(axes_labels, rotation='horizontal', fontsize=12)
+        ax.set_xticklabels(axes_labels, rotation='vertical', fontsize=15)
+        ax.set_yticklabels(axes_labels, rotation='horizontal', fontsize=15)
         ax.set_xlabel('Teacher Training Mechanism', fontsize=15)
-        ax.set_ylabel('Student Distillation Training Mechanism', fontsize=15)
+        ax.set_ylabel('Student Training Mechanism', fontsize=15)
         # ax.set_title(f'Counterfactual {key.replace("_", " ")} Test Accuracy - {loss} Loss')
         plt.savefig(f'images/heatmaps/{loss}/'+key+'.png', dpi=300, bbox_inches='tight')
 
@@ -382,7 +325,7 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
     n_metrics = len(cols)
     n_cols = min(2, len(cols))
     n_rows = np.ceil(n_metrics / n_cols).astype(int)
-    plot_width, plot_height = 14, 4* n_rows
+    plot_width, plot_height = 13, 3.75* n_rows
 
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(plot_width, plot_height), sharey=True)
     axs = axs.flatten() # Flatten the axs array so that we can iterate over it with a single loop
@@ -406,9 +349,9 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
     for ax in axs:
         ax.set_prop_cycle(color=[color_dict[group_name] for group_name in color_dict])
     legend_handles = []
-    for i, mean_col in enumerate(cols):
+    for i, mean_col in enumerate(cols): # Iterate over subplots
         var_col = mean_col.replace(' Mean', ' Var')
-        for line_num, history in enumerate(histories):
+        for line_num, history in enumerate(histories): # Iterate over lines
             group_name = history['Group Name'].iloc[0]
             if mean_col in history.columns and var_col in history.columns:
                 line = axs[i].plot(history.index, 
@@ -421,30 +364,32 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
                                     history[mean_col] - history[var_col].apply(np.sqrt),
                                     history[mean_col] + history[var_col].apply(np.sqrt),
                                     alpha=0.2)
-                if i == 0:  # Only add legend handles once per group
+                # the key to matching the legend to the lines is to check the order of dominoes_exp_dict.keys() cos I don't think these correspond to plotting order
+                print("group_name: ", group_name, "line_num: ", line_num, "actual_group_names: ", actual_group_names[line_num])
+                if i == 0:  # Only add legend handles once per group (correspond to first subplot)
                     legend_handles.append(mpl.lines.Line2D([0], [0], 
                                                            color=color_dict[group_name], 
                                                            linestyle=line_styles[line_num%len(line_styles)], 
-                                                           label=list(dominoes_exp_dict.keys())[line_num].replace('_', ' '),
+                                                           label=actual_group_names[line_num],
                                                            linewidth=2))
         axs[i].set_title(mean_col.replace(' Mean', '').replace('_', ' '), fontsize=18)
         axs[i].tick_params(axis='both', which='major', labelsize=15)
         axs[i].tick_params(axis='both', which='minor', labelsize=12)
-        axs[i].set_ylim(0, 110)
+        axs[i].set_ylim(-10, 110)
         match mode:
             case 'acc':
-                axs[i].set_ylabel('Test accuracy/percent', fontsize=15)
+                axs[i].set_ylabel('Test accuracy %', fontsize=15)
             case 'kl':
                 axs[i].set_ylabel('KL divergence', fontsize=15)
             case 'fidelity':
-                axs[i].set_ylabel('Top-1 fidelity/percent', fontsize=15)
+                axs[i].set_ylabel('Top-1 fidelity %', fontsize=15)
         labelLines(axs[i].get_lines(), align=False, fontsize=13)
         axs[i].set_xlabel('Training step/100 iterations', fontsize=15)
     lines, labels = axs[0].get_legend_handles_labels()
-    fig.legend(handles=legend_handles, loc='lower right', ncol=2, bbox_to_anchor=(0.9, 0.1), fontsize=15, frameon=False)
+    fig.legend(handles=legend_handles, loc='lower right', ncol=1, bbox_to_anchor=(0.8, 0.05), fontsize=18, frameon=False)
     # fig.suptitle(title, fontsize=20)
     plt.tight_layout(pad=5)
-    plt.savefig('images/exhaustivevstime/'+title+'.png', dpi=500, bbox_inches='tight')
+    plt.savefig('images/exhaustivevstime/'+title+'.png', dpi=300, bbox_inches='tight')
 
 
 def counterfactual_plot(histories: pd.DataFrame, exp_dict: Dict[str, List], title: str) -> None:
@@ -467,14 +412,14 @@ def wandb_plot(histories: List[pd.DataFrame], title: str) -> None:
     mean_cols.sort(key=lambda col: custom_sort(col, 'acc'))
     make_plot(histories, mean_cols, title, 'acc')
 
-plot_names = ['M S1 S2', 'S1 S2', 'Rand S1', 'Rand S2', 'Rand M']
+actual_group_names = ['CIFAR10 MNIST Box', 'CIFAR10 Box', 'CIFAR10 MNIST', 'MNIST Box', 'Box', 'MNIST', 'CIFAR10']
 if __name__ == "__main__":
     title = 'Jacobian Matching Distillation'
     mode = 1 # 0 for heatmap, 1 for plots
     loss_num = 1
 
     exp_dict = dominoes_exp_dict 
-    loss = loss_dict[loss_num]
+    loss_names = ['Base', 'Jacobian']
 
     if mode == 0:
         # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
@@ -482,7 +427,8 @@ if __name__ == "__main__":
         plot_counterfactual_heatmaps(histories, dominoes_exp_dict, loss_num)
     elif mode == 1:
         for t_mech in range(7):
-            title = f'Base {list(dominoes_exp_dict.keys())[t_mech]}'
-            # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-            histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=t_mech, loss_num=loss_num, plot_tmechs_together=False)
-            wandb_plot(histories, title)
+            for loss_num in range(2):
+                title = f'{loss_names[loss_num]} {list(dominoes_exp_dict.keys())[t_mech]}'
+                # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
+                histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=t_mech, loss_num=loss_num, plot_tmechs_together=False)
+                wandb_plot(histories, title)

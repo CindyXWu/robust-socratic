@@ -167,18 +167,42 @@ def dataloader_3D_shapes(load_type, batch_size, randomise=False, floor_frac=0, s
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=(load_type=='train'), drop_last=True, num_workers=0)
     return dataloader
 
+def show_images_grid(imgs_, class_labels, num_images, title=None):
+    """Now modified to show both [c h w] and [h w c] images."""
+    ncols = int(np.ceil(num_images**0.5))
+    nrows = int(np.ceil(num_images / ncols))
+    _, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
+    axes = axes.flatten()
+
+    for ax_i, ax in enumerate(axes):
+        if ax_i < num_images:
+            img = imgs_[ax_i]
+            if img.ndim == 3 and img.shape[0] == 3:
+                img = img.transpose(1, 2, 0)
+            ax.imshow(img, cmap='Greys_r', interpolation='nearest')
+            ax.set_title(f'Class: {class_labels[ax_i]}')  # Display the class label as title
+            ax.set_xticks([])
+            ax.set_yticks([])
+        else:
+            ax.axis('off')
+    if title:
+        plt.savefig(image_dir+title+'.png')
+    else:
+        plt.show()
+
 
 if __name__ == "__main__":
-    bsize = 4
-    shapes_dataloader = dataloader_3D_shapes('train', bsize, floor_frac=0.5, scale_frac=0.5)
-    desired_class = 1  # choose the class you want
+    bsize = 80
+    shapes_dataloader = dataloader_3D_shapes('train', bsize, randomise=True, floor_frac=1, scale_frac=1)
+    desired_class = 7  # choose the class you want
 
     for images, labels in shapes_dataloader:
         mask = labels == desired_class
         if any(mask):
             images = images[mask]  # get only images of the desired class
             labels = labels[mask]  # get only labels of the desired class
+            images = images[:10]
+            labels = labels[:10]
             images = einops.rearrange(images, 'b c h w -> b h w c')
-            num_images = len(images)  # update num_images to the number of images after filtering
-            show_images_grid(images, labels, num_images)
+            show_images_grid(images, labels, len(images))
             break
