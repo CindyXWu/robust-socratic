@@ -1,3 +1,5 @@
+"""Note for future self: plotting and plotting_new differ only in which datasets they are used for (see executing code at bottom)."""
+
 from collections import defaultdict
 import pandas as pd
 import numpy as np

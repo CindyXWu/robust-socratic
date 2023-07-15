@@ -1,3 +1,5 @@
+"""Dataset creation for box and cue datasets. Includes own version of image batch plotting."""
+
 import torch
 import torchvision
 import torchvision.transforms as T
@@ -197,7 +199,7 @@ class domCueDataset(Dataset):
             image_fmnist = torch.zeros_like(image)     
 
         if put_box:
-            m = self.get_box(torch.zeros_like(image), label)
+            m = self.get_large_box(torch.zeros_like(image), label)
 
             # Zero image where mask is present and add mask
             image = m + (m == 0).all(axis=0) * image
@@ -219,7 +221,7 @@ class domCueDataset(Dataset):
         s = 3
         c = torch.Tensor((rgb / 255) * 1.)
 
-        w, h = mask.shape[1], mask.shape[2]
+        w, h = mask.shape[1], mask.shape[2] # Same dimensions as image
 
         if (loc == 0): # upper left
             mask[:, :s, :s] = c
@@ -253,6 +255,44 @@ class domCueDataset(Dataset):
                         (h - s) // 2 - (h // 4) : 
                         (h + s) // 2 - (h // 4)] = c
 
+        return mask
+    
+    def get_large_box(self, mask, label):
+        loc = np.random.randint(0, 10) if self.randomize_box else (label % 10)
+        s = mask.shape[1] // 3  # Now box size is 1/3 of the width
+        w, h = mask.shape[1], mask.shape[2] # Same dimensions as image
+
+        if (loc == 0): # upper left
+            mask[:, :s, :s] = torch.rand((3, s, s))
+        elif (loc == 1): # upper center
+            mask[:, :s, (h - s) // 2 : (h + s) // 2] = torch.rand((3, s, (h + s) // 2 - (h - s) // 2))
+        elif (loc == 2): # upper right
+            mask[:, :s, -s:] = torch.rand((3, s, s))
+
+        elif (loc == 3): # middle left
+            mask[:, (w - s) // 2 : (w + s) // 2, :s] = torch.rand((3, (w + s) // 2 - (w - s) // 2, s))
+        elif (loc == 4): # middle center
+            mask[:, (w - s) // 2 : (w + s) // 2, (h - s) // 2 : (h + s) // 2] = torch.rand((3, (w + s) // 2 - (w - s) // 2, (h + s) // 2 - (h - s) // 2))
+        elif (loc == 5): # middle right
+            mask[:, (w - s) // 2 : (w + s) // 2, -s:] = torch.rand((3, (w + s) // 2 - (w - s) // 2, s))
+
+        elif (loc == 6): # lower left
+            mask[:, -s:, :s] = torch.rand((3, s, s))
+        elif (loc == 7): # lower center
+            mask[:, -s:, (h - s) // 2 : (h + s) // 2] = torch.rand((3, s, (h + s) // 2 - (h - s) // 2))
+        elif (loc == 8): # lower right
+            mask[:, -s:, -s:] = torch.rand((3, s, s))
+
+        elif (loc == 9):
+            if self.n_classes == 10:
+                # draw nothing if CIFAR-10
+                pass
+            else:
+                # mid-upper-left if CIFAR-100
+                mask[:, (w - s) // 2 - (w // 4) : 
+                        (w + s) // 2 - (w // 4), 
+                        (h - s) // 2 - (h // 4) : 
+                        (h + s) // 2 - (h // 4)] = torch.rand((3, (w + s) // 2 - (w - s) // 2 - (w // 4), (h + s) // 2 - (h - s) // 2 - (h // 4)))
         return mask
 
 
@@ -316,7 +356,7 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
         cue_type: 'nocue', 'box', 'dominoes', 'domcues'
         box_frac, mnist_frac, image_frac, randomize_box, randomize_mnist: only for Dominoes
     Datasets default download=False. Set download=True to download for first time.
-    Doesn't matter what cue_type equals if base_dataset is 'Dominoes' - proporition of cues controlled by 'cue_proportions'.
+    Doesn't matter what cue_type equals if base_dataset is 'Dominoes' - proportion of cues controlled by 'cue_proportions'.
     E.g. plain dominoes (CIFAR only predictive of label), use box_frac=0, mnist_frac=0.
     Shuffle automatically set to true for test and train.
     """
@@ -326,8 +366,7 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
     #     cue_proportion = 0.0 if cue_type == 'nocue' else cue_proportion
     #     cue_type = 'dominoes'
     
-    # Set this to true when first running code
-    download_datasets = False
+    download_datasets = True
     
     if base_dataset == 'Dominoes':
         base_dataset = 'CIFAR10'
@@ -362,23 +401,6 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
     return dataloader
 
 
-def show_images_grid(imgs_, class_labels, num_images=25):
-    ncols = int(np.ceil(num_images**0.5))
-    nrows = int(np.ceil(num_images / ncols))
-    _, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
-    axes = axes.flatten()
-
-    for ax_i, ax in enumerate(axes):
-        if ax_i < num_images:
-            ax.imshow(imgs_[ax_i], cmap='Greys_r', interpolation='nearest')
-            ax.set_title(f'Class: {class_labels[ax_i]}')  # Display the class label as title
-            ax.set_xticks([])
-            ax.set_yticks([])
-        else:
-            ax.axis('off')
-    plt.show()
-
-
 class LR_Scheduler(object):
     def __init__(self, optimizer, num_epochs, base_lr, final_lr, iter_per_epoch):
         self.base_lr = base_lr
@@ -397,20 +419,43 @@ class LR_Scheduler(object):
 
     def get_lr(self):
         return self.current_lr
-    
-if __name__ == "__main__":
-    batch_size=200
-    class_label = 9
-    train_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, cue_type='domcues', cue_proportion=0.5, randomize_cue=False, box_frac=0, mnist_frac=1.0, image_frac=0, randomize_box=False, randomize_mnist=True, randomize_img=False)
-    for i, (x, y) in enumerate(train_loader):
-        # Filter out images of a certain class
-        mask = (y == class_label)
-        x, y = x[mask], y[mask]
-        
-        if len(x) > 0:  # check if there are any images of the desired class in the batch
-            x = einops.rearrange(x, 'b c h w -> b h w c')
-            show_images_grid(x, y, num_images=min(batch_size, len(x)))  # number of images should not exceed the batch size or the number of images of the desired class
+
+
+def show_images_grid(imgs_, class_labels, num_images):
+    """Now modified to show both [c h w] and [h w c] images."""
+    ncols = int(np.ceil(num_images**0.5))
+    nrows = int(np.ceil(num_images / ncols))
+    _, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
+    axes = axes.flatten()
+
+    for ax_i, ax in enumerate(axes):
+        if ax_i < num_images:
+            img = imgs_[ax_i]
+            if img.ndim == 3 and img.shape[0] == 3:
+                img = einops.rearrange(img, 'c h w -> h w c')
+            ax.imshow(img, cmap='Greys_r', interpolation='nearest')
+            ax.set_title(f'Class: {class_labels[ax_i]}')  # Display the class label as title
+            ax.set_xticks([])
+            ax.set_yticks([])
         else:
-            print(f"No images of class {class_label} in batch {i}")
-            
+            ax.axis('off')
+    print("showing plot")
+    plt.show()
+        
+        
+if __name__ == "__main__":
+    batch_size=20
+    train_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, cue_type='domcues', box_frac=1.0, mnist_frac=1.0, image_frac=0, randomize_box=False, randomize_mnist=True, randomize_img=False)
+    for i, (x, y) in enumerate(train_loader):
+        show_images_grid(x, y, num_images=batch_size)
         break
+        # Filter out images of a certain class
+        # mask = (y == class_label)
+        # class_label = 9
+        # x, y = x[mask], y[mask]
+        
+        # if len(x) > 0:  # check if there are any images of the desired class in the batch
+        #     x = einops.rearrange(x, 'b c h w -> b h w c')
+        #     show_images_grid(x, y, num_images=min(batch_size, len(x)))  # number of images should not exceed the batch size or the number of images of the desired class
+        # else:
+        #     print(f"No images of class {class_label} in batch {i}")
