@@ -180,7 +180,7 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
     n_rows = np.ceil(n_metrics / n_cols).astype(int)
     plot_width, plot_height = 15, 3.5* n_rows
 
-    fig, axs = plt.subplots(n_rows, n_cols, figsize=(plot_width, plot_height), sharey=True)
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(plot_width, plot_height))
     axs = axs.flatten() # Flatten the axs array so that we can iterate over it with a single loop
     # Remove any unused subplots
     if n_metrics < n_rows * n_cols:
@@ -232,6 +232,12 @@ def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: 
         axs[i].set_title(plot_names[i], fontsize=20)
         labelLines(axs[i].get_lines(), align=False, fontsize=13)
         axs[i].set_xlabel('Training step/100 iterations', fontsize=15)
+        if mode == 'acc':
+            axs[i].set_ylabel('Test accuracy (%)', fontsize=15)
+        elif mode == 'kl':
+            axs[i].set_ylabel('T-S KL', fontsize=15)
+        elif mode == 'fidelity':
+            axs[i].set_ylabel('Top-1 fidelity (%)', fontsize=15)
 
     legend = fig.legend(handles=legend_handles, loc='lower center', ncol=1, bbox_to_anchor=(0.8, 0.2), fontsize=15, frameon=False)
     legend.set_title("Distillation dataset mechanism", prop={"size": 15})

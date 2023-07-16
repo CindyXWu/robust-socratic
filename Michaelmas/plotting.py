@@ -149,7 +149,7 @@ def heatmap_diff_df(dataset_names: List[str], student):
         # Increase x-axis and y-axis tick label size
         plt.xticks(fontsize=14)  # Increase x-axis tick label size
         plt.yticks(fontsize=14)  # Increase y-axis tick label size
-        sns.heatmap(df_pivot, cmap='YlGnBu', annot=True, fmt=".1f", cbar_kws={'label': 'Accuracy Diff'}, linewidths=.5)
+        sns.heatmap(df_pivot, cmap='YlGnBu', annot=True, fmt=".1f", cbar_kws={'label': 'Accuracy Diff'}, linewidths=.5, vmin=-10, vmax=10)
         plt.savefig(f'Michaelmas/images/diffheatmaps/{student}/{dataset_name}_diff.png', bbox_inches='tight')
 
 
@@ -185,7 +185,7 @@ def plot_data(data_arr, d1, d2, title=''):
 
 if __name__ == '__main__':
 
-    fig_type = 1 # 0: plot data, 1: plot heatmap, 2: plot heatmap difference
+    fig_type = 2 # 0: plot data, 1: plot heatmap, 2: plot heatmap difference
     base_dir = 'Michaelmas/teacher_results/'
 
     dataset_names = []
@@ -205,7 +205,7 @@ if __name__ == '__main__':
                 print(df.head())
                 plot_df(df, base_name=base_dir, title=dataset)
         case 1:
-            heatmap_df(dataset_names, student='large')
+            heatmap_df(dataset_names, student='small')
         case 2:
-            heatmap_diff_df(dataset_names, student='large')
+            heatmap_diff_df(dataset_names, student='small')
         
