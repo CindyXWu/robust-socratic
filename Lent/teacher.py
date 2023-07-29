@@ -6,7 +6,7 @@ import yaml
 from time import gmtime, strftime
 
 from models.image_models import *
-from plotting import *
+from plotting_targeted import *
 from losses.jacobian import *
 from losses.contrastive import *
 from losses.feature_match import *
@@ -27,7 +27,6 @@ if not os.path.exists(teacher_dir):
     os.makedirs(teacher_dir)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-# print(f"Using {device} device")
 
 # ======================================================================================
 # ARGPARSE

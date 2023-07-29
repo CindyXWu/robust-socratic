@@ -401,26 +401,6 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
     return dataloader
 
 
-class LR_Scheduler(object):
-    def __init__(self, optimizer, num_epochs, base_lr, final_lr, iter_per_epoch):
-        self.base_lr = base_lr
-        # Iterations per epoch
-        decay_iter = iter_per_epoch * num_epochs
-        self.lr_schedule = final_lr+0.5*(base_lr-final_lr)*(1+np.cos(np.pi*np.arange(decay_iter)/decay_iter))        
-        self.optimizer = optimizer
-        self.iter = 0
-        self.current_lr = 0
-
-    def step(self):
-        for param_group in self.optimizer.param_groups:
-            lr = param_group['lr'] = self.lr_schedule[self.iter]
-        self.iter += 1
-        self.current_lr = lr
-
-    def get_lr(self):
-        return self.current_lr
-
-
 def show_images_grid(imgs_, class_labels, num_images):
     """Now modified to show both [c h w] and [h w c] images."""
     ncols = int(np.ceil(num_images**0.5))

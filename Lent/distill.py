@@ -8,7 +8,7 @@ from datasets.image_utils import *
 from info_dicts import *
 from train_utils import *
 from models.image_models import *
-from plotting import *
+from plotting_targeted import *
 from losses.jacobian import *
 from losses.contrastive import *
 from losses.feature_match import *
@@ -16,6 +16,7 @@ from datasets.utils_ekdeep import *
 from datasets.shapes_3D import *
 from info_dicts import *
 from configs.sweep_configs import *
+
 
 # Suppress warnings "divide by zero" produced by NaN gradients
 import warnings
@@ -26,9 +27,9 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 # Change directory to one this file is in
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-# ======================================================================================
+# =========================================================================
 # ARGPARSE
-# ======================================================================================
+# =========================================================================
 # Add boolean flag for whether to use config file and sweep
 parser = argparse.ArgumentParser()
 parser.add_argument("--config_name", type=str, default=None)
@@ -37,11 +38,13 @@ parser.add_argument('--config_num', type=int, help='Index of the configuration t
 # This time we only do sweeps for specific losses and datasets
 # (Jacobian, Contrastive and box spurious correlations)
 parser.add_argument("--sweep", type=bool, default=False)
+# This contains all other config things not related to distillation specific setup (things in capitals)
+parser.add_argument("--main_config_name", type=str, default=None)
 args = parser.parse_args()
 
-# ======================================================================================
+# =========================================================================
 # YAML CONFIGS
-# ======================================================================================
+# =========================================================================
 if args.config_name:
     # Load the config file - contains list of dictionaries
     with open(f'{args.config_name}', 'r') as f:
@@ -80,10 +83,10 @@ def sweep():
     train_distill(teacher, student, train_loader, test_loader, base_dataset, lr, final_lr, temp, epochs, LOSS_NUM, run_name, alpha=alpha, tau=tau, s_layer=s_layer, t_layer=t_layer)
 
 
-#================================================================================================
+#==========================================================================
 # For the following values, manual input or read from config file if one is provided
 # Refer to dictionaries in info_dicts.py for what the numbers mean
-#================================================================================================
+#==========================================================================
 is_sweep = args.sweep
 T_EXP_NUM = 2
 S_EXP_NUM = 4

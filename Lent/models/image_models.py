@@ -38,6 +38,7 @@ class NormalizationConstructorType(Protocol):
     def __call__(self, num_features: int) -> nn.Module:
         ...
 
+
 class LeNet5(nn.Module):
     """Changed input channels to 3 and added batchnorm."""
     def __init__(self, n_classes, greyscale=False):
@@ -69,10 +70,11 @@ class LeNet5(nn.Module):
             nn.Linear(in_features=84*in_channels, out_features=n_classes),
         )
 
+
     def attention_map(self, x, layer):
         layer_index = None
         for i, (name, _) in enumerate(self.named_modules()):
-            # For some reason first 2 modles is the entire model so skip it
+            # For some reason first 2 modules is the entire model so skip it
             if i <=1:
                 continue
             if name == layer:
@@ -89,6 +91,7 @@ class LeNet5(nn.Module):
         logits = self.classifier(x)
         probs = nn.functional.softmax(logits, dim=1)
         return logits
+
 
 class CustomResNet18(models.ResNet):
     """This model accepts images of any size using adaptive average pooling."""
@@ -118,6 +121,7 @@ class CustomResNet18(models.ResNet):
 
         return x
 
+
 class CustomResNet50(models.ResNet):
     """This model accepts images of any size using adaptive average pooling."""
     def __init__(self, num_classes):
@@ -145,6 +149,7 @@ class CustomResNet50(models.ResNet):
         x = self.fc(x)
 
         return x
+
 
 def wide_resnet_constructor(
         blocks_per_stage: int,
@@ -228,6 +233,7 @@ def wide_resnet_constructor(
 
     return model
 
+
 # Use this to find the names of the layers in the model for feature extractor in feature_match.py
 def get_submodules(model):
     """ Get names of all submodules in model as dict."""
@@ -243,10 +249,12 @@ def get_submodules(model):
             submodules[name] = name
     print(submodules)
 
+
 def show_model(model):
     print("List of model layers:")
     for idx, module in enumerate(model.children()):
         print(f"Layer {idx}: {module}")
+
 
 if __name__ == "__main__":
     resnet_ap = CustomResNet18(8)

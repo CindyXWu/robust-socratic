@@ -22,7 +22,9 @@ import wandb
 from wandb.sdk.wandb_run import Run
 from sklearn.manifold import TSNE
 
+
 warnings.filterwarnings("ignore")
+
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 image_dir = "images/"

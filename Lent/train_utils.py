@@ -6,7 +6,7 @@ from torch.nn import Module
 from torch.utils.data import DataLoader
 from typing import Tuple
 from models.image_models import *
-from plotting import *
+from plotting_exhaustive import *
 from losses.jacobian import *
 from losses.contrastive import *
 from losses.feature_match import *
@@ -14,9 +14,9 @@ from datasets.utils_ekdeep import *
 from datasets.shapes_3D import *
 from info_dicts import *
 
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Instantiate losses
 kl_loss = nn.KLDivLoss(reduction='batchmean')
 ce_loss = nn.CrossEntropyLoss(reduction='mean')
 mse_loss = nn.MSELoss(reduction='mean')
@@ -71,6 +71,26 @@ def counterfactual_evaluate(teacher: nn.Module,
     return avg_acc, avg_KL, avg_top_1
 
 
+class LRScheduler(object):
+    def __init__(self, optimizer, num_epochs, base_lr, final_lr, iter_per_epoch):
+        self.base_lr = base_lr
+        # Iterations per epoch
+        decay_iter = iter_per_epoch * num_epochs
+        self.lr_schedule = final_lr+0.5*(base_lr-final_lr)*(1+np.cos(np.pi*np.arange(decay_iter)/decay_iter))        
+        self.optimizer = optimizer
+        self.iter = 0
+        self.current_lr = 0
+
+    def step(self):
+        for param_group in self.optimizer.param_groups:
+            lr = param_group['lr'] = self.lr_schedule[self.iter]
+        self.iter += 1
+        self.current_lr = lr
+
+    def get_lr(self):
+        return self.current_lr
+    
+
 def weight_reset(model: nn.Module):
     """Reset weights of model at start of training."""
     for module in model.modules():
@@ -91,8 +111,9 @@ def train_teacher(model: nn.Module,
                   base_path: str) -> None:
     optimizer = optim.SGD(model.parameters(), lr=lr)
     it = 0
-    scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
-
+    scheduler = LRScheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
+    weight_reset(model) # Really important: reset weights compared to default initialisation
+    
     for epoch in range(epochs):
         print("Epoch: ", epoch)
         train_acc = []
@@ -181,11 +202,11 @@ def train_distill(
         epochs = N_its//(len(train_loader)//its_per_log)+1
 
     teacher.eval()
+    weight_reset(student) # Really important: reset weights compared to default initialisation
     student.train()
-    # weight_reset(student)
 
     optimizer = optim.SGD(student.parameters(), lr=lr)
-    scheduler = LR_Scheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
+    scheduler = LRScheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
     it = 0
 
     output_dim = len(train_loader.dataset.classes)
