@@ -1,0 +1,8 @@
+config:
+  im_frac: 1
+  m1_frac: 0.3
+  m2_frac: 0.6
+  rand_im: false
+  rand_m1: false
+  rand_m2: false
+name: 'Teacher both spurious: 100 30 60'

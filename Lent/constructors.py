@@ -15,14 +15,13 @@ class Constructor():
         self.distill_loss_type = config.distill_loss_type
         self.dataset_type = config.dataset_type
         self.model_type = config.model_type
-        self.config_group = config.config_group
         
     def make_model(self) -> nn.Module:
         """Factory method for creating student and teacher models."""   
         models = {
-                ModelType.LENET: (LeNet5(self.class_num).to(self.device), {'feature_extractor.10': 'feature_extractor.10'}),
-                ModelType.RN18AP: (CustomResNet18(self.class_num).to(self.device), {'layer4.1.bn2': 'bn_bn2'}),
-                ModelType.RN20W: (wide_resnet_constructor(3, self.class_num).to(self.device), {"11.path2.5": "final_features"}),
+                ModelType.LENET5_3CHAN: (LeNet5(self.class_num).to(self.device), {'feature_extractor.10': 'feature_extractor.10'}),
+                ModelType.RESNET18_ADAPTIVE_POOLING: (CustomResNet18(self.class_num).to(self.device), {'layer4.1.bn2': 'bn_bn2'}),
+                ModelType.RESNE20_WIDE: (wide_resnet_constructor(3, self.class_num).to(self.device), {"11.path2.5": "final_features"}),
             }
         return models.get(self.model_type)
     
@@ -45,9 +44,9 @@ class Constructor():
         match self.loss_type:
             case DistillLossType.BASE:
                 return 1
-            case DistillLossType.JAC:
+            case DistillLossType.JACOBIAN:
                 return 0.5
-            case DistillLossType.CONTRAST:
+            case DistillLossType.CONTRASTIVE:
                 return 0.01
             case _:
                 raise ValueError(f"Unknown loss type {self.distill_loss_type}")
@@ -95,3 +94,22 @@ def get_counterfactual_dataloaders(main_config: MainConfig) -> dict[str, DataLoa
     dataloaders = {}
     for exp_num, (name, config) in enumerate(ConfigGroups.counterfactual_configs.items()):
         _, dataloaders[name] = create_dataloader(exp_num, main_config, config, counterfactual=True)
+        
+
+class LRScheduler(object):
+    def __init__(self, optimizer, num_epochs, base_lr, final_lr, iter_per_epoch):
+        self.base_lr = base_lr
+        decay_iter = iter_per_epoch * num_epochs
+        self.lr_schedule = final_lr+0.5*(base_lr-final_lr)*(1+np.cos(np.pi*np.arange(decay_iter)/decay_iter))        
+        self.optimizer = optimizer
+        self.iter = 0
+        self.current_lr = 0
+
+    def step(self):
+        for param_group in self.optimizer.param_groups:
+            lr = param_group['lr'] = self.lr_schedule[self.iter]
+        self.iter += 1
+        self.current_lr = lr
+
+    def get_lr(self):
+        return self.current_lr
