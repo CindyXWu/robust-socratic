@@ -96,7 +96,6 @@ def weight_reset(model: nn.Module):
     for module in model.modules():
         if hasattr(module, 'reset_parameters'):
             module.reset_parameters()
-        # Initialise
         if isinstance(module, nn.Conv2d):
             nn.init.kaiming_normal_(module.weight, mode="fan_out", nonlinearity="relu")
 
@@ -104,24 +103,28 @@ def weight_reset(model: nn.Module):
 def train_teacher(model: nn.Module, 
                   train_loader: DataLoader, 
                   test_loader: DataLoader, 
-                  lr: float, 
+                  default_lr: float, 
                   final_lr: float, 
-                  epochs: int, 
+                  epochs: int,
+                  num_eval_its: int, 
                   project: str, 
-                  base_path: str) -> None:
+                  model_save_path: str) -> None:
+    """
+    Args:
+        num_eval_its: number of iterations between logging each datapoint.
+    """
     optimizer = optim.SGD(model.parameters(), lr=lr)
-    it = 0
-    scheduler = LRScheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
+    scheduler = LRScheduler(optimizer, epochs, base_lr=default_lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
     weight_reset(model) # Really important: reset weights compared to default initialisation
+    train_acc_list, test_acc_list = [], []
+    it = 0
     
     for epoch in range(epochs):
         print("Epoch: ", epoch)
-        train_acc = []
-        test_acc = []
         train_loss = []
         model.train()
         
-        for inputs, labels in tqdm(train_loader):
+        for inputs, labels in tqdm(train_loader, desc=f"Training iterations within epoch {epoch}"):
             inputs, labels = inputs.to(device), labels.to(device)
             scores = model(inputs)
 
@@ -133,49 +136,29 @@ def train_teacher(model: nn.Module,
             lr = scheduler.get_lr()
             train_loss.append(loss.detach().cpu().numpy())
             
-            if it % 100 == 0:
+            if it % num_eval_its == 0:
                 batch_size = inputs.shape[0]
-                train_acc.append(evaluate(model, train_loader, batch_size, max_ex=10))
-                test_acc.append(evaluate(model, test_loader, batch_size, max_ex=10))
-                print('Iteration: %i, %.2f%%' % (it, test_acc[-1]), "Epoch: ", epoch)
-                print("Project {}, LR {}".format(project, lr))
-                wandb.log({"Test Accuracy": test_acc[-1], "Loss": train_loss[-1], "LR": lr})
+                train_acc = evaluate(model, train_loader, batch_size, max_ex=20)
+                test_acc = evaluate(model, test_loader, batch_size, max_ex=10)
+                train_acc_list.append(train_acc)
+                test_acc_list.append(test_acc)
+                print(f'Project {project}, Epoch: {epoch}, Train accuracy: {train_acc}, Test accuracy: {test_acc}, LR {lr}')
+                wandb.log({"Train Acc": train_acc, "Test Acc": test_acc, "Loss": np.mean(train_loss), "LR": lr}, step=it)
             it += 1
 
-        # Checkpoint model at end of every epoch
-        # Have two models: working copy (this one) and final fetched model
-        # Save optimizer in case re-run, save test accuracy to compare models
-        save_path = base_path+"_working"
-        torch.save({'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'loss_hist': train_loss,
-                'test_acc': test_acc,
-                },
-                save_path)
+        # Checkpoint model at end of epoch
+        save_model(f"{model_save_path}_working", epoch, model, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
     
-    save_path = base_path+"_final"
-    torch.save({'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss_hist': train_loss,
-            'test_acc': test_acc,
-            },
-            save_path)
+    save_model(f"{model_save_path}_final", epoch, model, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
 
-
-def base_distill_loss(scores: torch.Tensor, targets: torch.Tensor, temp: float) -> torch.Tensor:
-    scores = F.log_softmax(scores/temp)
-    targets = F.softmax(targets/temp)
-    return kl_loss(scores, targets)
-
-
+    
 def train_distill(
     teacher: Module, 
     student: Module, 
     train_loader: DataLoader, 
     test_loader: DataLoader, 
     base_dataset: str, 
-    lr: float, 
+    default_lr: float, 
     final_lr: float, 
     temp: float, 
     epochs: int, 
@@ -205,7 +188,7 @@ def train_distill(
     weight_reset(student) # Really important: reset weights compared to default initialisation
     student.train()
 
-    optimizer = optim.SGD(student.parameters(), lr=lr)
+    optimizer = optim.SGD(student.parameters(), lr=default_lr)
     scheduler = LRScheduler(optimizer, epochs, base_lr=lr, final_lr=final_lr, iter_per_epoch=len(train_loader))
     it = 0
 
@@ -261,9 +244,8 @@ def train_distill(
                     # Currently not plotting datasets
                     cf_evals[name], cf_evals[name+" T-S KL"], cf_evals[name+" T-S Top 1 Fidelity"] = counterfactual_evaluate(teacher, student, dataloaders[name], batch_size, max_ex=N_eval_batches, title=None)
                 print(cf_evals)
-                print('Iteration: %i, %.2f%%' % (it, test_acc), "Epoch: ", epoch, "Loss: ", train_loss)
-                print("Project {}, LR {}, temp {}".format(run_name, lr, temp))
-                results = {**cf_evals, **{
+                print(f"Project: {run_name}, Iteration: {it}, Epoch: {epoch}, Loss: {train_loss}, LR: {lr}, Temperature: {temp}, Alpha: {alpha}, Tau: {tau}")
+                results_dict = {**cf_evals, **{
                     "T-S KL": test_KL, 
                     "T-S Top 1 Fidelity": test_top1, 
                     "S Train": train_acc, 
@@ -271,7 +253,7 @@ def train_distill(
                     "S Loss": train_loss, 
                     "S LR": lr, } 
                 }
-                wandb.log(results)
+                wandb.log(results_dict, step=it)
             it += 1
         ## Visualise 3d at end of each epoch
         # if loss_num == 2:
@@ -326,3 +308,34 @@ def create_dataloader(base_dataset: Dataset,
         test_loader = dataloader_3D_shapes('test', batch_size=batch_size, randomise=randomize_img, floor_frac=mech_1_frac, scale_frac=mech_2_frac)
  
     return train_loader, test_loader
+
+
+def base_distill_loss(
+    scores: torch.Tensor,
+    targets: torch.Tensor,
+    temp: float) -> torch.Tensor:
+    scores = F.log_softmax(scores/temp)
+    targets = F.softmax(targets/temp)
+    return kl_loss(scores, targets)
+
+
+def save_model(
+    path: str, 
+    epoch: int, 
+    model: nn.Module, 
+    optimizer: optim.Optimizer, 
+    train_loss: List[float], 
+    train_acc: List[float], 
+    test_acc: List[float],
+    final_acc: float,
+    ) -> None:
+    torch.save({'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss_hist': train_loss,
+                'train_acc': train_acc,
+                'test_acc': test_acc,
+                'final_acc': final_acc
+                },
+                path)
+    

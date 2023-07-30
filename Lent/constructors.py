@@ -55,7 +55,6 @@ class Constructor():
 
 def create_dataloader(exp_num: int,
                       main_config: MainConfig,
-                      exp_config: ExperimentConfig = None,
                       counterfactual: bool = False,
                       ) -> Tuple[DataLoader, DataLoader]:
     """Set train and test loaders based on dataset and experiment.

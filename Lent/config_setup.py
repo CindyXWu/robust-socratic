@@ -1,14 +1,15 @@
 """Bunch of dataclasses and enums to group immutable variables into classes."""
+import numpy as np
+from enum import Enum
+import yaml
+import os
 from dataclasses import dataclass, field
 from typing import Any, Tuple
 from collections import namedtuple
-import numpy as np
-from enum import Enum
 
 from models.image_models import *
 
 
-# Only doing self-distillation for now, so specify singular architecture type
 class ModelType(str, Enum):
     RN18AP = "ResNet18AdaptivePooling"
     RN20W = "ResNet20Wide"
@@ -44,19 +45,14 @@ class OptimizerType(str, Enum):
 @dataclass
 class ExperimentConfig:
     """If there is only one mechanism, values of mech 2 frac and random mech 2 do not matter."""
-    im_frac: float = field(default=1.0)
-    m1_frac: float = field(default=0.0, metadata=['BOX', 'FLOOR'])
-    m2_frac: float = field(default=0.0, metadata=['MNIST', 'SCALE'])
-    rand_im: bool
-    rand_m1: bool
-    rand_m2: bool
+    im_frac: float = 1.0
+    m1_frac: float = field(default=0.0, metadata={'tags': ['BOX', 'FLOOR']})
+    m2_frac: float = field(default=0.0, metadata={'tags': ['MNIST', 'SCALE']})
+    rand_im: bool = False
+    rand_m1: bool = False
+    rand_m2: bool = False
 
-    def __post_init__(self):
-        for attr in ['im_frac', 'm1_frac', 'm2_frac']:
-            value = getattr(self, attr)
-            if not 0 <= value <= 1:
-                raise ValueError(f"{attr} must be between 0 and 1")
-            
+
 ExpConfig = namedtuple('ExpConfig', ['name', 'config'])
 
 
@@ -78,7 +74,7 @@ class ConfigGroups:
 
 
     # Numbers relate to M, S1 and S2 respectively in the string below
-    targeted_exp_configs = (
+    targeted_configs = (
         ExpConfig("No mechanisms (baseline): 100 0 0", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
         ExpConfig("Teacher one spurious: 100 0 60", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.6, rand_im=False, rand_m1=False, rand_m2=False)),
         ExpConfig("Teacher both spurious: 100 30 60", ExperimentConfig(im_frac=1, m1_frac=0.3, m2_frac=0.6, rand_im=False, rand_m1=False, rand_m2=False)),
@@ -96,6 +92,22 @@ class ConfigGroups:
     )
 
 
+@dataclass
+class DataLoaderConfig:
+    """
+    train_fraction: Fraction of dataset to be set aside for training.
+    batch_size: For both train and test.
+    shuffle: Whether to shuffle the training data.
+    seed: Random seed for reproducibility, ensuring fn returns same split with same args.
+    """
+    train_bs: int = 64
+    test_bs: int = 32
+    num_workers: int = 1
+    train_fraction: float = 0.95
+    shuffle_train: bool = True
+    seed: int = 42
+    
+    
 class LRScheduler(object):
     def __init__(self, optimizer, num_epochs, base_lr, final_lr, iter_per_epoch):
         self.base_lr = base_lr
@@ -132,22 +144,24 @@ class OptimizerConfig:
 class MainConfig:
     model_type: ModelType
     dataset_type: DatasetType
+    num_training_iter: int
+    distill_epochs: int
+    teacher_epochs: int
+    
     config_group: Tuple[ExpConfig, ...] # Group of specified configs - allows separate experiment types to be run for each dataset
     distill_loss_type: DistillLossType
     aug_type: AugType
     teach_data_num: int = 0
     dist_data_num: int = 0 # Which counterfactual dataset
     
-    optimizer: OptimizerConfig = field(default_factory=OptimizerConfig)
+    optimization: OptimizerConfig = field(default_factory=OptimizerConfig)
+    dataloader: DataLoaderConfig = field(default_factory=DataLoaderConfig)
     
-    distill_epochs: int
-    epochs: int
-    train_bsize: int = 64
-    eval_bsize: int = 16
-    
-    wandb_run: bool = False # Whether to log to wandb
+    log_to_wandb: bool = False # Whether to log to wandb
+    save_model_as_artifact: bool = True
+    wandb_project_name: str = "iib-fcnn" # Serves as base project name - model type and dataset also included
+    model_save_path: str = "trained_models"
     is_sweep: bool = False
-
 
     def __post_init__(self):
         t_exp_name = self.config_group[self.teach_data_num].name.split(":")[-1].strip()
@@ -156,7 +170,27 @@ class MainConfig:
 
 @dataclass
 class HyperparamConfig(MainConfig):
-    """May move a few of these things to hydra."""
-    N_its: int = None # Standardise training length where dataset size can vary between runs.
     t: int = 30 # KL soft base distillation temperature
     tau: float = 0.1 # Contrastive loss temperature
+    
+
+def config_to_yaml(configs, filename_prefix):
+    directory = os.path.dirname(filename_prefix)
+
+    # Check if directory is not an empty string
+    if directory and not os.path.exists(directory):
+        os.makedirs(directory)
+
+    for i, config in enumerate(configs):
+        filename = f"{filename_prefix}_{i}.yaml"
+        # Check if directory exists in the filename, if not, create the directory
+        file_dir = os.path.dirname(filename)
+        if file_dir and not os.path.exists(file_dir):
+            os.makedirs(file_dir)
+        
+        with open(filename, 'w') as file:
+            yaml.dump({'name': config.name, 'config': vars(config.config)}, file)
+        
+        
+if __name__ == "__main__":
+    config_to_yaml(ConfigGroups.exhaustive_configs, 'configs/exhaustive_configs/exhaustive_configs')
