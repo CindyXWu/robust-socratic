@@ -10,7 +10,7 @@ optimization:
   cosine_lr_schedule: true
   optimizer_kwargs: {}
 dataset:
-  data_folder: "data"
+  data_folder: data
   output_size: null
 dataloader:
   train_bs: 64
@@ -31,3 +31,13 @@ save_model_as_artifact: true
 teacher_save_path: null
 wandb_project_name: null
 wandb_run_name: null
+experiment:
+  config_filename: targeted_0
+  experiment_config:
+    im_frac: 1
+    m1_frac: 0
+    m2_frac: 0
+    rand_im: false
+    rand_m1: false
+    rand_m2: false
+  name: 'No mechanisms (baseline): 100 0 0'
