@@ -1,8 +1,0 @@
-config:
-  im_frac: 1
-  m1_frac: 0
-  m2_frac: 0.6
-  rand_im: false
-  rand_m1: false
-  rand_m2: false
-name: 'Teacher one spurious: 100 0 60'

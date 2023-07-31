@@ -1,8 +1,8 @@
-config:
+experiment_config:
   im_frac: 1
   m1_frac: 1
   m2_frac: 1
   rand_im: false
-  rand_m1: false
+  rand_m1: true
   rand_m2: false
-name: CMB
+name: 'Randomize S1: 100 R 100'

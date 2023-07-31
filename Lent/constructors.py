@@ -1,77 +1,76 @@
 """Construct models, get class numbers, get alpha, construct dataloaders."""
 import torch
 import torch.nn as nn
-from typing import Tuple
+import torch.optim as optim
+from typing import Tuple, Optional
 from dataclasses import asdict
-from config_setup import *
+
+from config_setup import MainConfig, ModelType, DatasetType, DatasetConfig, ConfigGroups, ExperimentConfig, OptimizerType
 from datasets.utils_ekdeep import *
 from datasets.shapes_3D import *
+from models.resnet import wide_resnet_constructor
+from models.resnet_ap import CustomResNet18
+from models.lenet import LeNet5
+from models.mlp import mlp_constructor
 
 
-class Constructor():
-    def __init__(self, config: MainConfig):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.class_num = self.get_class_num()
-        self.distill_loss_type = config.distill_loss_type
-        self.dataset_type = config.dataset_type
-        self.model_type = config.model_type
-        
-    def make_model(self) -> nn.Module:
-        """Factory method for creating student and teacher models."""   
-        models = {
-                ModelType.LENET5_3CHAN: (LeNet5(self.class_num).to(self.device), {'feature_extractor.10': 'feature_extractor.10'}),
-                ModelType.RESNET18_ADAPTIVE_POOLING: (CustomResNet18(self.class_num).to(self.device), {'layer4.1.bn2': 'bn_bn2'}),
-                ModelType.RESNE20_WIDE: (wide_resnet_constructor(3, self.class_num).to(self.device), {"11.path2.5": "final_features"}),
-            }
-        return models.get(self.model_type)
-    
-    def get_class_num(self):
-        match self.dataset_type:
-            case DatasetType.DOMINOES:
-                return 10
-            case DatasetType.SHAPES:
-                return 8
-            case DatasetType.CIFAR100:
-                return 100
-            case DatasetType.CIFAR10:
-                return 10
-            case _:
-                raise ValueError(f"Unknown dataset type {self.dataset_type}")
-    
-    def get_alpha(self):
-        """Weighting of this loss term with respect to base soft label matching distillation.
-        Currently hard-coded, but probably better as hyperparameter."""
-        match self.loss_type:
-            case DistillLossType.BASE:
-                return 1
-            case DistillLossType.JACOBIAN:
-                return 0.5
-            case DistillLossType.CONTRASTIVE:
-                return 0.01
-            case _:
-                raise ValueError(f"Unknown loss type {self.distill_loss_type}")
+def model_constructor(config: MainConfig) -> nn.Module:
+    """Constructs a model based on a specified model type."""
+    if config.model_type == ModelType.MLP:
+        model = mlp_constructor(
+            input_size=config.dataset.input_length,
+            hidden_sizes=config.mlp_config.hidden_sizes,
+            output_size=config.mlp_config.output_size,
+            bias=config.mlp_config.add_bias,
+        )
+    elif config.model_type == ModelType.RESNE20_WIDE:
+        model = wide_resnet_constructor(
+            blocks_per_stage=config.resnet_config.blocks_per_stage,
+            width_factor=config.resnet_config.width_factor,
+            output_size=config.dataset.output_size,
+        )
+    elif config.model_type == ModelType.RESNET18_ADAPTIVE_POOLING:
+        model = CustomResNet18(config.dataset.output_size)
+    else:
+        raise ValueError(f"Invalid model type: {config.model_type}")
+    return model
 
 
-def create_dataloader(exp_num: int,
-                      main_config: MainConfig,
-                      counterfactual: bool = False,
+def get_model_intermediate_layer(config: MainConfig) -> str:
+    """For feature difference losses."""
+    models = {
+            ModelType.LENET5_3CHAN: {'feature_extractor.10': 'feature_extractor.10'},
+            ModelType.RESNET18_ADAPTIVE_POOLING: {'layer4.1.bn2': 'bn_bn2'},
+            ModelType.RESNE20_WIDE: {"11.path2.5": "final_features"},
+        }
+    return models.get(config.model_type)
+
+
+def create_dataloader(config: MainConfig,
+                      exp_config: Optional[ExperimentConfig] = None
                       ) -> Tuple[DataLoader, DataLoader]:
     """Set train and test loaders based on dataset and experiment.
     For generating dominoes: box is cue 1, MNIST is cue 2.
     For CIFAR100 box: box is cue 1.
+
+    Two ways to run this function:
+    1. If used to generate counterfactual datasets, index into ConfigGroup.counterfactual_configs dictionary. exp_config must be specified.
+    2. Otherwise assume generating main training and testing dataloaders for experiment - values are in MainConfig object 'config' due to Hydra handling this.
+
+    Form of exp_config exampled in configs/targeted_distillation folder.
     
     Args:
-        exp_num: index in the ExperimentConfig tuple.
-        counterfactual: whether this dataloader being generated is a counterfactual dataloader. If true, then we load experiments based on the counterfactual configs group inside ConfigGroups class.
+        exp_config: Optional experiment config specified separately. Handling of this is expected to be external to this function.
     Returns:
-        train_loader: same as test_loader, just split differently.
+        train_loader: Same as test_loader, just split differently.
         test_loader: "".
     """
-    base_dataset = main_config.dataset_type
-    train_bsize = main_config.train_bsize
-    config_group: Tuple[ExpConfig, ...] = ConfigGroups.counterfactual_configs if counterfactual else ConfigGroups.targeted_exp_configs
-    config: ExperimentConfig = config_group[exp_num].config if exp_config is None else exp_config
-    im_frac, m1_frac, m2_frac, rand_im, rand_m1, rand_m2 = asdict(config).values()
+    base_dataset = config.dataset_type
+    train_bsize = config.dataloader.train_bs
+
+    if exp_config is None: # Main training and testing dataloaders
+        exp_config = config.experiment_config
+    im_frac, m1_frac, m2_frac, rand_im, rand_m1, rand_m2 = asdict(exp_config).values()
 
     if base_dataset == DatasetType.DOMINOES: # BOX: MECH 1, MNIST: MECH 2
         train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes', batch_size=train_bsize, rand_im=rand_im, box_frac=m1_frac, mnist_frac=m2_frac, im_frac=im_frac, randomize_box=rand_m1, randomize_mnist=rand_m2)
@@ -90,10 +89,22 @@ def create_dataloader(exp_num: int,
 
 
 def get_counterfactual_dataloaders(main_config: MainConfig) -> dict[str, DataLoader]:
-    """Get a dictionary of dataloaders for counterfactual evaluation. Key of dictionary tells us which settings for counterfactual evals are used."""
+    """Get a dictionary of dataloaders for counterfactual evaluation. Key is string describing counterfactual experiment settings."""
     dataloaders = {}
-    for exp_num, (name, config) in enumerate(ConfigGroups.counterfactual_configs.items()):
-        _, dataloaders[name] = create_dataloader(exp_num, main_config, config, counterfactual=True)
+    for idx, (name, exp_config) in enumerate(ConfigGroups.counterfactual_configs.items()):
+        _, dataloaders[name] = create_dataloader(main_config, exp_config)
+
+
+def create_or_load_dataset(dataset_type: str, dataset_config: DatasetConfig) -> Dataset:
+    """Create or load an existing dataset based on a specified filepath and dataset type."""
+    filepath = f'{dataset_config.data_folder}/{dataset_config.filename}.pt'
+    if os.path.exists(filepath):
+        dataset = torch.load(filepath)
+    else:
+        dataset_type = globals()[dataset_type]
+        dataset = dataset_type(dataset_config)
+        torch.save(dataset, filepath)
+    return dataset
         
 
 class LRScheduler(object):
@@ -113,3 +124,26 @@ class LRScheduler(object):
 
     def get_lr(self):
         return self.current_lr
+
+
+def optimizer_constructor(config: MainConfig, model: nn.Module) -> optim.Optimizer:
+    match config.optimization.optimizer_type:
+        case OptimizerType.SGD:
+            optim_constructor = torch.optim.SGD
+        case OptimizerType.ADAM:
+            optim_constructor = torch.optim.Adam
+        case _:
+            raise ValueError(f"Unknown optimizer type: {config.optimization.optimizer_type}")
+    optim = optim_constructor(
+        params=model.parameters(),
+        lr=config.optimization.base_lr,
+        **config.optimization.optimizer_kwargs,
+    )
+
+    if config.optimization.cosine_lr_schedule:
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer=optim,
+            T_max=config.iters_used,
+        )
+        scheduler = LRScheduler(optim, config.epochs, base_lr=lr, final_lr=config.optimization.final_lr, iter_per_epoch=len(train_loader))
+    return optim, scheduler

@@ -1,15 +1,13 @@
 """Bunch of dataclasses and enums to group immutable variables into classes."""
-import numpy as np
 from enum import Enum
 import yaml
 from dataclasses import dataclass, field
-from typing import Any, Tuple
+from typing import Optional
 from collections import namedtuple
-
-from models.image_models import *
 
 
 class ModelType(str, Enum):
+    MLP = "MLP"
     RESNET18_ADAPTIVE_POOLING = "RN18AP"
     RESNE20_WIDE = "RN20W"
     LENET5_3CHAN = "LENET5"
@@ -19,6 +17,12 @@ class DistillLossType(str, Enum):
     BASE = "BASE"
     JACOBIAN = "JACOBIAN"
     CONTRASTIVE = "CONTRASTIVE"
+
+
+class LossType(str, Enum):
+    KL = "KL"
+    MSE = "MSE"
+    CE = "CE"
 
 
 class DatasetType(str, Enum):
@@ -39,8 +43,124 @@ class OptimizerType(str, Enum):
     SGD = "SGD"
     ADAM = "ADAM"
     ADAMW = "ADAMW"
+
+
+@dataclass
+class ResNetConfig:
+    blocks_per_stage: int = 3 # Gives ResNet20: 3 blocks * 3 stages * 2 layers per block + input layer + output layer
+    _width_factor: int = field(default=1, repr=False) # Hide this field for repr
+
+    @property
+    def width_factor(self):
+        return self._width_factor
+
+
+@dataclass
+class DatasetConfig:
+    dataset_filename = "filename.csv"
+    data_folder: str = "data"
+    output_size: int = 10
+
+
+@dataclass
+class DataLoaderConfig:
+    """
+    train_fraction: Fraction of dataset to be set aside for training.
+    batch_size: For both train and test.
+    seed: Random seed for reproducibility, ensuring fn returns same split with same args.
+    """
+    train_bs: int = 64
+    test_bs: int = 32
+    num_workers: int = 1
+    train_fraction: float = 0.95
+    shuffle_train: bool = True
+    seed: int = 42
     
+
+@dataclass
+class OptimizerConfig:
+    optimizer_type: OptimizerType = OptimizerType.SGD
+    base_lr = 3e-1 # Base LR for SGD
+    weight_decay: float = 0.0
+    momentum: float = 0.0
+    # For cosine LR scheduler
+    final_lr: int = 1e-3
+    cosine_lr_schedule: bool = True
+
+
+# TODO: Consider making this a MainConfig and creating a separate DistillConfig
+@dataclass
+class MainConfig:
+    """Does not include which config group to load experiment from. This is specified from command line via Hydra multirun."""
+    model_type: ModelType
+    dataset_type: DatasetType
+
+    # Distillation stuff
+    is_distill: bool = False
+    distill_loss_type: Optional[DistillLossType]
+    aug_type: Optional[AugType]
+    nonbase_loss_frac: Optional[float]
+    """Weighting of this loss term with respect to base soft label matching distillation."""
+    dist_temp: Optional[float] = 30
+    jac_temp: Optional[float] = 1
+    contrast_temp: Optional[float] = 0.1 # 0.1 recommended in paper
+    # Initialise these in the main function
+    s_layer: Optional[str] = None 
+    t_layer: Optional[str] = None
+    jacobian_loss_type: LossType = LossType.MSE
     
+    # Stuff from other dataclasses
+    optimization: OptimizerConfig = field(default_factory=OptimizerConfig)
+    dataset: DatasetConfig = field(default_factory=DatasetConfig)
+    dataloader: DataLoaderConfig = field(default_factory=DataLoaderConfig)
+
+    # Model-specific init
+    resnet_config: Optional[ResNetConfig] = field(default_factory=ResNetConfig)
+
+    # Training 
+    distill_iters: int = 8000 # Neither of these values are directly used in the code, but are used to calculate the other values
+    teacher_iters: int = 4000
+    eval_frequency: int = 100
+    """How many iterations between evaluations. If None, assumed to be 1 epoch, if the dataset is not Iterable."""
+    num_eval_batches: Optional[int] = 20
+    """
+    How many batches to evaluate on. If None, evaluate on the entire eval dataLoader.
+    Note, this might result in infinite evaluation if the eval dataLoader is not finite.
+    """
+    teacher_save_path: str = "trained_teachers"
+    student_save_path: str = "trained_students"
+
+    # Logging
+    log_to_wandb: bool = False # Whether to log to wandb
+    save_model_as_artifact: bool = True
+    wandb_run_name: str = "run" # Initialise in main function
+    is_sweep: bool = False
+
+    def __post_init__(self):  
+        match self.dataset_type:
+            case DatasetType.DOMINOES:
+                self.dataset.output_size = 10
+            case DatasetType.SHAPES:
+                self.dataset.output_size = 8
+            case DatasetType.CIFAR100:
+                self.dataset.output_size = 100
+            case DatasetType.CIFAR10:
+                self.dataset.output_size = 10
+            case _:
+                raise ValueError(f"Unknown dataset type {self.dataset_type}")
+        
+        match self.distill_loss_type:
+            case DistillLossType.JACOBIAN:
+                self.nonbase_loss_frac = 0.5
+            case DistillLossType.CONTRASTIVE:
+                self.nonbase_loss_frac = 0.01
+            case _:
+                raise ValueError(f"Unknown loss type {self.distill_loss_type}")
+        
+        self.wandb_project_name = f"{self.model_type} {self.dataset_type}"
+        self.iters_used = self.distill_iters if self.is_distill else self.teacher_iters
+
+
 @dataclass
 class ExperimentConfig:
     """If there is only one mechanism, values of mech 2 frac and random mech 2 do not matter."""
@@ -52,7 +172,7 @@ class ExperimentConfig:
     rand_m2: bool = False
 
 
-ExpConfig = namedtuple('ExpConfig', ['name', 'config'])
+ExpConfig = namedtuple('ExpConfig', ['name', 'experiment_config'])
 
 
 @dataclass
@@ -94,70 +214,11 @@ class ConfigGroups:
     )
 
 
-@dataclass
-class DataLoaderConfig:
-    """
-    train_fraction: Fraction of dataset to be set aside for training.
-    batch_size: For both train and test.
-    seed: Random seed for reproducibility, ensuring fn returns same split with same args.
-    """
-    train_bs: int = 64
-    test_bs: int = 32
-    num_workers: int = 1
-    train_fraction: float = 0.95
-    shuffle_train: bool = True
-    seed: int = 42
-    
-
-@dataclass
-class OptimizerConfig:
-    optimizer_type: OptimizerType = OptimizerType.SGD
-    base_lr = 1e-3 # Base LR for SGD
-    weight_decay: float = 0.0
-    momentum: float = 0.0
-    # For cosine LR scheduler
-    cosine_lr: bool = False
-    initial_lr: int = 1e-1
-    final_lr: int = 1e-5
-
-
-# TODO: Check Hydra config grouping.
-@dataclass
-class MainConfig:
-    """Does not include which config group to load experiment from. This is specified from command line via counterfactual_config=counterfactual_0 [citation needed]."""
-    model_type: ModelType
-    dataset_type: DatasetType
-    num_training_iter: int
-    distill_epochs: int
-    teacher_epochs: int
-    
-    distill_loss_type: DistillLossType
-    aug_type: AugType
-    teach_data_num: int = 0
-    dist_data_num: int = 0 # Which counterfactual dataset
-    dist_temp: float = 30 # Base distillation temperature
-    contrast_temp: float = 0.1 # Contrastive loss temperature
-    
-    optimization: OptimizerConfig = field(default_factory=OptimizerConfig)
-    dataloader: DataLoaderConfig = field(default_factory=DataLoaderConfig)
-    
-    log_to_wandb: bool = False # Whether to log to wandb
-    save_model_as_artifact: bool = True
-    wandb_project_name: str = "iib-fcnn" # Serves as base project name - model type and dataset also included
-    model_save_path: str = "trained_models"
-    is_sweep: bool = False
-
-    # TODO: Change this
-    def __post_init__(self):
-        t_exp_name = self.config_group[self.teach_data_num].name.split(":")[-1].strip()
-        s_exp_name = self.config_group[self.dist_data_num].name.split(":")[-1].strip()
-        
-
 def config_to_yaml(configs, filename_prefix):
     for i, config in enumerate(configs):
         filename = f"{filename_prefix}_{i}.yaml"
         with open(filename, 'w') as file:
-            yaml.dump({'name': config.name, 'config': vars(config.config)}, file)
+            yaml.dump({'name': config.name, 'experiment_config': vars(config.experiment_config)}, file)
 
 
 def create_new_configs():

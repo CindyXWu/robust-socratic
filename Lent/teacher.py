@@ -5,7 +5,10 @@ import argparse
 import yaml
 from time import gmtime, strftime
 
-from models.image_models import *
+from models.resnet import wide_resnet_constructor
+from models.resnet_ap import CustomResNet18, CustomResNet50
+from models.lenet import LeNet5
+from models.mlp import mlp_constructor
 from plotting_targeted import *
 from losses.jacobian import *
 from losses.contrastive import *
@@ -159,7 +162,7 @@ if __name__ == "__main__":
         wandb.config.teacher = teacher_dict[TEACH_NUM]
         wandb.config.teacher_mechanism = short_exp_name
         
-        train_loader, test_loader = create_dataloader(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size)
+        train_loader, test_loader = create_dataloaders(base_dataset=base_dataset, EXP_NUM=EXP_NUM, batch_size=batch_size)
 
         ## Plot images
         # for i, (x, y) in enumerate(train_loader):
