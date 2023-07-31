@@ -101,9 +101,9 @@ class MainConfig:
     # Model-specific init
     resnet_config: Optional[ResNetConfig] = field(default_factory=ResNetConfig)
 
-    # Training 
+    # Training
     epochs: Optional[int] = None # Instantiate in main function
-    num_iters: int = 4000
+    num_iters: int = 20000 # Upper bound - see early stopping
     eval_frequency: int = 100
     """How many iterations between evaluations. If None, assumed to be 1 epoch, if the dataset is not Iterable."""
     num_eval_batches: Optional[int] = 20
@@ -111,6 +111,7 @@ class MainConfig:
     How many batches to evaluate on. If None, evaluate on the entire eval dataLoader.
     Note, this might result in infinite evaluation if the eval dataLoader is not finite.
     """
+    early_stop_patience: int = 5 # Number of evaluation rounds with no accuracy improvement before training stops
     teacher_save_path: Optional[str] = None
 
     # Logging
@@ -138,15 +139,6 @@ class DistillConfig(MainConfig):
     t_layer: Optional[str] = None
     
     student_save_path: str = None
-    
-    def __post_init__(self): 
-        match self.distill_loss_type:
-            case DistillLossType.JACOBIAN:
-                self.nonbase_loss_frac = 0.5
-            case DistillLossType.CONTRASTIVE:
-                self.nonbase_loss_frac = 0.01
-            case _:
-                raise ValueError(f"Unknown loss type {self.distill_loss_type}")
 
 
 @dataclass
@@ -204,14 +196,14 @@ class ConfigGroups:
 
 def config_to_yaml(configs, filename_prefix):
     for i, config in enumerate(configs):
-        filename = f"{filename_prefix}_{i}.yaml"
+        filename = f"lent/configs/experiment/{filename_prefix}_{i}.yaml"
         with open(filename, 'w') as file:
-            yaml.dump({'config_filename': filename, 'name': config.name, 'experiment_config': vars(config.experiment_config)}, file)
+            yaml.dump({'config_filename': f"{filename_prefix}_{i}", 'name': config.name, 'experiment_config': vars(config.experiment_config)}, file)
 
 
 def create_new_configs():
-    config_to_yaml(ConfigGroups.targeted_configs, 'lent/configs/experiment/targeted')
-    config_to_yaml(ConfigGroups.exhaustive_configs, 'lent/configs/experiment/exhaustive')
+    config_to_yaml(ConfigGroups.targeted_configs, 'targeted')
+    config_to_yaml(ConfigGroups.exhaustive_configs, 'exhaustive')
     # config_to_yaml(ConfigGroups.counterfactual_configs, 'lent/configs/counterfactual/cf')
         
 if __name__ == "__main__":

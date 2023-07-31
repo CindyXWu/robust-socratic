@@ -7,11 +7,11 @@ from torch.utils.data import DataLoader, Dataset
 from typing import Tuple, Optional
 from dataclasses import asdict
 import numpy as np
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import OmegaConf
 
 import os
 
-from config_setup import MainConfig, ModelType, DatasetType, DatasetConfig, ConfigGroups, ExperimentConfig, OptimizerType
+from config_setup import MainConfig, DistillConfig, ModelType, DatasetType, DistillLossType, DatasetConfig, ConfigGroups, ExperimentConfig, OptimizerType
 from datasets.utils_ekdeep import get_box_dataloader
 from datasets.shapes_3D import dataloader_3D_shapes
 from models.resnet import wide_resnet_constructor
@@ -170,3 +170,8 @@ def optimizer_constructor(
         scheduler = LRScheduler(optim, config.epochs, base_lr=config.optimization.base_lr, final_lr=config.optimization.final_lr, iter_per_epoch=len(train_loader))
         
     return optim, scheduler
+
+
+def get_nonbase_loss_frac(distill_config: DistillConfig):
+    nonbase_loss_frac_dict = {DistillLossType.JACOBIAN: 0.5, DistillLossType.CONTRASTIVE: 0.01}
+    return nonbase_loss_frac_dict.get(distill_config.distill_loss_type)

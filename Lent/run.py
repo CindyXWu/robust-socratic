@@ -3,6 +3,8 @@ import os
 import wandb
 import hydra
 from hydra.core.config_store import ConfigStore
+from hydra.core.hydra_config import HydraConfig
+from hydra.utils import get_original_cwd
 import logging
 from omegaconf import OmegaConf
 
@@ -77,8 +79,10 @@ def main(config: MainConfig) -> None:
     )
     # Save teacher model and config as wandb artifacts:
     if config.save_model_as_artifact:
+        cwd = get_original_cwd()
+        output_dir = HydraConfig.get().run.dir  # Get the output directory
         model_artifact = wandb.Artifact("teacher", type="model", description="Traiend teacher model state_dict")
-        model_artifact.add_file(".hydra/main_config.yaml", name="main_config.yaml")
+        model_artifact.add_file(f"{cwd}/{output_dir}/.hydra/config.yaml", name="main_config.yaml")
         wandb.log_artifact(model_artifact)
 
 

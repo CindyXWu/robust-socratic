@@ -1,4 +1,4 @@
-config_filename: lent/configs/experiment/exhaustive_1.yaml
+config_filename: exhaustive_1
 experiment_config:
   im_frac: 1
   m1_frac: 1

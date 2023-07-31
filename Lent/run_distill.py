@@ -9,7 +9,7 @@ from omegaconf import OmegaConf
 from create_sweep import construct_sweep_config, load_config
 from train_utils import train_distill, print_saved_model
 from config_setup import DistillConfig
-from constructors import model_constructor, optimizer_constructor, create_dataloaders, get_dataset_output_size
+from constructors import model_constructor, optimizer_constructor, create_dataloaders, get_dataset_output_size, get_nonbase_loss_frac
 
 
 # Change directory to one this file is in
@@ -71,6 +71,7 @@ def main(config: DistillConfig) -> None:
     wandb.config.model_type = config.model_type
 
     ## Train
+    config.nonbase_loss_frac = get_nonbase_loss_frac(config)
     # For wandb sweeps: update with wandb values
     config = update_with_wandb_config(config)
     train_distill(

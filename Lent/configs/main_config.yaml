@@ -21,9 +21,10 @@ resnet_config:
   blocks_per_stage: 3
   _width_factor: 1
 epochs: null
-num_iters: 4000
+num_iters: 20000
 eval_frequency: 100
 num_eval_batches: 20
+early_stop_patience: 5
 is_sweep: false
 log_to_wandb: false
 save_model_as_artifact: true
