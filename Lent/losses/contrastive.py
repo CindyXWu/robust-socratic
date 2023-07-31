@@ -1,6 +1,7 @@
 """'Contrastive Representation Distillation' (Tian et al. 2019)"""
 import torch
 from torch import nn
+from losses.loss_common import *
 
 # Approximately N/M
 eps = 0.97
@@ -8,26 +9,26 @@ eps = 0.97
 class CRDLoss(nn.Module):
     """CRD Loss function for student model
     Args:
-        s_dim: the dimension of student's feature
-        t_dim: the dimension of teacher's feature
-        feat_dim: the dimension of the projection space
-        T: temperature
+        s_dim: Dimension of student's feature.
+        t_dim: Dimension of teacher's feature.
+        feat_dim: Dimension of projection space.
+        T: Temperature to divide dot product of student and teacher features by.
     """
-    def __init__(self, s_dim, t_dim, T, feat_dim=128):
+    def __init__(self, s_dim: int, t_dim: int, T: int, feat_dim: int = 128):
         super(CRDLoss, self).__init__()
         self.embed_s = Embed(s_dim, feat_dim)
         self.embed_t = Embed(t_dim, feat_dim)
         self.T = T
         self.criterion_s = ContrastLoss()
 
-    def forward(self, f_s, f_t, y):
+    def forward(self, f_s: torch.Tensor, f_t: torch.Tensor, y: torch.Tensor) -> float:
         """
         Args:
-            f_s: the feature of student network, size [batch_size, s_dim]
-            f_t: the feature of teacher network, size [batch_size, t_dim]
-            y: the labels of the samples, size [batch_size]
+            f_s: Feature of student network, size [batch_size, s_dim].
+            f_t: Feature of teacher network, size [batch_size, t_dim].
+            y: Labels of samples, size [batch_size].
         Returns:
-            The contrastive loss for the student model
+            s_loss: Contrastive loss for student model.
         """
         f_s = self.embed_s(f_s)
         f_t = self.embed_t(f_t)
@@ -41,16 +42,16 @@ class CRDLoss(nn.Module):
 
 class ContrastLoss(nn.Module):
     """
-    contrastive loss with in-batch negatives
+    Contrastive loss with in-batch negatives
     """
     def __init__(self):
         super(ContrastLoss, self).__init__()
 
-    def forward(self, x: float, y: int):
+    def forward(self, x: float, y: int) -> float:
         """
         Args:
-            x: exponentiated dot product similarity, size [batch_size, batch_size]
-            y: labels, size [batch_size]
+            x: Exponentiated dot product similarity, size [batch_size, batch_size].
+            y: Labels, size [batch_size].
         """
         bsz = x.shape[0]
         y_expand = y.unsqueeze(0).repeat(bsz, 1)
@@ -71,29 +72,31 @@ class ContrastLoss(nn.Module):
         loss = - (log_D1.sum(0) + log_D0.sum(0)) / bsz
         return loss
 
+
 class Embed(nn.Module):
-    """Embedding module"""
-    def __init__(self, dim_in=1024, dim_out=128):
+    def __init__(self, dim_in: int = 1024, dim_out: int = 128):
         super(Embed, self).__init__()
         self.linear = nn.Linear(dim_in, dim_out)
         self.l2norm = Normalize(2)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x.view(x.shape[0], -1)
         x = self.linear(x)
         x = self.l2norm(x)
         return x
 
+
 class Normalize(nn.Module):
-    """normalization layer"""
-    def __init__(self, power=2):
+    """Normalization layer."""
+    def __init__(self, power: int = 2):
         super(Normalize, self).__init__()
         self.power = power
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         norm = x.pow(self.power).sum(1, keepdim=True).pow(1. / self.power)
         out = x.div(norm)
         return out
+
 
 if __name__ == "__main__":
     s_dim = t_dim = 128

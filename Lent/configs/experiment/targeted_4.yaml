@@ -1,3 +1,4 @@
+config_filename: lent/configs/experiment/targeted_4.yaml
 experiment_config:
   im_frac: 1
   m1_frac: 0.9

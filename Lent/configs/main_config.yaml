@@ -1,51 +1,32 @@
-model_type: "MLP" # options: MLP, RN18AP, RN20W, LENET5
-dataset_type: "DOMINOES" # options: DOMINOES, SHAPES, PARITY, CIFAR100, CIFAR10
-is_distill: false
-distill_loss_type: "BASE" # options: BASE, JACOBIAN, CONTRASTIVE
-aug_type: "NONE" # options: NONE, MIXUP, UNION
-nonbase_loss_frac: 0 # Put as 0 default
-dist_temp: 30
-jac_temp: 1
-contrast_temp: 0.1
-s_layer: null
-t_layer: null
-jacobian_loss_type: "MSE" # options: KL, MSE, CE
-
+model_type: RN18AP
+dataset_type: DOMINOES
+aug_type: NONE
 optimization:
-  optimizer_type: "SGD" # options: SGD, ADAM, ADAMW
+  optimizer_type: SGD
   base_lr: 0.3
   weight_decay: 0.0
   momentum: 0.0
-  cosine_lr: false
-  initial_lr: 0.3
   final_lr: 0.001
   cosine_lr_schedule: true
-
+  optimizer_kwargs: {}
 dataset:
-  dataset_filename: "filename.csv"
   data_folder: "data"
-  output_size: 10
-
+  output_size: null
 dataloader:
   train_bs: 64
   test_bs: 32
   num_workers: 1
-  train_fraction: 0.95
   shuffle_train: true
-  seed: 42
-
 resnet_config:
   blocks_per_stage: 3
   _width_factor: 1
-
-distill_iters: 8000
-teacher_iters: 4000
+epochs: null
+num_iters: 4000
 eval_frequency: 100
 num_eval_batches: 20
-teacher_save_path: "trained_teachers"
-student_save_path: "trained_students"
+is_sweep: false
 log_to_wandb: false
 save_model_as_artifact: true
-wandb_project_name: "iib-fcnn"
-wandb_run_name: "run"
-is_sweep: false
+teacher_save_path: null
+wandb_project_name: null
+wandb_run_name: null

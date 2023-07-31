@@ -2,33 +2,18 @@ import torch
 import os
 import wandb
 import hydra
-from hydra import compose, initialize
 from hydra.core.config_store import ConfigStore
-import argparse
 import logging
 from omegaconf import OmegaConf
 
-from models.resnet import wide_resnet_constructor
-from models.resnet_ap import CustomResNet18
-from models.lenet import LeNet5
-from models.mlp import mlp_constructor
-from plotting_targeted import *
-from losses.jacobian import *
-from losses.contrastive import *
-from losses.feature_match import *
-from datasets.utils_ekdeep import *
-from datasets.shapes_3D import *
-from info_dicts import * 
-from train_utils import create_dataloaders, train_teacher, train_distill
-from configs.sweep_configs import *
-from config_setup import *
-from constructors import *
+from create_sweep import construct_sweep_config, load_config
+from train_utils import train_teacher
+from config_setup import MainConfig
+from constructors import model_constructor, optimizer_constructor, create_dataloaders, get_dataset_output_size
 
 
 # Change directory to one this file is in
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 # Register the defaults from the structured dataclass config schema:
@@ -44,26 +29,29 @@ def main(config: MainConfig) -> None:
     """
     logging.info(f"Hydra current working directory: {os.getcwd()}")
 
+    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    
     """Command line:
     python run.py experiment@t_exp=exhaustive_0 experiment@s_exp=exhaustive_1
     """
-    t_exp_idx = config.t_exp.name.split("_")[-1]
-    s_exp_idx = config.s_exp.name.split("_")[-1]
-    t_exp_name = config.t_exp.name.split(":")[-1].strip()
-    s_exp_name = config.s_exp.name.split(":")[-1].strip()
+    [t_exp_prefix, t_exp_idx] = config.experiment.config_filename.split("_")
+    t_exp_name = config.experiment.name.split(":")[-1].strip()
+    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name}"
     
+    # Datasets
+    config.dataset.output_size = get_dataset_output_size(config)
     train_loader, test_loader = create_dataloaders(config=config)
+
+    ## Model
+    teacher = model_constructor(config).to(DEVICE)
     
-    if config.is_distill:
-        student = model_constructor(config).to(DEVICE)
-        teacher = model_constructor(config).to(DEVICE)
-        optimizer, scheduler = optimizer_constructor(config=config, model=student)
-        config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}"
-    else:
-        teacher = model_constructor(config).to(DEVICE)
-        optimizer, scheduler = optimizer_constructor(config=config, model=teacher)
-        config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}, S Mech: {s_exp_idx} {s_exp_name}, Loss: {config.distill_loss_type}"
+    ## Optimizer
+    config.epochs = config.num_iters//(len(train_loader))  
+    optimizer, scheduler = optimizer_constructor(config=config, model=teacher, train_loader=train_loader)
     
+    ## wandb
+    config.wandb_project_name = f"{config.model_type} {config.dataset_type}"
+    config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}"
     logger_params = {
     "name": config.wandb_run_name,
     "project": config.wandb_project_name,
@@ -76,36 +64,22 @@ def main(config: MainConfig) -> None:
     wandb.config.dataset_type = config.dataset_type
     wandb.config.model_type = config.model_type
 
-    epochs = config.distill_iters//(len(train_loader))  
+    ## Train
     config = update_with_wandb_config(config) # For wandb sweeps: update with wandb values
-    if config.is_distill:
-        train_distill(
-            teacher=teacher,
-            student=student,
-            train_loader=train_loader,
-            test_loader=test_loader,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            config=config,
-            epochs=epochs,
-            device=DEVICE
-        )
-    else:
-        train_teacher(
-            model=teacher,
-            train_loader=train_loader,
-            test_loader=test_loader,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            config=config,
-            epochs=epochs,
-            device=DEVICE
-        )
-        # Save teacher model and config as wandb artifacts:
-        if config.save_model_as_artifact:
-            model_artifact = wandb.Artifact("model", type="model", description="The trained model state_dict")
-            model_artifact.add_file(".hydra/config.yaml", name="config.yaml")
-            wandb.log_artifact(model_artifact)
+    train_teacher(
+        model=teacher,
+        train_loader=train_loader,
+        test_loader=test_loader,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        config=config,
+        device=DEVICE
+    )
+    # Save teacher model and config as wandb artifacts:
+    if config.save_model_as_artifact:
+        model_artifact = wandb.Artifact("teacher", type="model", description="Traiend teacher model state_dict")
+        model_artifact.add_file(".hydra/main_config.yaml", name="main_config.yaml")
+        wandb.log_artifact(model_artifact)
 
 
 def update_with_wandb_config(config: OmegaConf) -> OmegaConf:
@@ -119,9 +93,9 @@ def update_with_wandb_config(config: OmegaConf) -> OmegaConf:
 
 if __name__ == "__main__":
     """May have to edit this hard coding opening one single config file in the future."""
-    config: Dict = load_config('configs/defaults.yaml')
+    config: dict = load_config('configs/main_config.yaml')
     if config.get("sweep"):
-        sweep_config = construct_sweep_config('defaults', 'sweep_configs')
+        sweep_config = construct_sweep_config('main_config', 'sweep_configs')
         sweep_id = wandb.sweep(
             sweep=sweep_config,
             project=config.get("wandb_project_name"),

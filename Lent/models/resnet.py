@@ -2,7 +2,7 @@ import functools
 from typing import Callable, Protocol
 import torch.nn as nn
 
-from common import Identity, SplitAggregate
+from models.common import Identity, SplitAggregate
 
 
 class NormalizationConstructorType(Protocol):

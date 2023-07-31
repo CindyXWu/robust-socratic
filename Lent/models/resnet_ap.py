@@ -3,9 +3,6 @@ import torch
 import torchvision.models as models
 from torch_intermediate_layer_getter import IntermediateLayerGetter as MidGet
 
-from resnet import wide_resnet_constructor
-from common import get_submodules
-
 
 class CustomResNet18(models.ResNet):
     """This model accepts images of any size using adaptive average pooling."""
@@ -35,6 +32,14 @@ class CustomResNet18(models.ResNet):
 
         return x
 
+    def weight_reset(self):
+        """Reset weights of model at start of training."""
+        for module in self.modules():
+            if hasattr(module, 'reset_parameters'):
+                module.reset_parameters()
+            if isinstance(module, nn.Conv2d):
+                nn.init.kaiming_normal_(module.weight, mode="fan_out", nonlinearity="relu")
+
 
 class CustomResNet50(models.ResNet):
     """This model accepts images of any size using adaptive average pooling."""
@@ -46,7 +51,7 @@ class CustomResNet50(models.ResNet):
         )
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(2048 * models.resnet.Bottleneck.expansion, num_classes)
-
+        
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
@@ -63,7 +68,14 @@ class CustomResNet50(models.ResNet):
         x = self.fc(x)
 
         return x
-
+    
+    def weight_reset(self):
+        """Reset weights of model at start of training."""
+        for module in self.modules():
+            if hasattr(module, 'reset_parameters'):
+                module.reset_parameters()
+            if isinstance(module, nn.Conv2d):
+                nn.init.kaiming_normal_(module.weight, mode="fan_out", nonlinearity="relu")
 
 
 def show_model(model):
@@ -71,13 +83,6 @@ def show_model(model):
     for idx, module in enumerate(model.children()):
         print(f"Layer {idx}: {module}")
 
-
-if __name__ == "__main__":
-    resnet_ap = CustomResNet18(8)
-    resnet50_ap = CustomResNet50(8)
-    resnet = wide_resnet_constructor(3, 100)
-    lenet = LeNet5(10)
-    get_submodules(lenet)
 
 # class ResNet18_CIFAR(models.ResNet):
 #     """10 layers in total.

@@ -2,8 +2,8 @@
 import torch
 import torch.nn.functional as F
 from torch_intermediate_layer_getter import IntermediateLayerGetter as MidGet
-from models.mlps import *
-from losses.jacobian import *
+from losses.loss_common import *
+
 
 def feature_map_diff(scores, targets, s_map, t_map, T, alpha, loss_fn, aggregate_chan):
     """Compute the difference between the feature maps of the student and teacher models.
@@ -12,7 +12,7 @@ def feature_map_diff(scores, targets, s_map, t_map, T, alpha, loss_fn, aggregate
         t_map: torch tensor, output of teacher model [batch_size, num_channels]
         aggregate_chan: bool, whether to aggregate the channels of the feature activation
     """
-    distill_loss = get_distill_loss(scores, targets, T, loss_fn)
+    distill_loss = base_distill_loss(scores, targets, T, loss_fn)
     # Aggregate the channels of the feature activation using root squared absolute value of channels to create activation map
     if aggregate_chan:
         s_map = torch.sqrt(torch.sum(torch.abs(s_map)**2, dim=1))

@@ -3,22 +3,30 @@
 """
 import torch.nn.functional as F
 import torch
-from models.image_models import *
+from losses.loss_common import *
+from config_setup import MainConfig
 
-def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_dim, output_dim, approx=True):
+
+def get_jacobian_loss(
+    scores: torch.Tensor,
+    targets: torch.Tensor,
+    inputs: torch.Tensor,
+    config: MainConfig,
+    input_dim: int,
+    approx=True):
     """Eq 10, no hard targets used.
+    
     Args:
-        scores: logits of student [batch_size, num_classes]
-        targets: logits of teacher [batch_size, num_classes]
-        inputs: [batch_size, input_dim, input_dim, channels]
-        T: float, temperature
-        alpha: float, weight of jacobian penalty
-        loss_fn: for classical distill loss - MSE, BCE, KLDiv
+        scores: logits of student [batch_size, num_classes].
+        targets: logits of teacher [batch_size, num_classes].
+        inputs: [batch_size, input_dim, input_dim, channels].
+        approx: Whether to approximate full Jacobian with top-k.
     """
-    distill_loss = get_distill_loss(scores, targets, T, loss_fn)
     # Number of classes to use for Jacobian approximation
     k = 20
-
+    output_dim = config.dataset.output_size
+    batch_size = config.dataloader.train_bs
+    
     # If the number of classes is less than k, use exact Jacobian regardless of approx flag
     if not approx or output_dim <= k:
         t_jac = get_jacobian(targets, inputs, batch_size, input_dim, output_dim)
@@ -30,40 +38,32 @@ def jacobian_loss(scores, targets, inputs, T, alpha, batch_size, loss_fn, input_
 
     s_jac= torch.div(s_jac, torch.norm(s_jac, 2, dim=-1).unsqueeze(1))
     t_jac = torch.div(t_jac, torch.norm(t_jac, 2, dim=-1).unsqueeze(1))
-    jacobian_loss = torch.norm(t_jac-s_jac, 2, dim=1)
-    jacobian_loss = torch.mean(jacobian_loss)  # Batchwise reduction
-    loss = (1-alpha) * distill_loss + alpha * jacobian_loss
+    loss = torch.mean(torch.norm(t_jac-s_jac, 2, dim=1)) # Batchwise reduction
+    
     return  loss
 
-def get_distill_loss(scores, targets, T, loss_fn):
-    """Distillation loss function."""
-    # Only compute softmax for KL divergence loss
-    if isinstance(loss_fn, nn.KLDivLoss):
-        soft_pred = F.log_softmax(scores/T, dim=1)
-        soft_targets = F.log_softmax(targets/T, dim=1)  # Have set log_target=True
-    elif isinstance(loss_fn, nn.MSELoss):
-        soft_pred = F.softmax(scores/T, dim=1)
-        soft_targets = F.softmax(targets/T, dim=1)
-    else:
-        raise ValueError("Loss function not supported.")
-    distill_loss = T**2 * loss_fn(soft_pred, soft_targets)
-    return distill_loss
 
-def get_approx_jacobian(output, x, batch_size, output_dim, i):
+def get_approx_jacobian(
+    output: torch.Tensor,
+    x: torch.Tensor,
+    batch_size: int,
+    output_dim: int,
+    top_k_idx: int):
     """Compute Jacobian for the top-k most probable classes instead of just the most probable class.
     Args:
         output: [batch_size, output_dim=num_classes]
         x: input with requres_grad() True [batch_size, input_dim]
-        i: indices of top-k classes. If None, calculate (assume for teacher). If not None, assume for calculating for student (needs to match teacher).
+        top_k_idx: indices of top-k classes. If None, calculate (assume for teacher). If not None, assume for calculating for student (needs to match teacher).
     """
     assert x.requires_grad
     jacobian = torch.zeros(batch_size, output_dim, x.numel() // batch_size, device=x.device)
-    for idx in range(i.shape[1]):
+    for idx in range(top_k_idx.shape[1]):
         grad_output = torch.zeros(batch_size, output_dim, device=x.device)
-        grad_output.scatter_(1, i[:, idx].unsqueeze(1), 1)
+        grad_output.scatter_(1, top_k_idx[:, idx].unsqueeze(1), 1)
         grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True, retain_graph=True)[0]
-        jacobian[:, i[:, idx], :] = grad_input.view(batch_size, -1)
+        jacobian[:, top_k_idx[:, idx], :] = grad_input.view(batch_size, -1)
     return jacobian.view(batch_size, -1)
+
 
 def get_jacobian(output, x, batch_size, input_dim, output_dim):
     """Autograd method. Need to keep grads, so set create_graph to True."""
@@ -75,6 +75,7 @@ def get_jacobian(output, x, batch_size, input_dim, output_dim):
         grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True)[0]
         jacobian[:, i, :] = grad_input.view(batch_size, input_dim)
     return jacobian.view(batch_size, -1) # Flatten
+
 
 # def get_approx_jacobian(output, x, batch_size, output_dim, i=None):
 #     """Rather than computing Jacobian for all output classes, compute for most probable class.
@@ -94,6 +95,7 @@ def get_jacobian(output, x, batch_size, input_dim, output_dim):
 #     output.backward(grad_output, create_graph=True)
 #     jacobian = x.grad.view(batch_size, -1)
 #     return jacobian
+
 
 # def get_jacobian(output, x, batch_size, input_dim, output_dim):
 #     """In order to keep grads, need to set create_graph to True, but computation very slow."""

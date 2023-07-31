@@ -1,31 +1,23 @@
 import torch
 from torch import nn, optim
-import wandb
-from tqdm import tqdm
 from torch.nn import Module
 from torch.utils.data import DataLoader
-from typing import Tuple
 
-from models.resnet import wide_resnet_constructor
-from models.resnet_ap import CustomResNet18
-from models.lenet import LeNet5
-from models.mlp import mlp_constructor
+import numpy as np
+import wandb
+from tqdm import tqdm
 
-from plotting_exhaustive import *
-from losses.jacobian import *
-from losses.contrastive import *
-from losses.feature_match import *
-from datasets.utils_ekdeep import *
-from datasets.shapes_3D import *
-from info_dicts import *
-from config_setup import MainConfig, DatasetType, DistillLossType
+from losses.loss_common import *
+from losses.jacobian import get_jacobian_loss
+from losses.contrastive import CRDLoss
+from losses.feature_match import feature_extractor
+
+from models.resnet_ap import CustomResNet18, CustomResNet50
+from config_setup import MainConfig, DistillLossType
 from constructors import get_counterfactual_dataloaders
+from plotting_exhaustive import plot_images
 
-
-kl_loss = nn.KLDivLoss(reduction='batchmean')
-ce_loss = nn.CrossEntropyLoss(reduction='mean')
-mse_loss = nn.MSELoss(reduction='mean')
-
+from typing import Optional, List, Dict
 
 @torch.no_grad()
 def evaluate(model: nn.Module, 
@@ -56,7 +48,8 @@ def counterfactual_evaluate(teacher: nn.Module,
                      dataloader: DataLoader, 
                      batch_size: int, 
                      max_ex: int, 
-                     title: Optional[str] = None) -> float:
+                     title: Optional[str] = None,
+                     device: torch.device = torch.device("cuda")) -> float:
     """Student test accuracy, T-S KL and T-S top-1 accuracy for max_ex batches."""
     acc = 0
     KL = 0
@@ -66,7 +59,7 @@ def counterfactual_evaluate(teacher: nn.Module,
             break
         labels, features = labels.to(device), features.to(device)
         targets, scores = teacher(features), student(features)
-        s_pred, t_pred = torch.argmax(scores, 1), torch.argmax(targets, 1)
+        s_pred, t_pred = torch.argmax(scores, dim=1), torch.argmax(targets, dim=1)
         acc += torch.sum(torch.eq(s_pred, labels)).item() # Total accurate samples in batch
         KL += kl_loss(F.log_softmax(scores, dim=1), F.softmax(targets, dim=1)) # Batchwise mean KL
         top_1 += torch.eq(s_pred, t_pred).float().mean() # Batchwise mean top-1 accuracy
@@ -113,16 +106,17 @@ def train_teacher(model: nn.Module,
                   optimizer: optim.Optimizer,
                   scheduler: LRScheduler,
                   config: MainConfig,
-                  epochs: int,
                   device: torch.device = torch.device("cuda")) -> None:
     """
     Args:
     """
-    weight_reset(model) # Really important: reset weights compared to default initialisation
+    # Really important: reset model weights compared to default initialisation
+    if isinstance(model, CustomResNet18) or isinstance(model, CustomResNet50):
+        model.weight_reset()
     train_acc_list, test_acc_list = [], []
     it = 0
     
-    for epoch in range(epochs):
+    for epoch in range(config.epochs):
         print("Epoch: ", epoch)
         train_loss = []
         model.train()
@@ -141,8 +135,8 @@ def train_teacher(model: nn.Module,
             
             if it % config.eval_frequency == 0:
                 batch_size = inputs.shape[0]
-                train_acc = evaluate(model, train_loader, batch_size, max_ex=20)
-                test_acc = evaluate(model, test_loader, batch_size, max_ex=10)
+                train_acc = evaluate(model, train_loader, batch_size, max_ex=20, device=device)
+                test_acc = evaluate(model, test_loader, batch_size, max_ex=10, device=device)
                 train_acc_list.append(train_acc)
                 test_acc_list.append(test_acc)
 
@@ -165,7 +159,6 @@ def train_distill(
     optimizer: optim.Optimizer,
     scheduler: LRScheduler,
     config: MainConfig,
-    epochs: int,
     device: torch.device = torch.device("cuda")) -> None:
     """
     Args:
@@ -178,8 +171,10 @@ def train_distill(
         N_its: Number of iterations to train for.
         its_per_log: Number of iterations between logging.
     """
+    # Really important: reset model weights compared to default initialisation
+    if isinstance(student, CustomResNet18) or isinstance(student, CustomResNet50):
+        student.weight_reset()
     teacher.eval()
-    weight_reset(student) # Really important: reset weights compared to default initialisation
     student.train()
 
     it = 0
@@ -191,7 +186,7 @@ def train_distill(
 
     cf_dataloaders = get_counterfactual_dataloaders(config.dataset_type, batch_size)
 
-    for epoch in range(epochs):
+    for epoch in range(config.epochs):
         for inputs, labels in tqdm(train_loader):
             inputs, labels = inputs.to(device), labels.to(device)
             inputs.requires_grad = True
@@ -199,26 +194,40 @@ def train_distill(
 
             # for param in student.parameters():
             #     assert param.requires_grad
+            loss = base_distill_loss(
+                        scores=scores, 
+                        targets=targets, 
+                        loss_type=config.base_distill_loss_type,
+                        temp=config.dist_temp
+            )
+            jacobian_loss = None
+            contrastive_loss = None
+            
             match config.distill_loss_type:
                 case DistillLossType.BASE:
-                    loss = base_distill_loss(scores, targets, config.dist_temp)
-                # TODO: RENAME PARAMS
+                    pass
+                
                 case DistillLossType.JACOBIAN:
-                    loss = jacobian_loss(
+                    jacobian_loss = get_jacobian_loss(
                         scores=scores,
                         targets=targets, 
                         inputs=inputs,
-                        T=config.jac_temp,
-                        alpha=config.nonbase_loss_frac,
-                        batch_size=batch_size,
-                        loss_fn=config.jacobian_loss_type,
-                        input_dim=input_dim,
-                        output_dim=config.dataset.output_size)
+                        jac_loss_frac=config.nonbase_loss_frac,
+                        config=config,
+                        input_dim=input_dim
+                    )
+                    loss = (1-config.nonbase_loss_frac)*loss + config.nonbase_loss_frac*jacobian_loss
+                    
                 case DistillLossType.CONTRASTIVE:
                     s_map = feature_extractor(student, inputs, config.s_layer).view(batch_size, -1)
                     t_map = feature_extractor(teacher, inputs, config.t_layer).view(batch_size, -1).detach()
-                    contrastive_loss = CRDLoss(s_map.shape[1], t_map.shape[1], T=config.contrast_temp)
-                    loss = config.nonbase_loss_frac*contrastive_loss(s_map, t_map, labels)+(1-config.nonbase_loss_frac)*base_distill_loss(scores, targets, config.dist_temp)
+                    contrastive_loss = CRDLoss(
+                        s_dim=s_map.shape[1],
+                        t_dim=t_map.shape[1],
+                        T=config.contrast_temp
+                    )
+                    loss = (1-config.nonbase_loss_frac)*loss + config.nonbase_loss_frac*contrastive_loss(s_map, t_map, labels)
+                    
                 # case DistillLossType.FEATURE_MAP: # Currently only for self-distillation
                 #     layer = 'feature_extractor.10'
                 # Only works if model has a feature extractor method
@@ -235,8 +244,8 @@ def train_distill(
 
             # if it == 0: check_grads(student)
             if it % config.eval_frequency == 0:
-                train_acc = evaluate(student, train_loader, batch_size, max_ex=config.num_eval_batches)
-                test_acc, test_KL, test_top1 = counterfactual_evaluate(teacher, student, test_loader, batch_size, max_ex=config.num_eval_batches, title=None)
+                train_acc = evaluate(student, train_loader, batch_size, max_ex=config.num_eval_batches, device=device)
+                test_acc, test_KL, test_top1 = counterfactual_evaluate(teacher, student, test_loader, batch_size, max_ex=config.num_eval_batches, title=None, device=device)
                 # Dictionary holds counterfactual acc, KL and top 1 fidelity for each dataset
                 cf_evals = defaultdict(float)
 
@@ -246,7 +255,7 @@ def train_distill(
                     cf_evals[name], cf_evals[f"{name} T-S KL"], cf_evals[f"{name} T-S Top 1 Fidelity"] = counterfactual_evaluate(teacher, student, cf_dataloaders[name], batch_size, max_ex=config.num_eval_batches, title=None)
 
                 print(cf_evals)
-                print(f"Project: {config.wandb_run_name}, Iteration: {it}, Epoch: {epoch}, Loss: {train_loss}, LR: {lr}, Base Temperature: {config.dist_temp}, Jacobina Temperature: {config.jac_temp}, Contrastive Temperature: {config.contrast_temp}, Nonbase Loss Frac: {config.nonbase_loss_frac}, ")
+                print(f"Project: {config.wandb_run_name}, Iteration: {it}, Epoch: {epoch}, Loss: {train_loss}, LR: {lr}, Base Temperature: {config.dist_temp}, Jacobian Temperature: {config.jac_temp}, Contrastive Temperature: {config.contrast_temp}, Nonbase Loss Frac: {config.nonbase_loss_frac}, ")
 
                 results_dict = {**cf_evals, **{
                     "T-S KL": test_KL, 
@@ -254,9 +263,11 @@ def train_distill(
                     "S Train": train_acc, 
                     "S Test": test_acc, 
                     "S Loss": train_loss, 
-                    "S LR": lr, } 
-                }
-
+                    "S LR": lr, 
+                    "Jacobian Loss": jacobian_loss, 
+                    "Contrastive Loss": contrastive_loss
+                }}
+                
                 wandb.log(results_dict, step=it)
 
             it += 1
@@ -271,15 +282,6 @@ def check_grads(model: nn.Module):
         assert param.grad is not None
 
 
-def base_distill_loss(
-    scores: torch.Tensor,
-    targets: torch.Tensor,
-    temp: float) -> torch.Tensor:
-    scores = F.log_softmax(scores/temp)
-    targets = F.softmax(targets/temp)
-    return kl_loss(scores, targets)
-
-
 def save_model(
     path: str, 
     epoch: int, 
@@ -288,8 +290,7 @@ def save_model(
     train_loss: List[float], 
     train_acc: List[float], 
     test_acc: List[float],
-    final_acc: float,
-    ) -> None:
+    final_acc: float) -> None:
     torch.save({'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
@@ -299,4 +300,10 @@ def save_model(
                 'final_acc': final_acc
                 },
                 path)
-    
+
+
+def print_saved_model(checkpoint: Dict) -> None:
+    for key, value in checkpoint.items():
+        print(f"Key: {key}")
+        print(f"Value: {value}")
+

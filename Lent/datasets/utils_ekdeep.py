@@ -1,5 +1,4 @@
 """Dataset creation for box and cue datasets. Includes own version of image batch plotting."""
-
 import torch
 import torchvision
 import torchvision.transforms as T
@@ -7,7 +6,6 @@ from torch.utils.data import DataLoader, Dataset
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import pickle as pkl
 import einops
 
 import torch.backends.cudnn as cudnn

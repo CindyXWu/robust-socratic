@@ -2,12 +2,18 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
+
 from typing import Tuple, Optional
 from dataclasses import asdict
+import numpy as np
+from omegaconf import OmegaConf, DictConfig
+
+import os
 
 from config_setup import MainConfig, ModelType, DatasetType, DatasetConfig, ConfigGroups, ExperimentConfig, OptimizerType
-from datasets.utils_ekdeep import *
-from datasets.shapes_3D import *
+from datasets.utils_ekdeep import get_box_dataloader
+from datasets.shapes_3D import dataloader_3D_shapes
 from models.resnet import wide_resnet_constructor
 from models.resnet_ap import CustomResNet18
 from models.lenet import LeNet5
@@ -46,7 +52,17 @@ def get_model_intermediate_layer(config: MainConfig) -> str:
     return models.get(config.model_type)
 
 
-def create_dataloader(config: MainConfig,
+def get_dataset_output_size(config: MainConfig) -> int:
+    dataset_output_sizes = {
+    "DOMINOES": 10,
+    "SHAPES": 8,
+    "CIFAR100": 100,
+    "CIFAR10": 10
+    }
+    return dataset_output_sizes.get(config.dataset_type)
+
+
+def create_dataloaders(config: MainConfig,
                       exp_config: Optional[ExperimentConfig] = None
                       ) -> Tuple[DataLoader, DataLoader]:
     """Set train and test loaders based on dataset and experiment.
@@ -60,21 +76,24 @@ def create_dataloader(config: MainConfig,
     Form of exp_config exampled in configs/targeted_distillation folder.
     
     Args:
-        exp_config: Optional experiment config specified separately. Handling of this is expected to be external to this function.
+        exp_config: Optional experiment config specified separately if and only if generating counterfactual dataloaders.
+        Handling of this is expected to be external to this function.
     Returns:
         train_loader: Same as test_loader, just split differently.
         test_loader: "".
     """
     base_dataset = config.dataset_type
-    train_bsize = config.dataloader.train_bs
-
-    if exp_config is None: # Main training and testing dataloaders
-        exp_config = config.experiment_config
-    im_frac, m1_frac, m2_frac, rand_im, rand_m1, rand_m2 = asdict(exp_config).values()
+    
+    if exp_config is None: # TRAINING DATALOADERS
+        batch_size = config.dataloader.train_bs
+        im_frac, m1_frac, m2_frac, rand_im, rand_m1, rand_m2 = OmegaConf.to_container(config.experiment.experiment_config).values()
+    else: # COUNTERFACTUAL DATALOADERS - TEST
+        batch_size = config.dataloader.test_bs
+        im_frac, m1_frac, m2_frac, rand_im, rand_m1, rand_m2 = asdict(exp_config).values()
 
     if base_dataset == DatasetType.DOMINOES: # BOX: MECH 1, MNIST: MECH 2
-        train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes', batch_size=train_bsize, rand_im=rand_im, box_frac=m1_frac, mnist_frac=m2_frac, im_frac=im_frac, randomize_box=rand_m1, randomize_mnist=rand_m2)
-        test_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=train_bsize, rand_im=rand_im, box_frac=m1_frac, mnist_frac=m2_frac, im_frac=im_frac, randomize_box=rand_m1, randomize_mnist=rand_m2)
+        train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes', batch_size=batch_size, randomize_img=rand_im, box_frac=m1_frac, mnist_frac=m2_frac, image_frac=im_frac, randomize_box=rand_m1, randomize_mnist=rand_m2)
+        test_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, randomize_img=rand_im, box_frac=m1_frac, mnist_frac=m2_frac, image_frac=im_frac, randomize_box=rand_m1, randomize_mnist=rand_m2)
 
     elif base_dataset == DatasetType.SHAPES: # FLOOR: MECH 1, SCALE: MECH 2
         train_loader = dataloader_3D_shapes('train', batch_size=batch_size, randomise=rand_im, floor_frac=m1_frac, scale_frac=m2_frac)
@@ -82,8 +101,8 @@ def create_dataloader(config: MainConfig,
     
     elif base_dataset in [DatasetType.CIFAR100, DatasetType.CIFAR10]: # Image frac isn't relevant - always 100 for these exps so don't pass in
         cue_type='box' if m1_frac != 0 else 'nocue'
-        train_loader = get_box_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=m1_frac, randomize_cue=rand_m1, rand_im = rand_im, batch_size=train_bsize)
-        test_loader = get_box_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=m1_frac, randomize_cue=rand_m1, rand_im = rand_im, batch_size=train_bsize)
+        train_loader = get_box_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=m1_frac, randomize_cue=rand_m1, randomize_img = rand_im, batch_size=batch_size)
+        test_loader = get_box_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=m1_frac, randomize_cue=rand_m1, randomize_img = rand_im, batch_size=batch_size)
  
     return train_loader, test_loader
 
@@ -92,7 +111,7 @@ def get_counterfactual_dataloaders(main_config: MainConfig) -> dict[str, DataLoa
     """Get a dictionary of dataloaders for counterfactual evaluation. Key is string describing counterfactual experiment settings."""
     dataloaders = {}
     for idx, (name, exp_config) in enumerate(ConfigGroups.counterfactual_configs.items()):
-        _, dataloaders[name] = create_dataloader(main_config, exp_config)
+        _, dataloaders[name] = create_dataloaders(main_config, exp_config)
 
 
 def create_or_load_dataset(dataset_type: str, dataset_config: DatasetConfig) -> Dataset:
@@ -126,7 +145,10 @@ class LRScheduler(object):
         return self.current_lr
 
 
-def optimizer_constructor(config: MainConfig, model: nn.Module) -> optim.Optimizer:
+def optimizer_constructor(
+    config: MainConfig,
+    model: nn.Module,
+    train_loader: DataLoader) -> optim.Optimizer:
     match config.optimization.optimizer_type:
         case OptimizerType.SGD:
             optim_constructor = torch.optim.SGD
@@ -143,7 +165,8 @@ def optimizer_constructor(config: MainConfig, model: nn.Module) -> optim.Optimiz
     if config.optimization.cosine_lr_schedule:
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer=optim,
-            T_max=config.iters_used,
+            T_max=config.num_iters,
         )
-        scheduler = LRScheduler(optim, config.epochs, base_lr=lr, final_lr=config.optimization.final_lr, iter_per_epoch=len(train_loader))
+        scheduler = LRScheduler(optim, config.epochs, base_lr=config.optimization.base_lr, final_lr=config.optimization.final_lr, iter_per_epoch=len(train_loader))
+        
     return optim, scheduler

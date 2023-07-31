@@ -11,7 +11,7 @@ import sys
 from numpy.typing import NDArray
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from plotting import *
+
 
 # Get the current script's directory
 script_dir = os.path.dirname(os.path.realpath(__file__))

@@ -2,7 +2,7 @@
 from enum import Enum
 import yaml
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Any
 from collections import namedtuple
 
 
@@ -22,7 +22,6 @@ class DistillLossType(str, Enum):
 class LossType(str, Enum):
     KL = "KL"
     MSE = "MSE"
-    CE = "CE"
 
 
 class DatasetType(str, Enum):
@@ -57,9 +56,8 @@ class ResNetConfig:
 
 @dataclass
 class DatasetConfig:
-    dataset_filename = "filename.csv"
     data_folder: str = "data"
-    output_size: int = 10
+    output_size: Optional[int] = 10
 
 
 @dataclass
@@ -71,10 +69,8 @@ class DataLoaderConfig:
     """
     train_bs: int = 64
     test_bs: int = 32
-    num_workers: int = 1
-    train_fraction: float = 0.95
+    num_workers: Optional[int] = 1
     shuffle_train: bool = True
-    seed: int = 42
     
 
 @dataclass
@@ -84,8 +80,9 @@ class OptimizerConfig:
     weight_decay: float = 0.0
     momentum: float = 0.0
     # For cosine LR scheduler
-    final_lr: int = 1e-3
+    final_lr: float = 1e-3
     cosine_lr_schedule: bool = True
+    optimizer_kwargs: Optional[dict[str, Any]] = field(default_factory=dict)
 
 
 # TODO: Consider making this a MainConfig and creating a separate DistillConfig
@@ -94,20 +91,7 @@ class MainConfig:
     """Does not include which config group to load experiment from. This is specified from command line via Hydra multirun."""
     model_type: ModelType
     dataset_type: DatasetType
-
-    # Distillation stuff
-    is_distill: bool = False
-    distill_loss_type: Optional[DistillLossType]
-    aug_type: Optional[AugType]
-    nonbase_loss_frac: Optional[float]
-    """Weighting of this loss term with respect to base soft label matching distillation."""
-    dist_temp: Optional[float] = 30
-    jac_temp: Optional[float] = 1
-    contrast_temp: Optional[float] = 0.1 # 0.1 recommended in paper
-    # Initialise these in the main function
-    s_layer: Optional[str] = None 
-    t_layer: Optional[str] = None
-    jacobian_loss_type: LossType = LossType.MSE
+    aug_type: AugType
     
     # Stuff from other dataclasses
     optimization: OptimizerConfig = field(default_factory=OptimizerConfig)
@@ -118,8 +102,8 @@ class MainConfig:
     resnet_config: Optional[ResNetConfig] = field(default_factory=ResNetConfig)
 
     # Training 
-    distill_iters: int = 8000 # Neither of these values are directly used in the code, but are used to calculate the other values
-    teacher_iters: int = 4000
+    epochs: Optional[int] = None # Instantiate in main function
+    num_iters: int = 4000
     eval_frequency: int = 100
     """How many iterations between evaluations. If None, assumed to be 1 epoch, if the dataset is not Iterable."""
     num_eval_batches: Optional[int] = 20
@@ -127,28 +111,35 @@ class MainConfig:
     How many batches to evaluate on. If None, evaluate on the entire eval dataLoader.
     Note, this might result in infinite evaluation if the eval dataLoader is not finite.
     """
-    teacher_save_path: str = "trained_teachers"
-    student_save_path: str = "trained_students"
+    teacher_save_path: Optional[str] = None
 
     # Logging
-    log_to_wandb: bool = False # Whether to log to wandb
-    save_model_as_artifact: bool = True
-    wandb_run_name: str = "run" # Initialise in main function
+    log_to_wandb: bool = False
     is_sweep: bool = False
+    save_model_as_artifact: bool = True
+    wandb_project_name: Optional[str] = None
+    wandb_run_name: Optional[str] = None # Initialise in main function
 
-    def __post_init__(self):  
-        match self.dataset_type:
-            case DatasetType.DOMINOES:
-                self.dataset.output_size = 10
-            case DatasetType.SHAPES:
-                self.dataset.output_size = 8
-            case DatasetType.CIFAR100:
-                self.dataset.output_size = 100
-            case DatasetType.CIFAR10:
-                self.dataset.output_size = 10
-            case _:
-                raise ValueError(f"Unknown dataset type {self.dataset_type}")
-        
+
+@dataclass
+class DistillConfig(MainConfig):
+    distill_loss_type: Optional[DistillLossType] = DistillLossType.BASE # Whether to add extra terms in base distillation
+    base_distill_loss_type: Optional[LossType] = LossType.KL # Type of base distillation loss
+    jacobian_loss_type: LossType = LossType.MSE
+    
+    nonbase_loss_frac: Optional[float] = 0
+    """Weighting of this loss term with respect to base soft label matching distillation."""
+    
+    dist_temp: float = 30
+    jac_temp: float = 1 # Currently NOT USED
+    contrast_temp: float = 0.1 # 0.1 recommended in paper
+    # Initialise these in the main function
+    s_layer: Optional[str] = None
+    t_layer: Optional[str] = None
+    
+    student_save_path: str = None
+    
+    def __post_init__(self): 
         match self.distill_loss_type:
             case DistillLossType.JACOBIAN:
                 self.nonbase_loss_frac = 0.5
@@ -156,9 +147,6 @@ class MainConfig:
                 self.nonbase_loss_frac = 0.01
             case _:
                 raise ValueError(f"Unknown loss type {self.distill_loss_type}")
-        
-        self.wandb_project_name = f"{self.model_type} {self.dataset_type}"
-        self.iters_used = self.distill_iters if self.is_distill else self.teacher_iters
 
 
 @dataclass
@@ -218,14 +206,13 @@ def config_to_yaml(configs, filename_prefix):
     for i, config in enumerate(configs):
         filename = f"{filename_prefix}_{i}.yaml"
         with open(filename, 'w') as file:
-            yaml.dump({'name': config.name, 'experiment_config': vars(config.experiment_config)}, file)
+            yaml.dump({'config_filename': filename, 'name': config.name, 'experiment_config': vars(config.experiment_config)}, file)
 
 
 def create_new_configs():
-    config_to_yaml(ConfigGroups.targeted_configs, 'lent/configs/targeted_configs/targeted')
-    config_to_yaml(ConfigGroups.exhaustive_configs, 'lent/configs/exhaustive_configs/exhaustive')
-    config_to_yaml(ConfigGroups.counterfactual_configs, 'lent/configs/counterfactual_configs/counterfactual')
-        
+    config_to_yaml(ConfigGroups.targeted_configs, 'lent/configs/experiment/targeted')
+    config_to_yaml(ConfigGroups.exhaustive_configs, 'lent/configs/experiment/exhaustive')
+    # config_to_yaml(ConfigGroups.counterfactual_configs, 'lent/configs/counterfactual/cf')
         
 if __name__ == "__main__":
-    pass
+    create_new_configs()

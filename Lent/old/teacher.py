@@ -17,7 +17,8 @@ from datasets.utils_ekdeep import *
 from datasets.shapes_3D import *
 from info_dicts import * 
 from train_utils import *
-from configs.sweep_configs import * 
+from configs.sweep_configs import *
+
 
 # Suppress warnings "divide by zero" produced by NaN gradients
 import warnings
