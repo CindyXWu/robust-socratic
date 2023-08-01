@@ -14,7 +14,7 @@ dataset:
   output_size: null
 dataloader:
   train_bs: 64
-  test_bs: 32
+  test_bs: 64
   num_workers: 1
 resnet_config:
   blocks_per_stage: 3

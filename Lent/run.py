@@ -71,7 +71,7 @@ def main(config: MainConfig, sweep_params: list[str] = None) -> None:
     if config.is_sweep:
         config = update_with_wandb_config(config, sweep_params) # For wandb sweeps: update with wandb values
     train_teacher(
-        model=teacher,
+        teacher=teacher,
         train_loader=train_loader,
         test_loader=test_loader,
         optimizer=optimizer,

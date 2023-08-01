@@ -68,7 +68,7 @@ class DataLoaderConfig:
     seed: Random seed for reproducibility, ensuring fn returns same split with same args.
     """
     train_bs: int = 64
-    test_bs: int = 32
+    test_bs: int = 64
     num_workers: Optional[int] = 1
     shuffle_train: bool = True
     
@@ -76,7 +76,7 @@ class DataLoaderConfig:
 @dataclass
 class OptimizerConfig:
     optimizer_type: OptimizerType = OptimizerType.SGD
-    base_lr = 3e-1 # Base LR for SGD
+    base_lr = 1e-1 # Base LR for SGD
     weight_decay: float = 0.0
     momentum: float = 0.0
     # For cosine LR scheduler
