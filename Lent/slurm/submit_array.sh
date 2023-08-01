@@ -1,7 +1,8 @@
 #!/bin/bash
+# Run array job via SLURM passing in individual config files in command line for Hydra
+# If not on SLURM I would expect to just pass in all the config files in a list for Hydra multirun
+exp_group="targeted"
+rel_config_folder="../configs/"
+num_configs=$(ls "${rel_config_folder}/${exp_group}"*.yaml 2> /dev/null | wc -l)
 
-config_file="configs/Dominoes_s.yml"
-rel_config_file="../${config_file}"
-num_configs=$(python -c "import yaml; print(len(yaml.safe_load(open('$rel_config_file'))))")
-
-sbatch --export=config_file=$config_file --array=0-$((num_configs-1)) array_s
+sbatch --export=exp_group=$exp_group --array=0-$((num_configs-1)) array_s

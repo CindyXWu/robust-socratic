@@ -30,13 +30,13 @@ source ~/.bashrc
 conda deactivate
 conda activate pytorch
 i=$SLURM_ARRAY_TASK_ID
-config_file=$config_file
+exp_group=$exp_group # e.g. targeted or exhaustive (or whatever I decide to call a set of experiments)
 
 #! Full path to application executable: 
-application="python ../teacher.py"
+application="python ../run.py"
 
 #! Run options for the application:
-options=""
+options="+experiment=${exp_group}_$i"
 
 #! Work directory (i.e. where the job will run):
 workdir="$SLURM_SUBMIT_DIR"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory
@@ -52,7 +52,7 @@ np=$[${numnodes}*${mpi_tasks_per_node}]
 #! Choose this for a pure shared-memory OpenMP parallel program on a single node:
 #! (OMP_NUM_THREADS threads will be created):
 #CMD="$application $options"
-CMD="$application --config_num $i --config_name $config_file"
+CMD="$application $options"
 
 #! Choose this for a MPI code using OpenMPI:
 #CMD="mpirun -npernode $mpi_tasks_per_node -np $np $application $options"

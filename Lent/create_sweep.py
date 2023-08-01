@@ -1,7 +1,7 @@
 import yaml
 
 
-def load_config(file_path):
+def load_config(file_path: str) -> dict:
     with open(file_path, 'r') as stream:
         try:
             config = yaml.safe_load(stream)
@@ -10,7 +10,8 @@ def load_config(file_path):
     return config
 
 
-def construct_sweep_config(main_config_name: str, sweep_config_name: str):
+def construct_sweep_config(main_config_name: str, sweep_config_name: str) -> dict:
+    """Used for wandb's sweep function, which requires a dictionary to be passed in for sweep configs."""
     main_config = load_config(f'configs/{main_config_name}.yaml')
     sweep_config = load_config(f'configs/{sweep_config_name}.yaml')
     default_config = {

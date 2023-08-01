@@ -38,8 +38,8 @@ def main(config: DistillConfig) -> None:
     [s_exp_prefix, s_exp_idx] = config.s_exp.config_filename.split("_")
     # From name field of config file
     t_exp_name, s_exp_name = config.t_exp.name.split(":")[-1].strip(), config.s_exp.name.split(":")[-1].strip()
-    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name}"
-    config.student_save_path = f"trained_students/{config.model_type}_{config.dataset_type}_{s_exp_prefix}_{s_exp_name}"
+    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}"
+    config.student_save_path = f"trained_students/{config.model_type}_{config.dataset_type}_{s_exp_prefix}_{s_exp_name.replace(' ', '_')}"
     
     ## Datasets
     config.dataset.output_size = get_dataset_output_size(config)

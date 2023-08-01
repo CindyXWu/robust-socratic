@@ -16,7 +16,6 @@ dataloader:
   train_bs: 64
   test_bs: 32
   num_workers: 1
-  shuffle_train: true
 resnet_config:
   blocks_per_stage: 3
   _width_factor: 1
@@ -24,7 +23,7 @@ epochs: null
 num_iters: 20000
 eval_frequency: 100
 num_eval_batches: 20
-early_stop_patience: 15
+early_stop_patience: 5
 is_sweep: false
 log_to_wandb: true
 save_model_as_artifact: true

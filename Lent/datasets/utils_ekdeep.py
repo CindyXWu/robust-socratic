@@ -363,9 +363,8 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
     #     base_dataset = 'CIFAR10'
     #     cue_proportion = 0.0 if cue_type == 'nocue' else cue_proportion
     #     cue_type = 'dominoes'
-    
-    download_datasets = True
-    
+    download_datasets = False
+    is_train = (load_type=='train')
     if base_dataset == 'Dominoes':
         base_dataset = 'CIFAR10'
         cue_type = 'domcues'
@@ -383,22 +382,22 @@ def get_box_dataloader(load_type='train', base_dataset='CIFAR10', cue_type='nocu
     elif (cue_type == 'dominoes'):
         dset_type = getattr(torchvision.datasets, 'FashionMNIST')
         dset_simple = dset_type(root=f'{data_dir}/FashionMNIST/', 
-                        train=(load_type == 'train'), download=download_datasets, transform=get_transform('dominoes'))
+                        train=is_train, download=download_datasets, transform=get_transform('dominoes'))
         dset = domDataset(dset, dset_simple, box_frac, mnist_frac, randomize_cue=randomize_cue, randomize_img=randomize_img)
     elif (cue_type == 'domcues'):
         dset_type = getattr(torchvision.datasets, 'FashionMNIST')
         dset_simple = dset_type(root=f'{data_dir}/FashionMNIST/', 
-                        train=(load_type == 'train'), download=download_datasets, transform=get_transform('dominoes'))
+                        train=is_train, download=download_datasets, transform=get_transform('dominoes'))
         dset = domCueDataset(dset, dset_simple, box_frac=box_frac, mnist_frac=mnist_frac, image_frac=image_frac, randomize_box=randomize_box, randomize_mnist=randomize_mnist, randomize_img=randomize_img)
 
     if isinstance(subset_ids, np.ndarray):
         dset = torch.utils.data.Subset(dset, subset_ids)
 
     # define dataloader
-    dataloader = DataLoader(dset, batch_size=batch_size, shuffle=(load_type=='train'), drop_last=True)
+    dataloader = DataLoader(dset, batch_size=batch_size, shuffle=is_train, drop_last=True)
     return dataloader
-
-
+        
+        
 def show_images_grid(imgs_, class_labels, num_images):
     """Now modified to show both [c h w] and [h w c] images."""
     ncols = int(np.ceil(num_images**0.5))
