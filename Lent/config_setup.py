@@ -163,19 +163,20 @@ class ConfigGroups:
     
     This is used mostly as a storage format - now deprecated for use in code with Hydra.
     But creating new configs should be done by changing values here first.
+    
+    Numbers relate to M (image mech), S1 (spurious 1: box or floor colour) and S2 (spurious 2: MNIST or object scale) respectively in the ExpConfig names.
     """
     exhaustive_configs = (
         ExpConfig("C", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)), 
-        ExpConfig("B", ExperimentConfig(im_frac=1, m1_frac=1, m2_frac=0, rand_im=True, rand_m1=False, rand_m2=False)), 
-        ExpConfig("M", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=1, rand_im=True, rand_m1=False, rand_m2=False)), 
-        ExpConfig("MB", ExperimentConfig(im_frac=1, m1_frac=1, m2_frac=1, rand_im=True, rand_m1=False, rand_m2=False)), 
+        ExpConfig("B", ExperimentConfig(im_frac=0, m1_frac=1, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)), 
+        ExpConfig("M", ExperimentConfig(im_frac=0, m1_frac=0, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=False)), 
+        ExpConfig("MB", ExperimentConfig(im_frac=0, m1_frac=1, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=False)), 
         ExpConfig("CM", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=False)),
         ExpConfig("CB", ExperimentConfig(im_frac=1, m1_frac=1, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)), 
         ExpConfig("CMB", ExperimentConfig(im_frac=1, m1_frac=1, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=False))
     )
 
 
-    # Numbers relate to M, S1 and S2 respectively in the string below
     targeted_configs = (
         ExpConfig("No mechanisms (baseline): 100 0 0", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
         ExpConfig("Teacher one spurious: 100 0 60", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.6, rand_im=False, rand_m1=False, rand_m2=False)),
@@ -202,7 +203,7 @@ def config_to_yaml(configs, filename_prefix):
 
 
 def create_new_configs():
-    config_to_yaml(ConfigGroups.targeted_configs, 'targeted')
+    # config_to_yaml(ConfigGroups.targeted_configs, 'targeted')
     config_to_yaml(ConfigGroups.exhaustive_configs, 'exhaustive')
     # config_to_yaml(ConfigGroups.counterfactual_configs, 'lent/configs/counterfactual/cf')
         

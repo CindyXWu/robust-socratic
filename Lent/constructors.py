@@ -12,7 +12,7 @@ from omegaconf import OmegaConf
 import os
 
 from config_setup import MainConfig, DistillConfig, ModelType, DatasetType, DistillLossType, DatasetConfig, ConfigGroups, ExperimentConfig, OptimizerType
-from datasets.utils_ekdeep import get_box_dataloader
+from datasets.dominoes_box import get_box_dataloader
 from datasets.shapes_3D import dataloader_3D_shapes
 from models.resnet import wide_resnet_constructor
 from models.resnet_ap import CustomResNet18

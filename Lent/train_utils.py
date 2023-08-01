@@ -21,6 +21,16 @@ from plotting_exhaustive import plot_images
 
 from typing import Optional, List, Dict
 
+
+@torch.no_grad()
+def evaluate_teacher(teacher: nn.Module) -> List[float]:
+    """Return performance of teacher on all counterfactual datasets.
+    
+    Currently only works for a 3 mechanism dataset and loads all possible combinations."""
+    # DOING: check if Ekdeep's utils dataset can allow images to not appear
+    
+    
+
 @torch.no_grad()
 def evaluate(model: nn.Module, 
              dataloader: DataLoader, 
@@ -29,6 +39,7 @@ def evaluate(model: nn.Module,
              title: Optional[str] = None,
              device: torch.device = torch.device("cuda")) -> float:
     """Accuracy for max_ex batches."""
+    model.eval()
     acc = 0
     for i, (features, labels) in enumerate(dataloader):
         labels = labels.to(device)
@@ -163,7 +174,8 @@ def train_teacher(model: nn.Module,
         # Checkpoint model at end of epoch
         save_model(f"{config.teacher_save_path}_working", epoch, model, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
     
-    save_model(f"{config.teacher_save_path}_final", epoch, model, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
+    # Hope is that by separating end of run saving with working, a working test run won't overwrite the best model
+    save_model(f"{config.teacher_save_path}_best", epoch, model, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
 
     
 def train_distill(
