@@ -23,7 +23,7 @@ epochs: null
 num_iters: 20000
 eval_frequency: 100
 num_eval_batches: 20
-early_stop_patience: 5
+early_stop_patience: 3
 is_sweep: false
 log_to_wandb: true
 save_model_as_artifact: true

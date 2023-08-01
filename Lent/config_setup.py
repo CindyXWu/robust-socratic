@@ -111,7 +111,7 @@ class MainConfig:
     How many batches to evaluate on. If None, evaluate on the entire eval dataLoader.
     Note, this might result in infinite evaluation if the eval dataLoader is not finite.
     """
-    early_stop_patience: int = 5 # Number of epochs with no accuracy improvement before training stops
+    early_stop_patience: int = 10 # Number of epochs with no accuracy improvement before training stops
     teacher_save_path: Optional[str] = None
 
     # Logging

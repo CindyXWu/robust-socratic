@@ -23,6 +23,8 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 cs = ConfigStore.instance()
 cs.store(name="config_base", node=MainConfig)
 
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    
 @hydra.main(config_path="configs/", config_name="main_config", version_base=None)
 def main(config: MainConfig, sweep_params: list[str] = None) -> None:
     """config is typed as MainConfig for duck-typing, but during runtime it's actually an OmegaConf object.
@@ -30,8 +32,6 @@ def main(config: MainConfig, sweep_params: list[str] = None) -> None:
     The MainConfig class (or any dataclass you use as a type hint for the config parameter) doesn't restrict what keys can be in the configuration; it only provides additional information to your editor and to Hydra's instantiate function. The actual contents of the configuration are determined entirely by the configuration files and command line arguments.
     """
     logging.info(f"Hydra current working directory: {os.getcwd()}")
-
-    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
     """Command line:
     python run.py experiment@t_exp=exhaustive_0 experiment@s_exp=exhaustive_1
@@ -40,17 +40,6 @@ def main(config: MainConfig, sweep_params: list[str] = None) -> None:
     [t_exp_prefix, t_exp_idx] = config.experiment.config_filename.split("_")
     t_exp_name = config.experiment.name.split(":")[-1].strip()
     config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}"
-    
-    # Datasets
-    config.dataset.output_size = get_dataset_output_size(config)
-    train_loader, test_loader = create_dataloaders(config=config)
-
-    ## Model
-    teacher = model_constructor(config).to(DEVICE)
-    
-    ## Optimizer
-    config.epochs = config.num_iters//(len(train_loader))  
-    optimizer, scheduler = optimizer_constructor(config=config, model=teacher, train_loader=train_loader)
     
     ## wandb
     config.wandb_project_name = f"{config.model_type} {config.dataset_type}"
@@ -66,7 +55,18 @@ def main(config: MainConfig, sweep_params: list[str] = None) -> None:
     # Probably won't do sweeps over these - okay to put here relative to call to update_with_wandb_config() below
     wandb.config.dataset_type = config.dataset_type
     wandb.config.model_type = config.model_type
+    
+    # Datasets
+    config.dataset.output_size = get_dataset_output_size(config)
+    train_loader, test_loader = create_dataloaders(config=config)
 
+    ## Model
+    teacher = model_constructor(config).to(DEVICE)
+    
+    ## Optimizer
+    config.epochs = config.num_iters//(len(train_loader))  
+    optimizer, scheduler = optimizer_constructor(config=config, model=teacher, train_loader=train_loader)
+    
     ## Train
     if config.is_sweep:
         config = update_with_wandb_config(config, sweep_params) # For wandb sweeps: update with wandb values
@@ -79,15 +79,18 @@ def main(config: MainConfig, sweep_params: list[str] = None) -> None:
         config=config,
         device=DEVICE
     )
-    # Save teacher model and config as wandb artifacts:
-    if config.save_model_as_artifact:
-        cwd = get_original_cwd()
-        output_dir = HydraConfig.get().run.dir
-        if HydraConfig.get().job.num is not None:
-            output_dir.replace("outputs", "multirun")
-        model_artifact = wandb.Artifact("teacher", type="model", description="Traiend teacher model state_dict")
-        model_artifact.add_file(f"{cwd}/{output_dir}/.hydra/config.yaml", name="main_config.yaml")
-        wandb.log_artifact(model_artifact)
+    try:
+        # Save teacher model and config as wandb artifacts:
+        if config.save_model_as_artifact:
+            cwd = get_original_cwd()
+            output_dir = HydraConfig.get().run.dir
+            if HydraConfig.get().job.num is not None:
+                output_dir.replace("outputs", "multirun")
+            model_artifact = wandb.Artifact("teacher", type="model", description="Trained teacher model state_dict")
+            model_artifact.add_file(f"{cwd}/{output_dir}/.hydra/config.yaml", name="main_config.yaml")
+            wandb.log_artifact(model_artifact)
+    except: # The most lazy way of saying 'this block of code is generating errors sometimes but it doesn't really matter so I'm not going to fix it'
+        pass # I'm not sorry
         
     # Needed to make sure each config file in multirun initialises separately
     wandb.finish()

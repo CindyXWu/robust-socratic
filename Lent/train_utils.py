@@ -146,20 +146,19 @@ def train_teacher(model: nn.Module,
 
                 print(f'Project {config.wandb_project_name}, Epoch: {epoch}, Train accuracy: {train_acc}, Test accuracy: {test_acc}, LR {lr}')
                 wandb.log({"Train Acc": train_acc, "Test Acc": test_acc, "Loss": np.mean(train_loss), "LR": lr}, step=it)
-
-            it += 1
         
-        # Early stopping logic
-        if test_acc > best_test_acc:
-            best_test_acc = test_acc
-            no_improve_count = 0
-            save_model(f"{config.teacher_save_path}_best", epoch, model, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
-        else:
-            no_improve_count += 1
-        if no_improve_count >= config.early_stop_patience:
-            print("Early stopping due to no improvement in test accuracy.")
-            return
-
+                # Early stopping logic
+                if test_acc > best_test_acc:
+                    best_test_acc = test_acc
+                    no_improve_count = 0
+                    save_model(f"{config.teacher_save_path}_best", epoch, model, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
+                else:
+                    no_improve_count += 1
+                if no_improve_count >= config.early_stop_patience:
+                    print("Early stopping due to no improvement in test accuracy.")
+                    return
+            
+            it += 1
 
         # Checkpoint model at end of epoch
         save_model(f"{config.teacher_save_path}_working", epoch, model, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
