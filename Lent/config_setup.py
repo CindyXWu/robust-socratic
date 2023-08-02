@@ -58,6 +58,7 @@ class ResNetConfig:
 class DatasetConfig:
     data_folder: str = "data"
     output_size: Optional[int] = 10
+    box_cue_size: Optional[int] = 4 # Inverse of fraction of image that box cue covers
 
 
 @dataclass

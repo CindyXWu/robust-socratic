@@ -151,12 +151,14 @@ class domCueDataset(Dataset):
                  mnist_frac: float,
                  randomize_img: bool = False,
                  randomize_box: bool = False,
-                 randomize_mnist: bool = False):
+                 randomize_mnist: bool = False,
+                 box_cue_size: int = 4):
         self.dataset = dataset
         self.classes = dataset.classes
         self.dataset_simple = dataset_simple
         self.n_classes = len(dataset.classes)
         self.targets = np.array(dataset.targets)
+        self.box_cue_size = box_cue_size
 
         self.image_frac, self.mnist_frac, self.box_frac =  image_frac, mnist_frac, box_frac
         self.randomize_img, self.randomize_box, self.randomize_mnist = randomize_img, randomize_box, randomize_mnist
@@ -215,7 +217,7 @@ class domCueDataset(Dataset):
             mask: Torch tensor of zeros with box added.
         """
         loc = np.random.randint(0, 10) if self.randomize_box else (label % 10)
-        box_size = mask.shape[1] // 3  # Now box size is 1/3 of the width
+        box_size = mask.shape[1] // self.box_cue_size # Adjustable box cue size
         
         if self.n_classes == 10 or (self.randomize_box and self.n_classes == 100):
             box_color = torch.rand((3, box_size, box_size))
@@ -346,7 +348,8 @@ def get_box_dataloader(
     data_dir='data',
     subset_ids=None,
     image_frac=1.0, box_frac=1.0, mnist_frac=1.0,
-    randomize_img=False, randomize_box=False, randomize_mnist=False) -> DataLoader:
+    randomize_img=False, randomize_box=False, randomize_mnist=False,
+    box_cue_size=4) -> DataLoader:
     """
     Return dataloaders for dominoes and box datasets. Main function to be called by other modules.
     
@@ -402,7 +405,8 @@ def get_box_dataloader(
         dset = domCueDataset(
             dset, 
             dset_simple, 
-            image_frac=image_frac, box_frac=box_frac, mnist_frac=mnist_frac,  randomize_img=randomize_img, randomize_box=randomize_box, randomize_mnist=randomize_mnist)
+            image_frac=image_frac, box_frac=box_frac, mnist_frac=mnist_frac,  randomize_img=randomize_img, randomize_box=randomize_box, randomize_mnist=randomize_mnist,
+            box_cue_size=box_cue_size)
 
     if isinstance(subset_ids, np.ndarray):
         dset = torch.utils.data.Subset(dset, subset_ids)
