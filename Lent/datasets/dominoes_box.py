@@ -366,7 +366,7 @@ def get_box_dataloader(
     E.g. plain dominoes (CIFAR only predictive of label), use box_frac=0, mnist_frac=0.
     Shuffle automatically set to true for test and train.
     """
-    download_datasets = True
+    download_datasets = False
     is_train = (load_type=='train')
     
     # if base_dataset == 'Dominoes':

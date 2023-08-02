@@ -77,7 +77,7 @@ class DataLoaderConfig:
 @dataclass
 class OptimizerConfig:
     optimizer_type: OptimizerType = OptimizerType.SGD
-    base_lr = 1e-1 # Base LR for SGD
+    base_lr = 0.1 # Base LR for SGD
     weight_decay: float = 0.0
     momentum: float = 0.0
     # For cosine LR scheduler
@@ -107,7 +107,7 @@ class MainConfig:
     num_iters: int = 20000 # Upper bound - see early stopping
     eval_frequency: int = 100
     """How many iterations between evaluations. If None, assumed to be 1 epoch, if the dataset is not Iterable."""
-    num_eval_batches: Optional[int] = 20
+    num_eval_batches: Optional[int] = 50
     """
     How many batches to evaluate on. If None, evaluate on the entire eval dataLoader.
     Note, this might result in infinite evaluation if the eval dataLoader is not finite.
@@ -128,10 +128,8 @@ class DistillConfig(MainConfig):
     distill_loss_type: Optional[DistillLossType] = DistillLossType.BASE # Whether to add extra terms in base distillation
     base_distill_loss_type: Optional[LossType] = LossType.KL # Type of base distillation loss
     jacobian_loss_type: LossType = LossType.MSE
-    
     nonbase_loss_frac: Optional[float] = 0
     """Weighting of this loss term with respect to base soft label matching distillation."""
-    
     dist_temp: float = 30
     jac_temp: float = 1 # Currently NOT USED
     contrast_temp: float = 0.1 # 0.1 recommended in paper
@@ -139,7 +137,7 @@ class DistillConfig(MainConfig):
     s_layer: Optional[str] = None
     t_layer: Optional[str] = None
     
-    student_save_path: str = None
+    student_save_path: Optional[str] = None
 
 
 @dataclass
