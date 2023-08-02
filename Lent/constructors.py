@@ -108,14 +108,13 @@ def create_dataloaders(config: MainConfig,
 
 
 def get_counterfactual_dataloaders(main_config: MainConfig, config_groupname: str) -> dict[str, DataLoader]:
-    """Get a dictionary of dataloaders for counterfactual evaluation. Key is string describing counterfactual experiment settings.
-    
-    Args:
-        config_groupname: Name of config group to load from ConfigGroups dictionary. The object inside ConfigGroups is of type Dict[ExpConfig] (see config_setup.py).
-    """
+    """Get a dictionary of dataloaders for counterfactual evaluation. Key is string describing counterfactual experiment settings."""
     dataloaders = {}
-    for idx, (name, exp_config) in enumerate(ConfigGroups[config_groupname].items()):
+    config_group = getattr(ConfigGroups, config_groupname)
+    for idx, exp_config in enumerate(config_group):
+        name, exp_config = exp_config.name, exp_config.experiment_config
         _, dataloaders[name] = create_dataloaders(main_config, exp_config)
+    return dataloaders
 
 
 def create_or_load_dataset(dataset_type: str, dataset_config: DatasetConfig) -> Dataset:

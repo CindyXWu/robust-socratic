@@ -158,7 +158,7 @@ class domCueDataset(Dataset):
         self.n_classes = len(dataset.classes)
         self.targets = np.array(dataset.targets)
 
-        self.image_frac, self.mnist_frac, self.box_frac, self.image_frac =  image_frac, mnist_frac, box_frac
+        self.image_frac, self.mnist_frac, self.box_frac =  image_frac, mnist_frac, box_frac
         self.randomize_img, self.randomize_box, self.randomize_mnist = randomize_img, randomize_box, randomize_mnist
         
         self.box_cue_ids: Dict[int, Dict[int, bool]] = get_cue_ids(labels=self.targets, n_classes=self.n_classes, cue_frac=self.box_frac)
@@ -217,9 +217,9 @@ class domCueDataset(Dataset):
         loc = np.random.randint(0, 10) if self.randomize_box else (label % 10)
         box_size = mask.shape[1] // 3  # Now box size is 1/3 of the width
         
-        if self.num_classes == 10 or (self.randomize_cue and self.num_classes == 100):
+        if self.n_classes == 10 or (self.randomize_box and self.n_classes == 100):
             box_color = torch.rand((3, box_size, box_size))
-        elif self.num_classes == 100 and not self.randomize_cue:
+        elif self.n_classes == 100 and not self.randomize_box:
             box_colors: List[np.ndarray] = generate_mandelbrot_images(10, 10)
             box_color = torch.from_numpy(box_colors[label % 10]).float() # Make sure data type is torch.float32
 
@@ -229,7 +229,7 @@ class domCueDataset(Dataset):
 
 
 def get_cue_ids(
-    labels: np.ndarray[Literal(int)] = None,
+    labels: np.ndarray = None,
     n_classes: int = 10,
     cue_frac: float = 1.0) -> Dict[int, Dict[int, bool]]:
     """
