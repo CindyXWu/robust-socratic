@@ -51,7 +51,6 @@ np=$[${numnodes}*${mpi_tasks_per_node}]
 
 #! Choose this for a pure shared-memory OpenMP parallel program on a single node:
 #! (OMP_NUM_THREADS threads will be created):
-#CMD="$application $options"
 CMD="$application $options"
 
 #! Choose this for a MPI code using OpenMPI:

@@ -11,10 +11,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from typing import Type, Union, Dict, Tuple, List, Literal
 
-import torch.backends.cudnn as cudnn
-torch.manual_seed(0)
-cudnn.deterministic = True
-cudnn.benchmark = False
+## Uncomment out below lines for reproducibility
+# import torch.backends.cudnn as cudnn
+# torch.manual_seed(0)
+# cudnn.deterministic = True
+# cudnn.benchmark = False
 
 
 def get_box_mask(
@@ -365,7 +366,7 @@ def get_box_dataloader(
     E.g. plain dominoes (CIFAR only predictive of label), use box_frac=0, mnist_frac=0.
     Shuffle automatically set to true for test and train.
     """
-    download_datasets = False
+    download_datasets = True
     is_train = (load_type=='train')
     
     # if base_dataset == 'Dominoes':
