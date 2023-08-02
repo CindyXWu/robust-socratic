@@ -1,5 +1,6 @@
 model_type: RN18AP
 dataset_type: SHAPES
+config_type: TARGETED
 aug_type: NONE
 optimization:
   optimizer_type: SGD

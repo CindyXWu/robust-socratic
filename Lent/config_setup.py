@@ -44,6 +44,11 @@ class OptimizerType(str, Enum):
     ADAMW = "ADAMW"
 
 
+class ConfigType(str, Enum):
+    TARGETED = "TARGETED" # Initial targeted experiments set out by Ekdeep
+    EXHAUSTIVE = "EXHAUSTIVE"
+    
+
 @dataclass
 class ResNetConfig:
     blocks_per_stage: int = 3 # Gives ResNet20: 3 blocks * 3 stages * 2 layers per block + input layer + output layer
@@ -92,6 +97,7 @@ class MainConfig:
     """Does not include which config group to load experiment from. This is specified from command line via Hydra multirun."""
     model_type: ModelType
     dataset_type: DatasetType
+    config_type: str
     aug_type: AugType
     
     # Stuff from other dataclasses
