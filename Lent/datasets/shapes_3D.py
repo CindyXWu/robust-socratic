@@ -2,20 +2,13 @@
 from matplotlib import pyplot as plt
 import numpy as np
 import h5py
-import os
 from torch.utils.data import DataLoader, Dataset
 import torch.nn.functional as F
 import torch
 import einops
-import sys
 from numpy.typing import NDArray
-from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-
-# Get the current script's directory
-script_dir = os.path.dirname(os.path.realpath(__file__))
-file_path = os.path.join(script_dir, '../data/3dshapes.h5')
+file_path = 'Lent/data/3dshapes.h5' # Relative to repo root
 
 class Shapes3D(Dataset):
     def __init__(self, randomise=False, floor_frac=0, scale_frac=0):
