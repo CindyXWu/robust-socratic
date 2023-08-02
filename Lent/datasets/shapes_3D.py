@@ -1,14 +1,15 @@
-
-from matplotlib import pyplot as plt
-import numpy as np
-import h5py
 from torch.utils.data import DataLoader, Dataset
 import torch.nn.functional as F
 import torch
+
+import logging
+from matplotlib import pyplot as plt
+import numpy as np
+import h5py
 import einops
 from numpy.typing import NDArray
+import os
 
-file_path = 'Lent/data/3dshapes.h5' # Relative to repo root
 
 class Shapes3D(Dataset):
     def __init__(self, randomise=False, floor_frac=0, scale_frac=0):
@@ -20,6 +21,11 @@ class Shapes3D(Dataset):
             floor_frac: fraction of images where floor hue is predictive of label. Set to 0 is equivalent to randomising or removing the feature.
             scale_frac: fraction of images where scale is predictive of label. Set to 0 is equivalent to randomising or removing the feature.
         """
+        script_dir = os.path.dirname(__file__)  # Get directory of current script
+#         root_dir = os.path.dirname(os.path.dirname(script_dir))  # Get the parent of the parent directory (i.e., go up two levels)
+#         file_path = os.path.join(root_dir, 'Lent/data/3dshapes.h5')  # Construct file path relative to root directory
+        file_path = os.path.join(script_dir, '../data/3dshapes.h5')  # Construct file path relative to root directory
+        
         with h5py.File(file_path, 'r') as dataset:
             self.images = np.array(dataset['images'])  # convert h5py Dataset to numpy array shape [480000,64,64,3], uint8 in range(256)
             self.labels = np.array(dataset['labels'])  # convert h5py Dataset to numpy array shape [480000,6], float64

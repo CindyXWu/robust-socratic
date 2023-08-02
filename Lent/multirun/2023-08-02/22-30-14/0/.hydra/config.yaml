@@ -1,0 +1,64 @@
+model_type: RN18AP
+dataset_type: DOMINOES
+config_type: EXHAUSTIVE
+aug_type: NONE
+optimization:
+  optimizer_type: SGD
+  base_lr: 0.1
+  weight_decay: 0.0
+  momentum: 0.0
+  final_lr: 0.001
+  cosine_lr_schedule: true
+  optimizer_kwargs: {}
+dataset:
+  data_folder: data
+  output_size: null
+  box_cue_size: 4
+dataloader:
+  train_bs: 64
+  test_bs: 64
+  num_workers: 1
+resnet_config:
+  blocks_per_stage: 3
+  _width_factor: 1
+epochs: null
+num_iters: 20000
+eval_frequency: 100
+num_eval_batches: 50
+early_stop_patience: 20
+is_sweep: false
+log_to_wandb: true
+save_model_as_artifact: true
+teacher_save_path: null
+wandb_project_name: null
+wandb_run_name: null
+distill_loss_type: JACOBIAN
+base_distill_loss_type: KL
+jacobian_loss_type: MSE
+nonbase_loss_frac: 0
+dist_temp: 30
+jac_temp: 1
+contrast_temp: 0.1
+s_layer: null
+t_layer: null
+student_save_path: null
+experiment:
+  config_filename: exhaustive_5
+  experiment_config:
+    im_frac: 1
+    m1_frac: 1
+    m2_frac: 0
+    rand_im: false
+    rand_m1: false
+    rand_m2: false
+  name: CB
+experiment_s:
+  config_filename: exhaustive_0
+  experiment_config:
+    im_frac: 1
+    m1_frac: 0
+    m2_frac: 0
+    rand_im: false
+    rand_m1: false
+    rand_m2: false
+  name: C

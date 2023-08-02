@@ -268,7 +268,6 @@ def train_distill(
                         scores=scores,
                         targets=targets, 
                         inputs=inputs,
-                        jac_loss_frac=config.nonbase_loss_frac,
                         config=config,
                         input_dim=input_dim
                     )

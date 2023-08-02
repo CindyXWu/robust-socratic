@@ -44,6 +44,7 @@ def main(config: DistillConfig, sweep_params: list[str] = None) -> None:
     config.student_save_path = f"trained_students/{config.model_type}_{config.dataset_type}_{s_exp_prefix}_{s_exp_name.replace(' ', '_')}"
     
     ## wandb
+    config.wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type}"
     config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}, S Mech: {s_exp_idx} {s_exp_name}, Loss: {config.distill_loss_type}"
     logger_params = {
     "name": config.wandb_run_name,

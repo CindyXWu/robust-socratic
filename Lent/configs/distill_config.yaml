@@ -1,5 +1,6 @@
 model_type: RN18AP
 dataset_type: DOMINOES
+config_type: EXHAUSTIVE
 aug_type: NONE
 optimization:
   optimizer_type: SGD
