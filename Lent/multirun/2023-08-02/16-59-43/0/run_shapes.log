@@ -1,3 +1,0 @@
-[2023-08-02 16:59:43,695][root][INFO] - Hydra current working directory: /workspace/robust-socratic/Lent
-[2023-08-02 16:59:43,744][wandb][INFO] - config set dataset_type = SHAPES - None
-[2023-08-02 16:59:43,745][wandb][INFO] - config set model_type = RN18AP - None
