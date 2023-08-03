@@ -25,8 +25,6 @@ if not os.path.exists(image_dir):
 def plot_PIL_batch(dataloader: DataLoader, num_images: int) -> None:
     """Returns PIL image of batch for later logging to WandB."""
     images, labels = next(iter(dataloader))
-    images = images[:num_images]
-    labels = labels[:num_images]
 
     cols = round(math.sqrt(num_images))
     rows = math.ceil(num_images / cols)
@@ -34,15 +32,14 @@ def plot_PIL_batch(dataloader: DataLoader, num_images: int) -> None:
     fig = plt.figure(figsize=(16, 16))
     for idx in range(num_images):
         ax = fig.add_subplot(rows, cols, idx+1, xticks=[], yticks=[])
-        img = images[idx]
-        npimg = img.numpy()
-        ax.imshow(np.transpose(npimg, (1, 2, 0)))
+        img = images[idx].numpy()
+        ax.imshow(np.transpose(img, (1, 2, 0)))
         ax.set_title("Class: " + str(labels[idx].item()))
 
-    grid = torchvision.utils.make_grid(images)
-    pil_image = PIL.Image.fromarray(np.transpose(grid.numpy(), (1, 2, 0)))
+    grid = torchvision.utils.make_grid(images).numpy()
+    grid = np.transpose(grid, (1, 2, 0))
     
-    return pil_image
+    return grid
     
     
 def show_images_grid(imgs_, class_labels, num_images, title=None):
