@@ -1,26 +1,55 @@
 """Common functions for quick visualisations."""
+import torch
+import torchvision
+from torch.utils.data import DataLoader
+
 import numpy as np
 import os
 import einops
-import torch
-from torch.utils.data import DataLoader
+import wandb
+import PIL
+import math
 
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 
 from typing import Optional
 
+
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 image_dir = "images/"
 if not os.path.exists(image_dir):
     os.makedirs(image_dir)
+    
+
+def plot_and_log_images(dataloader: DataLoader, num_images: int, title: str) -> None:
+    """Plot and log images using wandb."""
+    images, labels = next(iter(dataloader))
+    images = images[:num_images]
+    labels = labels[:num_images]
+
+    cols = round(math.sqrt(num_images))
+    rows = math.ceil(num_images / cols)
+
+    fig = plt.figure(figsize=(16, 16))
+    for idx in range(num_images):
+        ax = fig.add_subplot(rows, cols, idx+1, xticks=[], yticks=[])
+        img = images[idx]
+        npimg = img.numpy()
+        ax.imshow(np.transpose(npimg, (1, 2, 0)))
+        ax.set_title("Class: " + str(labels[idx].item()))
+
+    grid = torchvision.utils.make_grid(images)
+    pil_image = PIL.Image.fromarray(np.transpose(grid.numpy(), (1, 2, 0)))
+    
+    wandb.log({title: [wandb.Image(pil_image)]})
     
     
 def show_images_grid(imgs_, class_labels, num_images, title=None):
     """Now modified to show both [c h w] and [h w c] images."""
     ncols = int(np.ceil(num_images**0.5))
     nrows = int(np.ceil(num_images / ncols))
-    _, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
+    fig, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
     axes = axes.flatten()
 
     for ax_i, ax in enumerate(axes):

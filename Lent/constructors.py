@@ -173,7 +173,7 @@ def optimizer_constructor(
         lr=config.optimization.base_lr,
         **config.optimization.optimizer_kwargs,
     )
-
+    
     if config.optimization.cosine_lr_schedule:
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer=optim,

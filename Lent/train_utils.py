@@ -18,9 +18,9 @@ from losses.feature_match import feature_extractor
 from models.resnet_ap import CustomResNet18, CustomResNet50
 from config_setup import MainConfig, DistillLossType, DistillConfig
 from constructors import get_counterfactual_dataloaders
-from plotting_common import plot_images
+from plotting_common import plot_and_log_images
 
-from typing import Optional, List, Dict
+from typing import List, Dict
     
 
 @torch.no_grad()
@@ -28,7 +28,6 @@ def evaluate(model: nn.Module,
              dataloader: DataLoader, 
              batch_size: int, 
              num_eval_batches: int, 
-             title: Optional[str] = None,
              device: torch.device = torch.device("cuda")) -> float:
     """Accuracy for num_eval_batches batches."""
     model.eval()
@@ -43,9 +42,6 @@ def evaluate(model: nn.Module,
         if num_eval_batches != 0 and i >= num_eval_batches:
             break
         
-    if title:
-        plot_images(dataloader, num_images=batch_size, title=title)
-        
     model.train()
     
     # Avg acc - frac data points correctly classified
@@ -58,7 +54,6 @@ def counterfactual_evaluate(teacher: nn.Module,
                      dataloader: DataLoader, 
                      batch_size: int, 
                      num_eval_batches: int, 
-                     title: Optional[str] = None,
                      device: torch.device = torch.device("cuda")) -> float:
     """Student test accuracy, T-S KL and T-S top-1 accuracy for num_eval_batches batches."""
     acc, KL, top_1 = 0, 0, 0
@@ -75,9 +70,6 @@ def counterfactual_evaluate(teacher: nn.Module,
         acc += torch.sum(torch.eq(s_pred, labels)).item() # Total accurate samples in batch
         KL += kl_loss(F.log_softmax(scores, dim=1), F.softmax(targets, dim=1)) # Batchwise mean KL
         top_1 += torch.eq(s_pred, t_pred).float().mean() # Batchwise mean top-1 accuracy
-        
-    if title:
-        plot_images(dataloader, num_images=batch_size, title=title)
         
     avg_acc = acc*100/(i*batch_size)
     avg_KL = KL/i
@@ -337,10 +329,14 @@ def train_distill(
             lr = scheduler.get_lr()
             train_loss = loss.detach().cpu().numpy()
 
-            if it == 0: check_grads(student)
+            if it == 0: 
+                check_grads(student)
+                for name in cf_dataloaders:
+                    plot_and_log_images(dataloader=cf_dataloaders[name], num_images=batch_size, title=name)
+                    
             if it % config.eval_frequency == 0:
                 train_acc = evaluate(student, train_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
-                test_acc, test_KL, test_top1 = counterfactual_evaluate(teacher, student, test_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, title=None, device=device)
+                test_acc, test_KL, test_top1 = counterfactual_evaluate(teacher, student, test_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
                 train_acc_list.append(train_acc)
                 test_acc_list.append(test_acc)
                 
@@ -349,8 +345,13 @@ def train_distill(
                 for name in cf_dataloaders:
                     title = f'Dominoes_{name}'
                     # Currently not plotting datasets
-                    cf_evals[name], cf_evals[f"{name} T-S KL"], cf_evals[f"{name} T-S Top 1 Fidelity"] = counterfactual_evaluate(teacher, student, cf_dataloaders[name], batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, title=None)
-
+                    cf_evals[name], cf_evals[f"{name} T-S KL"], cf_evals[f"{name} T-S Top 1 Fidelity"] = counterfactual_evaluate(
+                        teacher=teacher,
+                        student=student,
+                        dataloader=cf_dataloaders[name],
+                        batch_size=config.dataloader.test_bs,
+                        num_eval_batches=config.num_eval_batches
+                        )
                 print(f"Project: {config.wandb_run_name}, Iteration: {it}, Epoch: {epoch}, Loss: {train_loss}, LR: {lr}, Base Temperature: {config.dist_temp}, Jacobian Temperature: {config.jac_temp}, Contrastive Temperature: {config.contrast_temp}, Nonbase Loss Frac: {config.nonbase_loss_frac}, ")
 
                 results_dict = {**cf_evals, **{
