@@ -108,7 +108,6 @@ def get_saliency_map(
     scores = model(input)
     # Zero out all other classes apart from target_class
     score = scores[0, target_class]
-    model.zero_grad()
     score.backward()
     # Saliency would be the absolute value of gradients
     saliency, _ = torch.max(input.grad.data.abs(), dim=1)
