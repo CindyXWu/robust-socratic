@@ -22,8 +22,8 @@ if not os.path.exists(image_dir):
     os.makedirs(image_dir)
     
 
-def plot_and_log_images(dataloader: DataLoader, num_images: int, title: str) -> None:
-    """Plot and log images using wandb."""
+def plot_PIL_batch(dataloader: DataLoader, num_images: int) -> None:
+    """Returns PIL image of batch for later logging to WandB."""
     images, labels = next(iter(dataloader))
     images = images[:num_images]
     labels = labels[:num_images]
@@ -42,7 +42,7 @@ def plot_and_log_images(dataloader: DataLoader, num_images: int, title: str) -> 
     grid = torchvision.utils.make_grid(images)
     pil_image = PIL.Image.fromarray(np.transpose(grid.numpy(), (1, 2, 0)))
     
-    wandb.log({title: [wandb.Image(pil_image)]})
+    return pil_image
     
     
 def show_images_grid(imgs_, class_labels, num_images, title=None):

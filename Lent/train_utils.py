@@ -18,7 +18,7 @@ from losses.feature_match import feature_extractor
 from models.resnet_ap import CustomResNet18, CustomResNet50
 from config_setup import MainConfig, DistillLossType, DistillConfig
 from constructors import get_counterfactual_dataloaders
-from plotting_common import plot_and_log_images
+from plotting_common import plot_PIL_batch
 
 from typing import List, Dict
     
@@ -332,7 +332,8 @@ def train_distill(
             if it == 0: 
                 check_grads(student)
                 for name in cf_dataloaders:
-                    plot_and_log_images(dataloader=cf_dataloaders[name], num_images=batch_size, title=name)
+                    batch_image = plot_PIL_batch(dataloader=cf_dataloaders[name], num_images=batch_size)
+                    wandb.log({name: [wandb.Image(batch_image)]}, step=it)
                     
             if it % config.eval_frequency == 0:
                 train_acc = evaluate(student, train_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
@@ -343,7 +344,6 @@ def train_distill(
                 # Dictionary holds counterfactual acc, KL and top 1 fidelity for each dataset
                 cf_evals = defaultdict(float)
                 for name in cf_dataloaders:
-                    title = f'Dominoes_{name}'
                     # Currently not plotting datasets
                     cf_evals[name], cf_evals[f"{name} T-S KL"], cf_evals[f"{name} T-S Top 1 Fidelity"] = counterfactual_evaluate(
                         teacher=teacher,
