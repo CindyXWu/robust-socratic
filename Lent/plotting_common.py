@@ -6,15 +6,13 @@ from torch.utils.data import DataLoader
 import numpy as np
 import os
 import einops
-import wandb
-import PIL
+import warnings
 import math
-
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
-
 from typing import Optional
 
+warnings.filterwarnings("ignore")
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 image_dir = "images/"
@@ -25,7 +23,9 @@ if not os.path.exists(image_dir):
 def plot_PIL_batch(dataloader: DataLoader, num_images: int) -> None:
     """Returns PIL image of batch for later logging to WandB."""
     images, labels = next(iter(dataloader))
-
+    images = images[:num_images]
+    labels = labels[:num_images]
+    
     cols = round(math.sqrt(num_images))
     rows = math.ceil(num_images / cols)
 

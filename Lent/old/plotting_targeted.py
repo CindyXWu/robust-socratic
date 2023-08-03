@@ -9,11 +9,12 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from scipy.signal import savgol_filter
 import seaborn as sns
-
 import wandb
 from wandb.sdk.wandb_run import Run
 
 from typing import List, Optional, Dict, Tuple
+
+from info_dicts import *
 
 warnings.filterwarnings("ignore")
 
