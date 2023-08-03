@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 
 import numpy as np
 import wandb
+import logging
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from collections import defaultdict
@@ -89,8 +90,7 @@ def counterfactual_evaluate(teacher: nn.Module,
 
 def get_saliency_map(
     model: nn.Module,
-    input: torch.Tensor,
-    target_class: int) -> torch.Tensor:
+    input: torch.Tensor) -> torch.Tensor:
     """
     Compute saliency map of an input.
 
@@ -106,10 +106,13 @@ def get_saliency_map(
     input.requires_grad_()
 
     scores = model(input)
+    score_max_class = scores.argmax()
     # Zero out all other classes apart from target_class
-    score = scores[0, target_class]
+    score = scores[0, score_max_class]
     score.backward()
-    # Saliency would be the absolute value of gradients
+    """Saliency would be the gradient with respect to the input image now. But note that the input image has 3 channels,
+    R, G and B. To derive a single class saliency value for each pixel (i, j),  we take the maximum magnitude
+    across all colour channels."""
     saliency, _ = torch.max(input.grad.data.abs(), dim=1)
 
     model.train()  # Switch the model back to training mode
@@ -222,7 +225,7 @@ def train_teacher(teacher: nn.Module,
                 if test_acc > best_test_acc:
                     best_test_acc = test_acc
                     no_improve_count = 0
-                    save_model(f"{config.teacher_save_path}_best", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
+                    save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
                 else:
                     no_improve_count += 1
                 if no_improve_count >= config.early_stop_patience:
@@ -232,7 +235,7 @@ def train_teacher(teacher: nn.Module,
             it += 1
     
     # Hope is that by separating end of run saving with working, a working test run won't overwrite the best model
-    save_model(f"{config.teacher_save_path}_best", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
+    save_model(f"{config.teacher_save_path}_teacher", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
 
     
 def train_distill(
@@ -272,10 +275,11 @@ def train_distill(
 
     cf_dataloaders = get_counterfactual_dataloaders(config, config_groupname="counterfactual_configs")
 
+    logging.info(config.nonbase_loss_frac)
+    
     for epoch in range(config.epochs):
         for inputs, labels in tqdm(train_loader):
             inputs, labels = inputs.to(device), labels.to(device)
-            inputs.requires_grad = True
             scores, targets = student(inputs), teacher(inputs) 
 
             # for param in student.parameters():
@@ -360,7 +364,7 @@ def train_distill(
                 if test_acc > best_test_acc:
                     best_test_acc = test_acc
                     no_improve_count = 0
-                    save_model(f"{config.teacher_save_path}_best", epoch, student, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
+                    save_model(f"{config.student_save_path}", epoch, student, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
                 else:
                     no_improve_count += 1
                 if no_improve_count >= config.early_stop_patience:
@@ -374,16 +378,11 @@ def train_distill(
         #     visualise_features_3d(s_map, t_map, title=run_name+"_"+str(it))
         
         # Plot saliency map at end of epoch
-        _, predicted_classes = torch.max(scores, 1)
-        target_class = predicted_classes[0]
-        saliency = get_saliency_map(student, inputs[0].unsqueeze(0), target_class).squeeze().detach().cpu().numpy()
+        saliency = get_saliency_map(student, inputs[0].unsqueeze(0)).squeeze().detach().cpu().numpy()
         plt.imshow(saliency, cmap='hot')
         plt.axis('off')
         
         wandb.log({f"saliency_map_epoch{epoch}": [wandb.Image(plt)]}, step=it)
-        
-    # By separating end of run saving with working, working test run won't overwrite best model
-    save_model(f"{config.student_save_path}_best", epoch, student, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
 
 
 def check_grads(model: nn.Module):
