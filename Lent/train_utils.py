@@ -237,9 +237,22 @@ def train_teacher(teacher: nn.Module,
                     return
             
             it += 1
-    
-    # Hope is that by separating end of run saving with working, a working test run won't overwrite the best model
-    save_model(f"{config.teacher_save_path}_teacher", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
+
+        # Plot saliency map at end of epoch
+        single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
+        saliency_map = get_saliency_map(teacher, single_image).squeeze().detach().cpu().numpy()
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))  # Create a figure with 2 subplots side by side
+
+        # Assuming `image` is your original image and `saliency_map` is your saliency map
+        axs[0].imshow(single_image)
+        axs[0].set_title("Original Image")
+        axs[1].imshow(saliency_map)
+        axs[1].set_title("Saliency Map")
+        plt.tight_layout()  # Adjust the layout so that plots do not overlap
+
+        wandb.log({f"image_and_saliency_map_it_{it}": [wandb.Image(fig)]}, step=it)
+        
+    save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
 
     
 def train_distill(
@@ -366,14 +379,6 @@ def train_distill(
                 }}
                 
                 wandb.log(results_dict)
-                
-                # Plot saliency map at each evaluation step
-                single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
-                saliency = get_saliency_map(student, single_image).squeeze().detach().cpu().numpy()
-                plt.imshow(saliency, cmap='hot')
-                plt.axis('off')
-                
-                wandb.log({f"saliency_map_it{it}": [wandb.Image(plt)]}, step=it)
 
                 if it > config.min_iters: # Only consider early stopping beyond certain threshold
                     # Early stopping logic
@@ -386,8 +391,24 @@ def train_distill(
                     if no_improve_count >= config.early_stop_patience:
                         print("Early stopping due to no improvement in test accuracy.")
                         return
-                
+             
             it += 1 
+
+        # Plot saliency map at end of epoch
+        single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
+        saliency_map = get_saliency_map(student, single_image).squeeze().detach().cpu().numpy()
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))  # Create a figure with 2 subplots side by side
+
+        # Assuming `image` is your original image and `saliency_map` is your saliency map
+        axs[0].imshow(single_image)
+        axs[0].set_title("Original Image")
+        axs[1].imshow(saliency_map)
+        axs[1].set_title("Saliency Map")
+        plt.tight_layout()  # Adjust the layout so that plots do not overlap
+
+        wandb.log({f"image_and_saliency_map_it_{it}": [wandb.Image(fig)]}, step=it)
+
+    save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
 
 
 def check_grads(model: nn.Module):
