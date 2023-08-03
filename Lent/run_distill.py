@@ -10,8 +10,8 @@ from hydra.utils import get_original_cwd
 from omegaconf import OmegaConf
 
 from create_sweep import construct_sweep_config, load_config
-from train_utils import train_distill, print_saved_model
-from config_setup import DistillConfig
+from train_utils import train_distill
+from config_setup import DistillConfig, DistillLossType
 from constructors import model_constructor, optimizer_constructor, create_dataloaders, get_dataset_output_size, get_nonbase_loss_frac
 
 
@@ -40,9 +40,14 @@ def main(config: DistillConfig, sweep_params: list[str] = None) -> None:
     [s_exp_prefix, s_exp_idx] = config.experiment_s.config_filename.split("_")
     # From name field of config file
     t_exp_name, s_exp_name = config.experiment.name.split(":")[-1].strip(), config.experiment_s.name.split(":")[-1].strip()
-    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_best" # Where to load teacher
-    config.student_save_path = f"trained_students/{config.model_type}_{config.dataset_type}_{s_exp_prefix}_{s_exp_name.replace(' ', '_')}"
+    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_teacher" # Where to load teacher
+    config.student_save_path = f"trained_students/{config.model_type}_{config.dataset_type}_{s_exp_prefix}_{s_exp_name.replace(' ', '_')}_student"
     
+    ## Update config file before logging config values to wandb
+    config.nonbase_loss_frac = get_nonbase_loss_frac(config)
+    config.dataset.output_size = get_dataset_output_size(config)
+    config.epochs = config.num_iters//(len(train_loader))
+            
     ## wandb
     config.wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type}"
     config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}, S Mech: {s_exp_idx} {s_exp_name}, Loss: {config.distill_loss_type}"
@@ -59,7 +64,6 @@ def main(config: DistillConfig, sweep_params: list[str] = None) -> None:
     wandb.config.model_type = config.model_type
     
     ## Datasets
-    config.dataset.output_size = get_dataset_output_size(config)
     train_loader, test_loader = create_dataloaders(config=config)
     
     ## Models
@@ -69,7 +73,6 @@ def main(config: DistillConfig, sweep_params: list[str] = None) -> None:
     teacher.load_state_dict(checkpoint['model_state_dict'])
     
     ## Optimizer
-    config.epochs = config.num_iters//(len(train_loader))
     optimizer, scheduler = optimizer_constructor(config=config, model=student, train_loader=train_loader)
 
     ## Train
@@ -83,8 +86,7 @@ def main(config: DistillConfig, sweep_params: list[str] = None) -> None:
         optimizer=optimizer,
         scheduler=scheduler,
         config=config,
-        device=DEVICE
-    )
+        device=DEVICE)
     try:
         # Save teacher model and config as wandb artifacts:
         if config.save_model_as_artifact:

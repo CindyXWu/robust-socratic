@@ -39,7 +39,7 @@ def main(config: MainConfig, sweep_params: list[str] = None) -> None:
     # logging.info(OmegaConf.to_container(config.experiment))
     [t_exp_prefix, t_exp_idx] = config.experiment.config_filename.split("_")
     t_exp_name = config.experiment.name.split(":")[-1].strip()
-    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}"
+    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_teacher"
     
     ## wandb
     config.wandb_project_name = f"{config.model_type} {config.dataset_type} {config.config_type}"

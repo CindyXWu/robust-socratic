@@ -27,7 +27,7 @@ eval_frequency: 100
 num_eval_batches: 50
 early_stop_patience: 20
 is_sweep: false
-log_to_wandb: true
+log_to_wandb: false
 save_model_as_artifact: true
 teacher_save_path: null
 wandb_project_name: null

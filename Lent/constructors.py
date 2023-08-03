@@ -20,6 +20,22 @@ from models.lenet import LeNet5
 from models.mlp import mlp_constructor
 
 
+def get_nonbase_loss_frac(distill_config: DistillConfig):
+    """To be called by main function. Contains all necessary dictionaries."""
+    nonbase_loss_frac_dict = {DistillLossType.JACOBIAN: 0.5, DistillLossType.CONTRASTIVE: 0.01}
+    return nonbase_loss_frac_dict.get(distill_config.distill_loss_type)
+
+
+def get_dataset_output_size(config: MainConfig) -> int:
+    dataset_output_sizes = {
+    "DOMINOES": 10,
+    "SHAPES": 8,
+    "CIFAR100": 100,
+    "CIFAR10": 10
+    }
+    return dataset_output_sizes.get(config.dataset_type)
+
+
 def model_constructor(config: MainConfig) -> nn.Module:
     """Constructs a model based on a specified model type."""
     if config.model_type == ModelType.MLP:
@@ -50,16 +66,6 @@ def get_model_intermediate_layer(config: MainConfig) -> str:
             ModelType.RESNE20_WIDE: {"11.path2.5": "final_features"},
         }
     return models.get(config.model_type)
-
-
-def get_dataset_output_size(config: MainConfig) -> int:
-    dataset_output_sizes = {
-    "DOMINOES": 10,
-    "SHAPES": 8,
-    "CIFAR100": 100,
-    "CIFAR10": 10
-    }
-    return dataset_output_sizes.get(config.dataset_type)
 
 
 def create_dataloaders(config: MainConfig,
@@ -173,8 +179,3 @@ def optimizer_constructor(
         scheduler = LRScheduler(optim, config.epochs, base_lr=config.optimization.base_lr, final_lr=config.optimization.final_lr, iter_per_epoch=len(train_loader))
         
     return optim, scheduler
-
-
-def get_nonbase_loss_frac(distill_config: DistillConfig):
-    nonbase_loss_frac_dict = {DistillLossType.JACOBIAN: 0.5, DistillLossType.CONTRASTIVE: 0.01}
-    return nonbase_loss_frac_dict.get(distill_config.distill_loss_type)
