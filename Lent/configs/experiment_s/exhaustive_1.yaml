@@ -6,4 +6,4 @@ experiment_config:
   rand_im: false
   rand_m1: false
   rand_m2: false
-name: B
+name: A

@@ -206,12 +206,15 @@ def config_to_yaml(configs, filename_prefix):
         filename = f"lent/configs/experiment/{filename_prefix}_{i}.yaml"
         with open(filename, 'w') as file:
             yaml.dump({'config_filename': f"{filename_prefix}_{i}", 'name': config.name, 'experiment_config': vars(config.experiment_config)}, file)
+        filename = f"lent/configs/experiment_s/{filename_prefix}_{i}.yaml"
+        with open(filename, 'w') as file:
+            yaml.dump({'config_filename': f"{filename_prefix}_{i}", 'name': config.name, 'experiment_config': vars(config.experiment_config)}, file)
 
 
 def create_new_configs():
-    # config_to_yaml(ConfigGroups.targeted_configs, 'targeted')
-    config_to_yaml(ConfigGroups.exhaustive_configs, 'exhaustive')
-    # config_to_yaml(ConfigGroups.counterfactual_configs, 'lent/configs/counterfactual/cf')
+    # config_to_yaml(ConfigGroups.targeted, 'targeted')
+    config_to_yaml(ConfigGroups.exhaustive, 'exhaustive')
+    # config_to_yaml(ConfigGroups.targeted_cf, 'lent/configs/counterfactual/cf')
         
 if __name__ == "__main__":
     create_new_configs()
