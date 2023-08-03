@@ -1,13 +1,7 @@
-"""Note for future self: plotting and plotting_new differ only in which datasets they are used for (see executing code at bottom)."""
-
 from collections import defaultdict
 import pandas as pd
 import numpy as np
 import os
-import einops
-import torch
-import warnings
-from torch.utils.data import DataLoader
 from labellines import labelLines
 from typing import List, Optional, Dict, Tuple
 
@@ -19,8 +13,7 @@ import wandb
 from wandb.sdk.wandb_run import Run
 from sklearn.manifold import TSNE
 
-
-warnings.filterwarnings("ignore")
+from plotting_common import show_images_grid, plot_images_grid, plot_saliency_map
 
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -29,74 +22,9 @@ if not os.path.exists(image_dir):
     os.makedirs(image_dir)
 
 api = wandb.Api(overrides=None, timeout=None, api_key =None)
-# Set the style and color palette
+
 sns.set_style("whitegrid")
 sns.set_palette("pastel")
-    
-
-def show_images_grid(imgs_, class_labels, num_images, title=None):
-    """Now modified to show both [c h w] and [h w c] images."""
-    ncols = int(np.ceil(num_images**0.5))
-    nrows = int(np.ceil(num_images / ncols))
-    _, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
-    axes = axes.flatten()
-
-    for ax_i, ax in enumerate(axes):
-        if ax_i < num_images:
-            img = imgs_[ax_i]
-            if img.ndim == 3 and img.shape[0] == 3:
-                img = img.transpose(1, 2, 0)
-            ax.imshow(img, cmap='Greys_r', interpolation='nearest')
-            ax.set_title(f'Class: {class_labels[ax_i]}')  # Display the class label as title
-            ax.set_xticks([])
-            ax.set_yticks([])
-        else:
-            ax.axis('off')
-    if title:
-        plt.savefig(image_dir+title+'.png')
-    else:
-        plt.show()
-
-
-def visualise_features_3d(s_features: torch.Tensor, t_features: torch.Tensor, title: Optional[str] = None):
-    tsne = TSNE(n_components=3, perplexity=30, learning_rate=200, n_iter=1000, random_state=42)
-    s = tsne.fit_transform(s_features.detach().numpy())
-    t = tsne.fit_transform(t_features.detach().numpy())
-    s_x, s_y, s_z = s[:, 0], s[:, 1], s[:, 2]
-    t_x, t_y, t_z = t[:, 0], t[:, 1], t[:, 2]
-
-    fig = plt.figure(figsize=(5, 5), dpi=300)
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(s_x, s_y, s_z, c='blue', label='Student', alpha=0.5)
-    ax.scatter(t_x, t_y, t_z, c='red', label='Teacher', alpha=0.5)
-    if title:
-        plt.savefig(image_dir+"3d/"+title+'.png')
-    else:
-        plt.show()
-
-
-def visualise_features_2d(s_features: torch.Tensor, t_features: torch.Tensor, title=None):
-    """Student and teacher features shape [num_samples, feature_dim]."""
-    tsne = TSNE(n_components=2, perplexity=30, learning_rate=200, n_iter=1000, random_state=42)
-    s = tsne.fit_transform(s_features.detach().numpy())
-    t = tsne.fit_transform(t_features.detach().numpy())
-    s_x, s_y = s[:, 0], s[:, 1]
-    t_x, t_y = t[:, 0], t[:, 1]
-
-    fig = plt.figure(figsize=(5, 5), dpi=300)
-    plt.scatter(s_x, s_y, c='blue', label='Student', alpha=0.5)
-    plt.scatter(t_x, t_y, c='red', label='Teacher', alpha=0.5)
-    if title:
-        plt.savefig(image_dir+"2d/"+title+'_2d.png')
-    else:
-        plt.show()
-
-
-def plot_images(dataloader: DataLoader, num_images: int, title: Optional[str] = None):
-    for i, (x, y) in enumerate(dataloader):
-        x = einops.rearrange(x, 'b c h w -> b h w c')
-        show_images_grid(x, y, num_images, title=title)
-        break
 
 
 def heatmap_get_data(project_name: str, 
@@ -286,7 +214,9 @@ def clean_history(history: pd.DataFrame) -> pd.DataFrame:
     return history_clean
 
 
-def smooth_history(history: pd.DataFrame, window_length: Optional[int]=5, polyorder: Optional[int] = 3) -> pd.DataFrame:
+def smooth_history(history: pd.DataFrame, 
+                   window_length: Optional[int]=5, 
+                   polyorder: Optional[int] = 3) -> pd.DataFrame:
     nan_mask = history.isna()
     # Smooth each column in the DataFrame, interpolating for NaNs
     filtered_history = history.interpolate().apply(lambda x: savgol_filter(x, window_length, polyorder, mode='mirror'))
@@ -318,7 +248,16 @@ def custom_sort(col: str, type: str) -> int:
         return len(order_list) + 1
 
 
-def make_plot(histories: List[pd.DataFrame], cols: List[str], title: str, mode: str) -> None:
+def make_plot(histories: List[pd.DataFrame], 
+              cols: List[str], 
+              title: str, 
+              mode: str) -> None:
+    """
+    Args:
+        histories: List of dataframes containing historical information for each group of runs.
+        cols: List of column names to plot.
+        mode: Plotting accuracy, KL or top-1.
+    """
     sns.set(style='whitegrid', context='paper', font_scale=1)
     num_groups = len(set([history['Group Name'].iloc[0] for history in histories]))
 
@@ -413,8 +352,10 @@ def wandb_plot(histories: List[pd.DataFrame], title: str) -> None:
     mean_cols.sort(key=lambda col: custom_sort(col, 'acc'))
     make_plot(histories, mean_cols, title, 'acc')
 
-actual_group_names = ['CIFAR10 MNIST Box', 'CIFAR10 Box', 'CIFAR10 MNIST', 'MNIST Box', 'Box', 'MNIST', 'CIFAR10']
+
 if __name__ == "__main__":
+    actual_group_names = ['CIFAR10 MNIST Box', 'CIFAR10 Box', 'CIFAR10 MNIST', 'MNIST Box', 'Box', 'MNIST', 'CIFAR10']
+    
     title = 'Jacobian Matching Distillation'
     mode = 1 # 0 for heatmap, 1 for plots
     loss_num = 1

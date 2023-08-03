@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 import numpy as np
 import wandb
 from tqdm import tqdm
-import logging
+import matplotlib.pyplot as plt
 from collections import defaultdict
 
 from losses.loss_common import *
@@ -16,8 +16,8 @@ from losses.feature_match import feature_extractor
 
 from models.resnet_ap import CustomResNet18, CustomResNet50
 from config_setup import MainConfig, DistillLossType, DistillConfig
-from constructors import get_counterfactual_dataloaders, create_dataloaders
-from plotting_exhaustive import plot_images
+from constructors import get_counterfactual_dataloaders
+from plotting_common import plot_images, plot_saliency_map
 
 from typing import Optional, List, Dict
     
@@ -85,6 +85,37 @@ def counterfactual_evaluate(teacher: nn.Module,
     student.train()
     
     return avg_acc, avg_KL, avg_top_1
+
+
+def get_saliency_map(
+    model: nn.Module,
+    input: torch.Tensor,
+    target_class: int) -> torch.Tensor:
+    """
+    Compute saliency map of an input.
+
+    Args:
+        model: PyTorch model.
+        input_tensor: PyTorch tensor, input for which saliency map is to be computed.
+        target_class: Class for which saliency map is computed.
+
+    Returns:
+        Saliency map as a PyTorch tensor.
+    """
+    model.eval()  # Switch the model to evaluation mode
+    input.requires_grad_()
+
+    scores = model(input)
+    # Zero out all other classes apart from target_class
+    score = scores[0, target_class]
+    model.zero_grad()
+    score.backward()
+    # Saliency would be the absolute value of gradients
+    saliency, _ = torch.max(input.grad.data.abs(), dim=1)
+
+    model.train()  # Switch the model back to training mode
+    
+    return saliency
 
 
 class LRScheduler(object):
@@ -340,12 +371,21 @@ def train_distill(
                 
             it += 1
 
-        ## Visualise 3d at end of each epoch
-        # if loss_num == 2:
+        ## Visualise 3d tSNE at end of epoch
+        # if config.distill_loss_type == DistillLossType.JACOBIAN:
         #     visualise_features_3d(s_map, t_map, title=run_name+"_"+str(it))
         
+        # Plot saliency map at end of epoch
+        _, predicted_classes = torch.max(scores, 1)
+        target_class = predicted_classes[0]
+        saliency = get_saliency_map(student, inputs[0].unsqueeze(0), target_class).squeeze().detach().cpu().numpy()
+        plt.imshow(saliency, cmap='hot')
+        plt.axis('off')
+        
+        wandb.log({f"saliency_map_epoch{epoch}": [wandb.Image(plt)]}, step=it)
+        
     # By separating end of run saving with working, working test run won't overwrite best model
-    save_model(f"{config.teacher_save_path}_best", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
+    save_model(f"{config.student_save_path}_best", epoch, student, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
 
 
 def check_grads(model: nn.Module):
