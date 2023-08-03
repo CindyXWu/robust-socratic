@@ -46,7 +46,6 @@ def main(config: DistillConfig, sweep_params: list[str] = None) -> None:
     ## Update config file before logging config values to wandb
     config.nonbase_loss_frac = get_nonbase_loss_frac(config)
     config.dataset.output_size = get_dataset_output_size(config)
-    config.epochs = config.num_iters//(len(train_loader))
             
     ## wandb
     config.wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type}"
@@ -65,6 +64,8 @@ def main(config: DistillConfig, sweep_params: list[str] = None) -> None:
     
     ## Datasets
     train_loader, test_loader = create_dataloaders(config=config)
+    # Epochs aren't logged faithfully to wandb, but is fine as it tends to be an upper bound due to early-stopping
+    config.epochs = config.num_iters//(len(train_loader))
     
     ## Models
     student = model_constructor(config).to(DEVICE)

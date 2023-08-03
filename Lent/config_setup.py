@@ -111,6 +111,7 @@ class MainConfig:
     # Training
     epochs: Optional[int] = None # Instantiate in main function
     num_iters: int = 20000 # Upper bound - see early stopping
+    min_iters: int = 8000
     eval_frequency: int = 100
     """How many iterations between evaluations. If None, assumed to be 1 epoch, if the dataset is not Iterable."""
     num_eval_batches: Optional[int] = 50
@@ -118,7 +119,7 @@ class MainConfig:
     How many batches to evaluate on. If None, evaluate on the entire eval dataLoader.
     Note, this might result in infinite evaluation if the eval dataLoader is not finite.
     """
-    early_stop_patience: int = 10 # Number of epochs with no accuracy improvement before training stops
+    early_stop_patience: int = 20 # Number of epochs with no accuracy improvement before training stops
     teacher_save_path: Optional[str] = None
 
     # Logging
@@ -171,18 +172,18 @@ class ConfigGroups:
     
     Numbers relate to M (image mech), S1 (spurious 1: box or floor colour) and S2 (spurious 2: MNIST or object scale) respectively in the ExpConfig names.
     """
-    exhaustive_configs = (
-        ExpConfig("C", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)), 
-        ExpConfig("B", ExperimentConfig(im_frac=0, m1_frac=1, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)), 
-        ExpConfig("M", ExperimentConfig(im_frac=0, m1_frac=0, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=False)), 
-        ExpConfig("MB", ExperimentConfig(im_frac=0, m1_frac=1, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=False)), 
-        ExpConfig("CM", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=False)),
-        ExpConfig("CB", ExperimentConfig(im_frac=1, m1_frac=1, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)), 
-        ExpConfig("CMB", ExperimentConfig(im_frac=1, m1_frac=1, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=False))
+    exhaustive = (
+        ExpConfig("I", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)), 
+        ExpConfig("A", ExperimentConfig(im_frac=0, m1_frac=1, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)), 
+        ExpConfig("B", ExperimentConfig(im_frac=0, m1_frac=0, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=False)), 
+        ExpConfig("AB", ExperimentConfig(im_frac=0, m1_frac=1, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=False)), 
+        ExpConfig("IB", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("IA", ExperimentConfig(im_frac=1, m1_frac=1, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)), 
+        ExpConfig("IAB", ExperimentConfig(im_frac=1, m1_frac=1, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=False))
     )
 
 
-    targeted_configs = (
+    targeted = (
         ExpConfig("No mechanisms (baseline): 100 0 0", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
         ExpConfig("Teacher one spurious: 100 0 60", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.6, rand_im=False, rand_m1=False, rand_m2=False)),
         ExpConfig("Teacher both spurious: 100 30 60", ExperimentConfig(im_frac=1, m1_frac=0.3, m2_frac=0.6, rand_im=False, rand_m1=False, rand_m2=False)),
@@ -191,7 +192,7 @@ class ConfigGroups:
     )
 
 
-    counterfactual_configs = (
+    targeted_cf = (
         ExpConfig("All mechanisms: 100 100 100", ExperimentConfig(im_frac=1, m1_frac=1, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=False)),
         ExpConfig("Only spurious: 0 100 100", ExperimentConfig(im_frac=0, m1_frac=1, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=False)),
         ExpConfig("Randomize S1: 100 R 100", ExperimentConfig(im_frac=1, m1_frac=1, m2_frac=1, rand_im=False, rand_m1=True, rand_m2=False)),

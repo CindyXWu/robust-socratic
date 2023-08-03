@@ -103,7 +103,7 @@ def get_saliency_map(
         Saliency map as a PyTorch tensor.
     """
     model.eval()  # Switch the model to evaluation mode
-    input.requires_grad_()
+    assert input.requires_grad
 
     scores = model(input)
     score_max_class = scores.argmax()
@@ -176,7 +176,11 @@ def train_teacher(teacher: nn.Module,
     no_improve_count = 0
     best_test_acc = 0.0
     
-    cf_dataloaders = get_counterfactual_dataloaders(config, config_groupname="exhaustive_configs")
+    if config.config_type == "TARGETED":
+        cf_groupname = "targeted_cf"
+    elif config.config_type == "EXHAUSTIVE":
+        cf_groupname = "exhaustive"
+    cf_dataloaders = get_counterfactual_dataloaders(config, cf_groupname)
     
     for epoch in range(config.epochs):
         print("Epoch: ", epoch)
@@ -273,17 +277,20 @@ def train_distill(
     assert batch_size == config.dataloader.train_bs
     input_dim = c*w*h
 
-    cf_dataloaders = get_counterfactual_dataloaders(config, config_groupname="counterfactual_configs")
+    if config.config_type == "TARGETED":
+        cf_groupname = "targeted_cf"
+    elif config.config_type == "EXHAUSTIVE":
+        cf_groupname = "exhaustive"
+    cf_dataloaders = get_counterfactual_dataloaders(config, cf_groupname)
 
     logging.info(config.nonbase_loss_frac)
     
     for epoch in range(config.epochs):
         for inputs, labels in tqdm(train_loader):
             inputs, labels = inputs.to(device), labels.to(device)
+            inputs.requires_grad_()
             scores, targets = student(inputs), teacher(inputs) 
-
-            # for param in student.parameters():
-            #     assert param.requires_grad
+            
             loss = base_distill_loss(
                         scores=scores, 
                         targets=targets, 
@@ -331,7 +338,7 @@ def train_distill(
             lr = scheduler.get_lr()
             train_loss = loss.detach().cpu().numpy()
 
-            # if it == 0: check_grads(student)
+            if it == 0: check_grads(student)
             if it % config.eval_frequency == 0:
                 train_acc = evaluate(student, train_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
                 test_acc, test_KL, test_top1 = counterfactual_evaluate(teacher, student, test_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, title=None, device=device)
@@ -360,29 +367,27 @@ def train_distill(
                 
                 wandb.log(results_dict)
                 
-                # Early stopping logic
-                if test_acc > best_test_acc:
-                    best_test_acc = test_acc
-                    no_improve_count = 0
-                    save_model(f"{config.student_save_path}", epoch, student, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
-                else:
-                    no_improve_count += 1
-                if no_improve_count >= config.early_stop_patience:
-                    print("Early stopping due to no improvement in test accuracy.")
-                    return
+                # Plot saliency map at each evaluation step
+                single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
+                saliency = get_saliency_map(student, single_image).squeeze().detach().cpu().numpy()
+                plt.imshow(saliency, cmap='hot')
+                plt.axis('off')
                 
-            it += 1
+                wandb.log({f"saliency_map_it{it}": [wandb.Image(plt)]}, step=it)
 
-        ## Visualise 3d tSNE at end of epoch
-        # if config.distill_loss_type == DistillLossType.JACOBIAN:
-        #     visualise_features_3d(s_map, t_map, title=run_name+"_"+str(it))
-        
-        # Plot saliency map at end of epoch
-        saliency = get_saliency_map(student, inputs[0].unsqueeze(0)).squeeze().detach().cpu().numpy()
-        plt.imshow(saliency, cmap='hot')
-        plt.axis('off')
-        
-        wandb.log({f"saliency_map_epoch{epoch}": [wandb.Image(plt)]}, step=it)
+                if it > config.min_iters: # Only consider early stopping beyond certain threshold
+                    # Early stopping logic
+                    if test_acc > best_test_acc:
+                        best_test_acc = test_acc
+                        no_improve_count = 0
+                        save_model(f"{config.student_save_path}", epoch, student, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
+                    else:
+                        no_improve_count += 1
+                    if no_improve_count >= config.early_stop_patience:
+                        print("Early stopping due to no improvement in test accuracy.")
+                        return
+                
+            it += 1 
 
 
 def check_grads(model: nn.Module):
