@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 
 import numpy as np
 import wandb
-import logging
+from einops import rearrange
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from collections import defaultdict
@@ -18,7 +18,7 @@ from losses.feature_match import feature_extractor
 from models.resnet_ap import CustomResNet18, CustomResNet50
 from config_setup import MainConfig, DistillLossType, DistillConfig
 from constructors import get_counterfactual_dataloaders
-from plotting_common import plot_images, plot_saliency_map
+from plotting_common import plot_images
 
 from typing import Optional, List, Dict
     
@@ -238,18 +238,6 @@ def train_teacher(teacher: nn.Module,
             
             it += 1
 
-        # Plot saliency map at end of epoch
-        single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
-        saliency_map = get_saliency_map(teacher, single_image).squeeze().detach().cpu().numpy()
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5))  # Create a figure with 2 subplots side by side
-
-        # Assuming `image` is your original image and `saliency_map` is your saliency map
-        axs[0].imshow(single_image)
-        axs[0].set_title("Original Image")
-        axs[1].imshow(saliency_map)
-        axs[1].set_title("Saliency Map")
-        plt.tight_layout()  # Adjust the layout so that plots do not overlap
-
         wandb.log({f"image_and_saliency_map_it_{it}": [wandb.Image(fig)]}, step=it)
         
     save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
@@ -295,8 +283,6 @@ def train_distill(
     elif config.config_type == "EXHAUSTIVE":
         cf_groupname = "exhaustive"
     cf_dataloaders = get_counterfactual_dataloaders(config, cf_groupname)
-
-    logging.info(config.nonbase_loss_frac)
     
     for epoch in range(config.epochs):
         for inputs, labels in tqdm(train_loader):
@@ -379,6 +365,21 @@ def train_distill(
                 }}
                 
                 wandb.log(results_dict)
+                
+                # Get saliency map
+                single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
+                saliency_map = get_saliency_map(student, single_image).squeeze().detach().cpu().numpy()
+                
+                # Plot saliency map
+                fig, axs = plt.subplots(1, 2, figsize=(10, 5))  # Create a figure with 2 subplots side by side
+                single_image = rearrange(single_image.squeeze(0).detach().cpu().numpy(), 'c h w -> h w c')
+                axs[0].imshow(single_image)
+                axs[0].set_title("Original Image")
+                axs[1].imshow(saliency_map)
+                axs[1].set_title("Saliency Map")
+                plt.tight_layout()  # Adjust the layout so that plots do not overlap
+
+                wandb.log({f"image_and_saliency_map_it_{it}": [wandb.Image(fig)]}, step=it)
 
                 if it > config.min_iters: # Only consider early stopping beyond certain threshold
                     # Early stopping logic
@@ -393,20 +394,6 @@ def train_distill(
                         return
              
             it += 1 
-
-        # Plot saliency map at end of epoch
-        single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
-        saliency_map = get_saliency_map(student, single_image).squeeze().detach().cpu().numpy()
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5))  # Create a figure with 2 subplots side by side
-
-        # Assuming `image` is your original image and `saliency_map` is your saliency map
-        axs[0].imshow(single_image)
-        axs[0].set_title("Original Image")
-        axs[1].imshow(saliency_map)
-        axs[1].set_title("Saliency Map")
-        plt.tight_layout()  # Adjust the layout so that plots do not overlap
-
-        wandb.log({f"image_and_saliency_map_it_{it}": [wandb.Image(fig)]}, step=it)
 
     save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
 

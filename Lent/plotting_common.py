@@ -1,22 +1,14 @@
-from collections import defaultdict
-import pandas as pd
+"""Common functions for quick visualisations."""
 import numpy as np
 import os
 import einops
 import torch
-import warnings
 from torch.utils.data import DataLoader
-from labellines import labelLines
-from typing import List, Optional, Dict, Tuple
 
 import matplotlib.pyplot as plt
-import matplotlib as mpl
-from scipy.signal import savgol_filter
-import seaborn as sns
-import wandb
-from wandb.sdk.wandb_run import Run
 from sklearn.manifold import TSNE
 
+from typing import Optional
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 image_dir = "images/"
@@ -47,13 +39,6 @@ def show_images_grid(imgs_, class_labels, num_images, title=None):
     else:
         plt.show()
         
-        
-def plot_saliency_map(saliency: torch.Tensor, title: str) -> None:
-    plt.imshow(saliency.cpu(), cmap=plt.cm.hot)
-    plt.axis('off')
-    plt.title(title)
-    plt.savefig(f'{image_dir}/{title}.png')
-
 
 def plot_images(dataloader: DataLoader, num_images: int, title: Optional[str] = None):
     for i, (x, y) in enumerate(dataloader):

@@ -11,8 +11,8 @@ from scipy.signal import savgol_filter
 import seaborn as sns
 import wandb
 from wandb.sdk.wandb_run import Run
-from sklearn.manifold import TSNE
 
+from info_dicts import *
 from plotting_common import show_images_grid, plot_images_grid, plot_saliency_map
 
 

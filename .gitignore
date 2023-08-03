@@ -9,3 +9,5 @@ slurm_script.txt
 data/*
 
 **/outputs/
+
+**/multirun/
