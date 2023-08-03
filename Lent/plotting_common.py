@@ -18,29 +18,37 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 image_dir = "images/"
 if not os.path.exists(image_dir):
     os.makedirs(image_dir)
-    
+
 
 def plot_PIL_batch(dataloader: DataLoader, num_images: int) -> None:
     """Returns PIL image of batch for later logging to WandB."""
     images, labels = next(iter(dataloader))
     images = images[:num_images]
     labels = labels[:num_images]
-    
-    cols = round(math.sqrt(num_images))
-    rows = math.ceil(num_images / cols)
-
-    fig = plt.figure(figsize=(16, 16))
-    for idx in range(num_images):
-        ax = fig.add_subplot(rows, cols, idx+1, xticks=[], yticks=[])
-        img = images[idx].numpy()
-        ax.imshow(np.transpose(img, (1, 2, 0)))
-        ax.set_title("Class: " + str(labels[idx].item()))
 
     grid = torchvision.utils.make_grid(images).numpy()
     grid = np.transpose(grid, (1, 2, 0))
-    
-    return grid
-    
+
+    cols = round(math.sqrt(num_images))
+    rows = math.ceil(num_images / cols)
+
+    fig, axs = plt.subplots(rows, cols, figsize=(16, 16))
+
+    # Loop over all subplots and add images with labels
+    for i, ax in enumerate(axs.flat):
+        # Transpose image from (C, H, W) to (H, W, C) for plotting
+        img = np.transpose(images[i].numpy(), (1, 2, 0))
+        ax.imshow(img)
+        ax.set_title("Class: " + str(labels[i].item()))
+        ax.set_xticks([]), ax.set_yticks([])
+
+    # Remove empty subplots
+    if num_images < rows*cols:
+        for idx in range(num_images, rows*cols):
+            fig.delaxes(axs.flatten()[idx])
+            
+    return fig
+
     
 def show_images_grid(imgs_, class_labels, num_images, title=None):
     """Now modified to show both [c h w] and [h w c] images."""
