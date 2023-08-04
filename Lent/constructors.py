@@ -92,7 +92,10 @@ def create_dataloaders(config: MainConfig,
     
     if exp_config is None: # TRAINING DATALOADERS
         batch_size = config.dataloader.train_bs
-        im_frac, m1_frac, m2_frac, rand_im, rand_m1, rand_m2 = OmegaConf.to_container(config.experiment.experiment_config).values()
+        if 'student_save_path' in config and config.student_save_path is not None: # Distillation
+            experiment = config.experiment_s
+        else: experiment = config.experiment # Teacher training
+        im_frac, m1_frac, m2_frac, rand_im, rand_m1, rand_m2 = OmegaConf.to_container(experiment.experiment_config).values()
     else: # COUNTERFACTUAL DATALOADERS - TEST
         batch_size = config.dataloader.test_bs
         im_frac, m1_frac, m2_frac, rand_im, rand_m1, rand_m2 = asdict(exp_config).values()
