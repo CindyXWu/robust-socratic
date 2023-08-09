@@ -144,6 +144,8 @@ class DistillConfig(MainConfig):
     s_layer: Optional[str] = None
     t_layer: Optional[str] = None
     
+    use_early_stop = False
+    
     student_save_path: Optional[str] = None
 
 

@@ -384,7 +384,7 @@ def train_distill(
 
                 wandb.log({f"image_and_saliency_map_it_{it}": [wandb.Image(fig)]}, step=it)
 
-                if it > config.min_iters: # Only consider early stopping beyond certain threshold
+                if it > config.min_iters and config.use_early_stop: # Only consider early stopping beyond certain threshold, and if we set the model to train with early-stop
                     # Early stopping logic
                     if test_acc > best_test_acc:
                         best_test_acc = test_acc
