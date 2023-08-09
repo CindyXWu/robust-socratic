@@ -24,9 +24,10 @@ cs = ConfigStore.instance()
 cs.store(name="config_base", node=DistillConfig)
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    
+        
+        
 @hydra.main(config_path="configs/", config_name="distill_config", version_base=None)
-def main(config: DistillConfig, sweep_params: list[str] = None) -> None:
+def main(config: DistillConfig) -> None:
     """config is typed as MainConfig for duck-typing, but during runtime it's actually an OmegaConf object.
     
     The MainConfig class (or any dataclass you use as a type hint for the config parameter) doesn't restrict what keys can be in the configuration; it only provides additional information to your editor and to Hydra's instantiate function. The actual contents of the configuration are determined entirely by the configuration files and command line arguments.
@@ -51,11 +52,11 @@ def main(config: DistillConfig, sweep_params: list[str] = None) -> None:
     config.wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type}"
     config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}, S Mech: {s_exp_idx} {s_exp_name}, Loss: {config.distill_loss_type}"
     logger_params = {
-    "name": config.wandb_run_name,
-    "project": config.wandb_project_name,
-    "settings": wandb.Settings(start_method="thread"),
-    "config": OmegaConf.to_container(config, resolve=True, throw_on_missing=True),
-    "mode": "disabled" if not config.log_to_wandb else "online",
+        "name": config.wandb_run_name,
+        "project": config.wandb_project_name,
+        "settings": wandb.Settings(start_method="thread"),
+        "config": OmegaConf.to_container(config, resolve=True, throw_on_missing=True),
+        "mode": "disabled" if not config.log_to_wandb else "online",
     }
     wandb.init(**logger_params)
     # Probably won't do sweeps over these - okay to put here relative to call to update_with_wandb_config() below
@@ -116,15 +117,16 @@ def update_with_wandb_config(config: OmegaConf, sweep_params: list[str]) -> Omeg
 
 if __name__ == "__main__":
     """May have to edit this hard coding opening one single config file in the future."""
+    # Ugly global variables because WandB sweep agent is annoying AF
     config: dict = load_config('configs/distill_config.yaml')
-    if config.get("sweep"):
+    if config.get("is_sweep"):
+        config.wandb_project_name = f"DISTILL {config['model_type']} {config['dataset_type']} {config['config_type']}"
         sweep_config = construct_sweep_config('distill_config', 'sweep_configs')
-        sweep_params = list(sweep_config.parameters.keys())
-        main_with_sweep = partial(main, config=config, sweep_params=sweep_params)
+        sweep_params = list(sweep_config['parameters'].keys())
         sweep_id = wandb.sweep(
             sweep=sweep_config,
             project=config.get("wandb_project_name"),
         )
-        wandb.agent(sweep_id, function=main_with_sweep, count=10)
+        wandb.agent(sweep_id, function=main, count=20)
     else:
         main()

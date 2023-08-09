@@ -257,9 +257,12 @@ def train_distill(
         N_its: Number of iterations to train for.
         its_per_log: Number of iterations between logging.
     """
+    # Some checks for model saving
+    if config.is_sweep:
+        assert config.save_model is False or config.save_model_as_artifact is False, "Don't save model during sweep"
     # Really important: reset model weights compared to default initialisation
     if isinstance(student, CustomResNet18) or isinstance(student, CustomResNet50):
-        student.weight_reset()
+        student.weight_reset()  
     teacher.eval()
     student.train()
     train_acc_list, test_acc_list = [], []
@@ -389,7 +392,8 @@ def train_distill(
                     if test_acc > best_test_acc:
                         best_test_acc = test_acc
                         no_improve_count = 0
-                        save_model(f"{config.student_save_path}", epoch, student, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
+                        if config.save_model: # May run sweeps where you don't want to save model
+                            save_model(f"{config.student_save_path}", epoch, student, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
                     else:
                         no_improve_count += 1
                     if no_improve_count >= config.early_stop_patience:
@@ -398,7 +402,8 @@ def train_distill(
              
             it += 1 
 
-    save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
+    if config.save_model:
+        save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
 
 
 def check_grads(model: nn.Module):

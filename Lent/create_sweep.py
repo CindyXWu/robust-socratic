@@ -16,15 +16,15 @@ def construct_sweep_config(main_config_name: str, sweep_config_name: str) -> dic
     sweep_config = load_config(f'configs/{sweep_config_name}.yaml')
     default_config = {
         "method": "bayes",
-        "metric": {"name": "train.loss", "goal": "minimize"},
-        "name": f"lr_sweep_{main_config.get('dataset_type')}_{main_config.get('model_type')}",
+        "metric": {"name": "S Loss", "goal": "minimize"},
+        "name": f"sweep_{main_config.get('dataset_type')}_{main_config.get('model_type')}",
         # "program": "run.py",
         # "command": ["${env}", "${interpreter}", "${program}", "--file_path", "${args_json_file}"],
         "parameters": {
-            "default_lr": {
-                "distribution": "uniform",
-                "min": 1e-4,
-                "max": 1e-1
+            "nonbase_loss_frac": {
+                "distribution": "log_uniform",
+                "min": 0.01,
+                "max": 0.5
             },
         },
         'early_terminate': {'type': 'hyperband', 'min_iter': 5}
