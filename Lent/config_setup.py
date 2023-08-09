@@ -143,6 +143,7 @@ class DistillConfig(MainConfig):
     s_layer: Optional[str] = None
     t_layer: Optional[str] = None
     
+    save_model: Optional[bool] = False
     student_save_path: Optional[str] = None
 
 

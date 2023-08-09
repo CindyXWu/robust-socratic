@@ -107,7 +107,7 @@ def update_with_wandb_config(config: OmegaConf, sweep_params: list[str]) -> Omeg
 if __name__ == "__main__":
     """May have to edit this hard coding opening one single config file in the future."""
     config: dict = load_config('configs/main_config.yaml')
-    if config.get("sweep"):
+    if config.get("is_sweep"):
         sweep_config = construct_sweep_config('main_config', 'sweep_configs')
         sweep_params = list(sweep_config.parameters.keys())
         main_with_sweep = partial(main, config=config, sweep_params=sweep_params)
@@ -115,6 +115,6 @@ if __name__ == "__main__":
             sweep=sweep_config,
             project=config.get("wandb_project_name"),
         )
-        wandb.agent(sweep_id, function=main_with_sweep, count=10)
+        wandb.agent(sweep_id, function=main_with_sweep, count=20)
     else:
         main()
