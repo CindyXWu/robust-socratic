@@ -91,7 +91,6 @@ class OptimizerConfig:
     optimizer_kwargs: Optional[dict[str, Any]] = field(default_factory=dict)
 
 
-# TODO: Consider making this a MainConfig and creating a separate DistillConfig
 @dataclass
 class MainConfig:
     """Does not include which config group to load experiment from. This is specified from command line via Hydra multirun."""

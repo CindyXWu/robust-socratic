@@ -220,11 +220,15 @@ class domCueDataset(Dataset):
         loc = np.random.randint(0, 10) if self.randomize_box else (label % 10)
         box_size = mask.shape[1] // self.box_cue_size # Adjustable box cue size
         
-        if self.n_classes == 10 or (self.randomize_box and self.n_classes == 100):
-            box_color = torch.rand((3, box_size, box_size))
-        elif self.n_classes == 100 and not self.randomize_box:
-            box_colors: List[np.ndarray] = generate_mandelbrot_images(10, 10)
-            box_color = torch.from_numpy(box_colors[label % 10]).float() # Make sure data type is torch.float32
+        # if self.n_classes == 10 or (self.randomize_box and self.n_classes == 100):
+        #     box_color = torch.rand((3, box_size, box_size))
+        # elif self.n_classes == 100 and not self.randomize_box:
+        #     box_colors: List[np.ndarray] = generate_mandelbrot_images(10, 10)
+        #     box_color = torch.from_numpy(box_colors[label % 10]).float() # Make sure data type is torch.float32
+        
+        # Pattern also depends on class, as well as position
+        box_colors: List[np.ndarray] = generate_mandelbrot_images(num_images=self.n_classes, size=box_size)
+        box_color = torch.from_numpy(box_colors[label % 10]).float()
 
         w, h = mask.shape[1], mask.shape[2] # Same dimensions as image
 
@@ -322,6 +326,12 @@ def mandelbrot_set(
     return (r1,r2,np.array([[mandelbrot(complex(r, i),max_iter) for r in r1] for i in r2]))
 
 
+def crop_image(image: np.ndarray, top_left: Tuple[int, int], size: int) -> np.ndarray:
+    """Crop the image based on the top-left corner and desired size."""
+    x, y = top_left
+    return image[:, y:y+size, x:x+size]
+
+
 def generate_mandelbrot_images(
     num_images: int,
     size: int,
@@ -335,7 +345,15 @@ def generate_mandelbrot_images(
         width = size
         height = size
         _, _, M = mandelbrot_set(xmin,xmax,ymin,ymax,width,height,max_iter)
-        images.append(M)
+        
+        # Convert the grayscale values (iteration counts) to colors using a colormap.
+        color_image = plt.cm.viridis(M / max_iter)[:, :, :3]  # RGB channels
+        
+        # Convert to format [channels x height x width]
+        transposed_image = np.transpose(color_image, (2, 0, 1))
+        
+        images.append(transposed_image)
+        
     return images
 
 

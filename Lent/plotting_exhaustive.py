@@ -2,18 +2,20 @@ from collections import defaultdict
 import pandas as pd
 import numpy as np
 import os
-from labellines import labelLines
-from typing import List, Optional, Dict, Tuple
-
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-from scipy.signal import savgol_filter
-import seaborn as sns
+from types import SimpleNamespace
+import yaml
+import logging
 import wandb
 from wandb.sdk.wandb_run import Run
 
-from info_dicts import *
-from plotting_common import show_images_grid, plot_images_grid, plot_saliency_map
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+from labellines import labelLines
+from scipy.signal import savgol_filter
+import seaborn as sns
+from typing import List, Optional, Dict, Tuple
+
+from config_setup import ConfigGroups, DistillConfig
 
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -27,40 +29,45 @@ sns.set_style("whitegrid")
 sns.set_palette("pastel")
 
 
-def heatmap_get_data(project_name: str, 
-                   t_num: int, 
-                   s_num: int, 
-                   exp_dict: dict[str, List],
-                   groupby_metrics: List[str],
-                   s_mech: Optional[int] = None,
-                   t_mech: Optional[int] = None,
-                   loss_num: Optional[int] = None) -> List[pd.DataFrame]:
+def heatmap_get_data(project_name: str,
+                     loss_name: str,
+                     groupby_metrics: List[str],) -> List[pd.DataFrame]:
     """Get data from wandb for experiment set, filter and group. 
-    Calculate mean/var of metrics and return historical information with mean/var interleaved."""
+    
+    Calculate mean/var of metrics and return a list of history dataframes with mean/var interleaved.
+    """
     runs = api.runs(project_name) 
-    teacher = teacher_dict[t_num]
-    student = student_dict[s_num]
-    t_mech = list(exp_dict.keys())[t_mech] if t_mech != None else None
-    s_mech = list(exp_dict.keys())[s_mech] if s_mech != None else None
-    loss = loss_dict[loss_num]
     filtered_runs = []
+    min_step = 300 # Filter partially logged/unfinished runs
 
-    # Don't filter for t_mech when running for heatmap data
-    # Filter by above settings and remove any crashed or incomplete runs
+    # Don't filter for teacher experiment type for heatmap data
+    # Filter for loss and remove crashed/incomplete runs
     for run in runs:
-        if run.config.get('loss') == loss:
+        if run.config.get('distill_loss_type') == loss_name:
             history = run.history()
-            if '_step' in history.columns and history['_step'].max() >= 50:
+            if '_step' in history.columns and history['_step'].max() >= min_step:
                 filtered_runs.append(run)
-                # Clean history of NaNs
-                history = clean_history(history)
-                # Filter history
+                history = drop_image_columns(history) # Remove artifacts
+                history = clean_history(history) # Remove NaNs
                 #history = smooth_history(history)
                 run.history  = history
+    # Check list of runs is not empty
     assert(len(filtered_runs) > 0), "No runs found with the given settings"
-    grouped_runs = get_grouped_runs(filtered_runs, groupby_metrics)
+    
+    """Key of form: tuple of groupby metrics (in order it's passed in, in groupby_metrics)"""
+    grouped_runs: Dict = get_grouped_runs(filtered_runs, groupby_metrics)
+    assert all(key is not None for key in grouped_runs.keys()), "Key is None"
+    
+    # Compute means/var for all metrics for each group of runs
+    histories = create_histories_list(grouped_runs, mode='exhaustive')
+    return histories
 
-    # Compute the means and variances for all of the metrics for each group of runs
+
+def create_histories_list(
+    grouped_runs: Dict[tuple, List],
+    mode: str,
+    **kwargs) -> List[pd.DataFrame]:
+
     histories = []
     for key, runs in grouped_runs.items():
         metrics = defaultdict(list)
@@ -69,116 +76,93 @@ def heatmap_get_data(project_name: str,
             for metric in history.columns:
                 metrics[metric].append(history[[metric]])
 
-        # Calculate the mean and variance for each metric between repeat runs
-        means_and_vars = {}
+        means_and_vars_list = []
         for metric, metric_values in metrics.items():
             combined = pd.concat(metric_values)
-            mean = combined.groupby(combined.index)[metric].mean().reset_index().rename(columns={metric: f'{metric} Mean'})
-            var = combined.groupby(combined.index)[metric].var().reset_index().rename(columns={metric: f'{metric} Var'})
-            means_and_vars[metric] = mean.merge(var, left_index=True, right_index=True)
+            mean = combined.groupby(combined.index)[metric].mean().rename(f'{metric} Mean')
+            var = combined.groupby(combined.index)[metric].var().rename(f'{metric} Var')
+            means_and_vars_list.append(pd.concat([mean, var], axis=1))
 
-        # Combine the means and vars for each metric into a single dataframe
-        first_metric = list(means_and_vars.keys())[0]
-        combined = means_and_vars[first_metric]
-        for metric in list(means_and_vars.keys())[1:]:
-            combined = combined.merge(means_and_vars[metric], left_index=True, right_index=True)
+        combined = pd.concat(means_and_vars_list, axis=1)
 
-        combined['Group Name'] = [('T: '+mech_map[key[0]]+', S: '+mech_map[key[1]])] * len(combined)
+        if mode == 'exhaustive': # For heatmaps
+            combined['Group Name'] = [{'T': key[0], 'S': key[1]}]*len(combined)
+        elif mode == 'vstime': # For vstime - must pass in extra info via kwargs
+            plot_tmechs_together = kwargs.get('plot_tmechs_together')
+            if plot_tmechs_together is None:
+                raise ValueError("plot_tmechs_together must be provided")
+            if plot_tmechs_together:
+                combined['Group Name'] = [{'T': key[0], 'S': key[1]}] * len(combined)
+            else: # Student only in Group Name
+                combined['Group Name'] = [key[1]] * len(combined)
+        else: raise ValueError("Mode must be 'exhaustive' or 'vstime'")
+                
         histories.append(combined)
 
-    # histories = get_histories(grouped_runs)
     return histories
-
-
-def wandb_get_data(project_name: str, 
-                   t_num: int, 
-                   s_num: int, 
-                   exp_dict: dict[str, List],
+    
+    
+def wandb_get_data(project_name: str,
+                   config: DistillConfig,
                    groupby_metrics: List[str],
-                   s_mech: Optional[int] = None,
-                   t_mech: Optional[int] = None,
-                   loss_num: Optional[int] = None,
                    plot_tmechs_together: Optional[bool] = False) -> List[pd.DataFrame]:
     """Get data from wandb for experiment set, filter and group. 
-    Calculate mean/var of metrics and return historical information with mean/var interleaved."""
+    For plotting over training time.
+    
+    Args:
+        config: DistillConfig object containing experiment settings.
+        groupby_metrics: List of metrics to group runs by (e.g. ["teacher mechanism", "student mechanism"]).
+        plot_tmechs_together: Whether to plot teacher mechanisms together or separately. If plotted together, then each run also needs to be labelled with its teacher experiment type.
+    """
     runs = api.runs(project_name) 
-    teacher = teacher_dict[t_num]
-    student = student_dict[s_num]
-    t_mech = list(exp_dict.keys())[t_mech] if t_mech != None else None
-    s_mech = list(exp_dict.keys())[s_mech] if s_mech != None else None
-    loss = loss_dict[loss_num]
     filtered_runs = []
+    min_step = 300 # Filter partially logged/unfinished runs
 
     for run in runs:
-        if (run.config.get('teacher') == teacher and 
-            run.config.get('student') == student and
-            run.config.get('teacher_mechanism') == t_mech and
-            run.config.get('loss') == loss):
+        if (run.config.get('model_type') == config.model_type and 
+            run.config.get('experiment.name') == config.experiment.name and
+            run.config.get('distill_loss_type') == config.distill_loss_type):
             try:
                 history = run.history()
             except:
                 history = run.history
-            if '_step' in history.columns and history['_step'].max() >= 10:
+            if '_step' in history.columns and history['_step'].max() >= min_step:
                 filtered_runs.append(run)
-                # Clean history of NaNs
-                history = clean_history(history)
-                # Filter history
-                run.history = smooth_history(history)
+                history = drop_image_columns(history) # Remove artifacts
+                history = clean_history(history) # Remove NaNs
+                run.history = smooth_history(history) # Smooth bumpy plots
 
-    assert(len(filtered_runs) > 0), f'No runs found: tmech {t_mech} loss {loss}'
-    grouped_runs = get_grouped_runs(filtered_runs, groupby_metrics)
+    assert(len(filtered_runs) > 0), f"No runs found: teacher experiment {config.experiment.name} loss {config.distill_loss_type}"
+    
+    # Group filtered runs: key is tuple of values of metrics specified in groupby_metrics (e.g. "teacher mechanism"). Values = list of runs satisfying these metric values.
+    grouped_runs: Dict = get_grouped_runs(filtered_runs, groupby_metrics)
 
-    # Compute the means and variances for all of the metrics for each group of runs
-    histories = []
-    for key, runs in grouped_runs.items():
-        metrics = defaultdict(list)
-        for run in runs:
-            history = run.history
-            for metric in history.columns:
-                metrics[metric].append(history[[metric]])
-
-        # Calculate the mean and variance for each metric between repeat runs
-        means_and_vars = {}
-        for metric, metric_values in metrics.items():
-            combined = pd.concat(metric_values)
-            mean = combined.groupby(combined.index)[metric].mean().reset_index().rename(columns={metric: f'{metric} Mean'})
-            var = combined.groupby(combined.index)[metric].var().reset_index().rename(columns={metric: f'{metric} Var'})
-            means_and_vars[metric] = mean.merge(var, left_index=True, right_index=True)
-
-        # Combine the means and vars for each metric into a single dataframe
-        first_metric = list(means_and_vars.keys())[0]
-        combined = means_and_vars[first_metric]
-        for metric in list(means_and_vars.keys())[1:]:
-            combined = combined.merge(means_and_vars[metric], left_index=True, right_index=True)
-
-        # Name each row of the dataframe with the values of the grouped metrics
-        # **Use shortened names for mechs**
-        if plot_tmechs_together:
-            combined['Group Name'] = [('T: '+mech_map[key[0]]+', S: '+mech_map[key[1]])] * len(combined)
-        else:
-            combined['Group Name'] = [('S: '+mech_map[key[1]])] * len(combined)
-        histories.append(combined)
-
-    # histories = get_histories(grouped_runs)
+    histories = create_histories_list(grouped_runs, mode='vstime', plot_tmechs_together=plot_tmechs_together)
+    
     return histories
 
 
-def plot_counterfactual_heatmaps(combined_history: List[pd.DataFrame], exp_dict: Dict[str, List], loss_num: int) -> Dict[str, np.ndarray]:
+def plot_counterfactual_heatmaps(
+    combined_history: List[pd.DataFrame], 
+    exp_names: str,
+    loss_name: str) -> Dict[str, np.ndarray]:
+    """
+    Args:
+        exp_names: ordered list of experiment names to plot.
+    """
     data_to_plot = {}
     axes_labels = []
-    num_keys = len(exp_dict.keys())
-    loss = loss_dict[loss_num]
+    num_keys = len(exp_names)
 
-    for i, key in enumerate(list(exp_dict.keys())):
+    for i, key in enumerate(exp_names):
         data_to_plot[key] = np.zeros((num_keys, num_keys))
-        axes_labels.append(mech_map_names[i])
+        axes_labels.append(exp_names[i])
                            
     for history in combined_history:
-        name = history['Group Name'].iloc[0]
-        mechs= name.split(', ')
-        row = mech_map_names.index(mechs[1].replace('S: ' , ''))
-        col = mech_map_names.index(mechs[0].replace('T: ', ''))
-        for key in exp_dict.keys():
+        mechs = history['Group Name'].iloc[0]
+        row = exp_names.index(mechs['S'])
+        col = exp_names.index(mechs['T'])
+        for key in exp_names:
             data_to_plot[key][row, col] = history[f'{key} Mean'].loc[history[f'{key} Mean'].last_valid_index()]
 
     for key, data in data_to_plot.items():
@@ -190,50 +174,77 @@ def plot_counterfactual_heatmaps(combined_history: List[pd.DataFrame], exp_dict:
         ax.set_xlabel('Teacher Training Mechanism', fontsize=15)
         ax.set_ylabel('Student Training Mechanism', fontsize=15)
         # ax.set_title(f'Counterfactual {key.replace("_", " ")} Test Accuracy - {loss} Loss')
-        plt.savefig(f'images/heatmaps/{loss}/'+key+'.png', dpi=300, bbox_inches='tight')
+        plt.savefig(f'images/heatmaps/{loss_name}/{key}.png', dpi=300, bbox_inches='tight')
 
 
-def get_grouped_runs(runs: List[Run], groupby_metrics: List[str]) -> Dict[Tuple[str, ...], List[Run]]:
-    """Key = value of metrics specified in groupby_metrics (e.g. "teacher mechanism"). Values = list of runs satisfying these metric values."""
-    grouped_runs = defaultdict(list)
-    for run in runs:
-        key = tuple([run.config.get(m) for m in groupby_metrics])
-        grouped_runs[key].append(run)
-    return grouped_runs
-
+def drop_image_columns(df):
+    """Where images have been logged, run.history will return artifacts also. 
+    This function removes these artifacts from the history dictionary.
+    """
+    cols_to_drop = []
+    for col in df.columns:
+        if any(isinstance(i, dict) for i in df[col]):
+            cols_to_drop.append(col)
+    df = df.drop(columns=cols_to_drop)
+    return df
+            
 
 def clean_history(history: pd.DataFrame) -> pd.DataFrame:
     """Remove any NaN datapoints individually due to data logging bug where wandb believes logging data as separate dictionaries is a new timstep at each call."""
     history_clean = pd.DataFrame()
+    
     for col in history.columns:
         if not col.startswith('_'):
             col_array = history[col].values
             col_array_clean = col_array[~np.isnan(col_array)]
             history_clean[col] = pd.Series(col_array_clean)
     history_clean.reset_index(drop=True, inplace=True)
+    
     return history_clean
 
 
 def smooth_history(history: pd.DataFrame, 
                    window_length: Optional[int]=5, 
                    polyorder: Optional[int] = 3) -> pd.DataFrame:
+    """Smooth each column in the DataFrame, interpolating for NaNs."""
     nan_mask = history.isna()
-    # Smooth each column in the DataFrame, interpolating for NaNs
     filtered_history = history.interpolate().apply(lambda x: savgol_filter(x, window_length, polyorder, mode='mirror'))
     filtered_history[nan_mask] = np.nan # Apply the NaN mask to the filtered history
+    
     return filtered_history
 
+        
+def get_grouped_runs(runs: List[Run], groupby_metrics: List[str]) -> Dict[Tuple[str, ...], List[Run]]:
+    """Key = value of metrics specified in groupby_metrics (e.g. "teacher mechanism"). Values = list of runs satisfying these metric values."""
+    grouped_runs = defaultdict(list)
+    
+    for run in runs:
+        key = tuple([get_nested_value(run.config, m) for m in groupby_metrics])
+        grouped_runs[key].append(run)
+        
+    return grouped_runs
 
-def get_order_list(exp_dict: Dict[str, List]) -> Tuple[List, List]:
+
+def get_nested_value(d: dict, keys_str: str):
+    """Helper function for the above get_grouped_runs function which deals with nested dictionaries."""
+    keys = keys_str.split('.')
+    for key in keys:
+        if d is None or not isinstance(d, dict):
+            return None
+        d = d.get(key)
+    return d
+
+
+def get_order_list(exp_names: List) -> List:
     """Order of subplots by metric name - used to make grouped plots make sense"""
     const_graph_list = ['T-S Top 1 Fidelity', 'T-S KL', 'T-S Test Difference']
-    dataset_specific_mechs = list(exp_dict.keys())
-    order_list = dataset_specific_mechs + const_graph_list
+    order_list = exp_names + const_graph_list
     return order_list
 
 
 def custom_sort(col: str, type: str) -> int:
-    order_list = get_order_list(exp_dict)
+    order_list = get_order_list(exp_names)
+    
     """Used to sort the order of the subplots in the grouped plots."""
     match type:
         case 'acc':
@@ -242,6 +253,7 @@ def custom_sort(col: str, type: str) -> int:
             metric_name = col.replace(' T_S KL Mean', '')
         case 'fidelity':
             metric_name = col.replace(' T_S Top 1 Fidelity Mean', '')
+            
     if metric_name in order_list:
         return order_list.index(metric_name)
     else:
@@ -253,6 +265,8 @@ def make_plot(histories: List[pd.DataFrame],
               title: str, 
               mode: str) -> None:
     """
+    For plots over time.
+    
     Args:
         histories: List of dataframes containing historical information for each group of runs.
         cols: List of column names to plot.
@@ -304,8 +318,8 @@ def make_plot(histories: List[pd.DataFrame],
                                     history[mean_col] - history[var_col].apply(np.sqrt),
                                     history[mean_col] + history[var_col].apply(np.sqrt),
                                     alpha=0.2)
-                # the key to matching the legend to the lines is to check the order of dominoes_exp_dict.keys() cos I don't think these correspond to plotting order
-                print("group_name: ", group_name, "line_num: ", line_num, "actual_group_names: ", actual_group_names[line_num])
+                # The key to matching the legend to lines is to check order of dominoes_exp_dict.keys() - these don't correspond to plotting order
+                print("Group name: ", group_name, "Line num: ", line_num, "actual_group_names: ", actual_group_names[line_num])
                 if i == 0:  # Only add legend handles once per group (correspond to first subplot)
                     legend_handles.append(mpl.lines.Line2D([0], [0], 
                                                            color=color_dict[group_name], 
@@ -348,29 +362,48 @@ def counterfactual_plot(histories: pd.DataFrame, exp_dict: Dict[str, List], titl
 
 
 def wandb_plot(histories: List[pd.DataFrame], title: str) -> None:
-    mean_cols = [col for col in histories[0].columns if col.replace(' Mean', '') in list(dominoes_exp_dict.keys())] 
+    """Extract unique column group names and plot them on separate plots - for plotting over training time."""
+    mean_cols = [col for col in histories[0].columns if col.replace(' Mean', '') in exp_names]
     mean_cols.sort(key=lambda col: custom_sort(col, 'acc'))
     make_plot(histories, mean_cols, title, 'acc')
 
 
-if __name__ == "__main__":
-    actual_group_names = ['CIFAR10 MNIST Box', 'CIFAR10 Box', 'CIFAR10 MNIST', 'MNIST Box', 'Box', 'MNIST', 'CIFAR10']
-    
-    title = 'Jacobian Matching Distillation'
-    mode = 1 # 0 for heatmap, 1 for plots
-    loss_num = 1
+def recursive_namespace(data):
+    """Unpack YAML file into dot notation indexable form."""
+    if isinstance(data, dict):
+        return SimpleNamespace(**{k: recursive_namespace(v) for k, v in data.items()})
+    return data
 
-    exp_dict = dominoes_exp_dict 
-    loss_names = ['Base', 'Jacobian']
+
+if __name__ == "__main__":
+    # Somewhat immutable things
+    exp_names = [config.name for config in ConfigGroups.exhaustive]
+    actual_group_names = ["I", "A", "B", "AB", "IB", "IA", "IAB"] # Actual order of names here
+    loss_names = ['BASE', 'JACOBIAN']
+    
+    # Configs - amazing part of using config YAML is I can load all settings in
+    config_filename = "distill_config"
+    with open(f"configs/{config_filename}.yaml", 'r') as stream:
+        config = yaml.safe_load(stream)
+    config = recursive_namespace(config)
+    wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type}"
+    
+    # To be changed
+    mode = 0 # 0 for heatmap, 1 for plots
+    groupby_metrics = ["experiment.name","experiment_s.name"]
 
     if mode == 0:
-        # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-        histories = heatmap_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=2, loss_num=loss_num)
-        plot_counterfactual_heatmaps(histories, dominoes_exp_dict, loss_num)
+        for loss_name in loss_names:
+            # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
+            histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, groupby_metrics=groupby_metrics)
+        
+            plot_counterfactual_heatmaps(histories, exp_names, loss_name)
+            
     elif mode == 1:
-        for t_mech in range(7):
-            for loss_num in range(2):
-                title = f'{loss_names[loss_num]} {list(dominoes_exp_dict.keys())[t_mech]}'
+        for t_exp_name in exp_names:
+            for loss_name in loss_names:
+                title = f"{config.model_type} {config.experiment.name} {config.distill_loss_type}"
                 # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-                histories = wandb_get_data('Distill ResNet18_AP ResNet18_AP_Dominoes', t_num=1, s_num=1, exp_dict=dominoes_exp_dict, groupby_metrics=['teacher_mechanism','student_mechanism'], t_mech=t_mech, loss_num=loss_num, plot_tmechs_together=False)
+                histories = wandb_get_data(project_name=wandb_project_name, config=config, groupby_metrics=groupby_metrics, plot_tmechs_together=False)
+                
                 wandb_plot(histories, title)
