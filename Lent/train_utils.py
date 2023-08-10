@@ -8,7 +8,6 @@ import wandb
 from einops import rearrange
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-import warnings
 import logging
 from collections import defaultdict
 from typing import List, Dict
@@ -22,8 +21,6 @@ from models.resnet_ap import CustomResNet18, CustomResNet50
 from config_setup import MainConfig, DistillLossType, DistillConfig
 from constructors import get_counterfactual_dataloaders
 from plotting_common import plot_PIL_batch
-    
-warnings.filterwarnings("ignore")
 
 
 @torch.no_grad()
@@ -313,12 +310,8 @@ def train_distill(
                     loss = (1-config.nonbase_loss_frac)*loss + config.nonbase_loss_frac*jacobian_loss
                     
                 case DistillLossType.CONTRASTIVE:
-                    s_map = feature_extractor(student, inputs, config.s_layer).view(batch_size, -1)
-                    logging.info("CUDA available:", torch.cuda.is_available())
-                    s_map = s_map.cuda()
-                    t_map = feature_extractor(teacher, inputs, config.t_layer).view(batch_size, -1)
-                    t_map = t_map.cuda()
-                    logging.info("Student device:", s_map.device)
+                    s_map = feature_extractor(student, inputs, config.s_layer).view(batch_size, -1).cuda()
+                    t_map = feature_extractor(teacher, inputs, config.t_layer).view(batch_size, -1).cuda()
                     contrastive_loss = CRDLoss(
                         s_dim=s_map.shape[1],
                         t_dim=t_map.shape[1],
@@ -385,21 +378,21 @@ def train_distill(
                 
                 # Plot saliency map
                 s_prob = F.softmax(student(single_image), dim=1).squeeze().detach().cpu().numpy()
-                s_prob = F.softmax(teacher(single_image), dim=1).squeeze().detach().cpu().numpy()
+                t_prob = F.softmax(teacher(single_image), dim=1).squeeze().detach().cpu().numpy()
                 
                 fig, axs = plt.subplots(1, 3, figsize=(15, 5))  # Create a figure with 3 subplots side by side
                 single_image = rearrange(single_image.squeeze(0).detach().cpu().numpy(), 'c h w -> h w c')
                 axs[0].imshow(single_image)
                 axs[0].set_title("Original Image")
-                axs[1].imshow(student_saliency_map)
+                axs[1].imshow(saliency_s)
                 axs[1].set_title("Student Saliency Map")
-                axs[2].imshow(teacher_saliency_map)
+                axs[2].imshow(saliency_t)
                 axs[2].set_title("Teacher Saliency Map")
                 
                 # Display probabilities
-                student_probs_str = ["Student - " + f"Class {i}: {p:.4f}" for i, p in enumerate(student_probabilities)]
-                teacher_probs_str = ["Teacher - " + f"Class {i}: {p:.4f}" for i, p in enumerate(teacher_probabilities)]
-                all_probs_str = "\n".join(student_probs_str + [""] + teacher_probs_str)
+                s_prob_str = ["Student - " + f"Class {i}: {p:.4f}" for i, p in enumerate(s_prob)]
+                t_prob_str = ["Teacher - " + f"Class {i}: {p:.4f}" for i, p in enumerate(t_prob)]
+                all_probs_str = "\n".join(s_prob_str + [""] + t_prob_str)
                 plt.figtext(0.85, 0.2, all_probs_str, fontsize=10, ha="center", va="center", bbox={'boxstyle': "round", 'facecolor': "white"})
                 plt.tight_layout()  # Adjust the layout so that plots do not overlap
 

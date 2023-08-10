@@ -53,8 +53,8 @@ class CRDLoss(nn.Module):
     
 class ContrastLoss(nn.Module):
     """Contrastive loss with in-batch negatives."""
-    def __init__(self):
-        super(ContrastLoss, self, eps=0.97).__init__()
+    def __init__(self, eps=0.97):
+        super(ContrastLoss, self).__init__()
         self.eps = eps # Approximately N/M
 
     def forward(self, x: float, y: int) -> torch.Tensor:
@@ -97,6 +97,7 @@ class Embed(nn.Module):
         super(Embed, self).__init__()
         self.linear = nn.Linear(dim_in, dim_out)
         self.l2norm = Normalize(2)
+        self.device = device
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x.view(x.shape[0], -1).to(self.device)
