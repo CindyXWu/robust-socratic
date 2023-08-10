@@ -12,7 +12,7 @@ from omegaconf import OmegaConf
 from create_sweep import construct_sweep_config, load_config
 from train_utils import train_distill
 from config_setup import DistillConfig, DistillLossType
-from constructors import model_constructor, optimizer_constructor, create_dataloaders, get_dataset_output_size, get_nonbase_loss_frac
+from constructors import model_constructor, get_model_intermediate_layer, optimizer_constructor, create_dataloaders, get_dataset_output_size, get_nonbase_loss_frac
 
 
 # Change directory to one this file is in
@@ -73,6 +73,7 @@ def main(config: DistillConfig) -> None:
     teacher = model_constructor(config).to(DEVICE)
     checkpoint = torch.load(config.teacher_save_path, map_location=DEVICE)
     teacher.load_state_dict(checkpoint['model_state_dict'])
+    config.t_layer = config.s_layer = get_model_intermediate_layer(config)
     
     ## Optimizer
     optimizer, scheduler = optimizer_constructor(config=config, model=student, train_loader=train_loader)
@@ -120,12 +121,12 @@ if __name__ == "__main__":
     # Ugly global variables because WandB sweep agent is annoying AF
     config: dict = load_config('configs/distill_config.yaml')
     if config.get("is_sweep"):
-        config.wandb_project_name = f"DISTILL {config['model_type']} {config['dataset_type']} {config['config_type']}"
+        wandb_project_name = f"DISTILL {config['model_type']} {config['dataset_type']} {config['config_type']}"
         sweep_config = construct_sweep_config('distill_config', 'sweep_configs')
         sweep_params = list(sweep_config['parameters'].keys())
         sweep_id = wandb.sweep(
             sweep=sweep_config,
-            project=config.get("wandb_project_name"),
+            project=wandb_project_name
         )
         wandb.agent(sweep_id, function=main, count=20)
     else:

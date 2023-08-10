@@ -1,10 +1,10 @@
 """'Contrastive Representation Distillation' (Tian et al. 2019)"""
 import torch
 from torch import nn
+import logging
+
 from losses.loss_common import *
 
-# Approximately N/M
-eps = 0.97
 
 class CRDLoss(nn.Module):
     """CRD Loss function for student model
@@ -14,19 +14,29 @@ class CRDLoss(nn.Module):
         feat_dim: Dimension of projection space.
         T: Temperature to divide dot product of student and teacher features by.
     """
-    def __init__(self, s_dim: int, t_dim: int, T: int, feat_dim: int = 128):
+    def __init__(self, 
+                 s_dim: int, 
+                 t_dim: int, 
+                 T: int, 
+                 feat_dim: int = 128, 
+                 device: torch.device = torch.device("cuda")):
         super(CRDLoss, self).__init__()
-        self.embed_s = Embed(s_dim, feat_dim)
-        self.embed_t = Embed(t_dim, feat_dim)
+        self.embed_s = Embed(s_dim, feat_dim, device).to(device)
+        self.embed_t = Embed(t_dim, feat_dim, device).to(device)
         self.T = T
         self.criterion_s = ContrastLoss()
+        self.device = device
 
-    def forward(self, f_s: torch.Tensor, f_t: torch.Tensor, y: torch.Tensor) -> float:
+    def forward(self, 
+                f_s: torch.Tensor, 
+                f_t: torch.Tensor, 
+                y: torch.Tensor) -> torch.Tensor:
         """
         Args:
             f_s: Feature of student network, size [batch_size, s_dim].
             f_t: Feature of teacher network, size [batch_size, t_dim].
             y: Labels of samples, size [batch_size].
+            
         Returns:
             s_loss: Contrastive loss for student model.
         """
@@ -40,14 +50,14 @@ class CRDLoss(nn.Module):
         s_loss = self.criterion_s(out_s, y)
         return s_loss
 
+    
 class ContrastLoss(nn.Module):
-    """
-    Contrastive loss with in-batch negatives
-    """
+    """Contrastive loss with in-batch negatives."""
     def __init__(self):
-        super(ContrastLoss, self).__init__()
+        super(ContrastLoss, self, eps=0.97).__init__()
+        self.eps = eps # Approximately N/M
 
-    def forward(self, x: float, y: int) -> float:
+    def forward(self, x: float, y: int) -> torch.Tensor:
         """
         Args:
             x: Exponentiated dot product similarity, size [batch_size, batch_size].
@@ -55,32 +65,41 @@ class ContrastLoss(nn.Module):
         """
         bsz = x.shape[0]
         y_expand = y.unsqueeze(0).repeat(bsz, 1)
+        
         # Matrix of comparisons
-        pos_mask = torch.eq(y_expand, y_expand.t())
-        neg_mask = torch.logical_not(pos_mask)
-        diag_mask = torch.eye(bsz, dtype=bool)
+        pos_mask = (y_expand == y_expand.t())
+        neg_mask = ~pos_mask
+        
+        # Exclude diagonal elements
+        diag_mask = torch.eye(bsz, dtype=torch.bool, device=x.device)
+        pos_mask = pos_mask & ~diag_mask
+        neg_mask = neg_mask & ~diag_mask
 
-        # Loss for positive pairs - flatten for ease
-        P_pos = x[pos_mask& ~diag_mask].view(-1, 1)
-        log_D1 = torch.log(torch.div(P_pos, P_pos.add(eps)))
+        # Loss for positive pairs
+        P_pos = x[pos_mask].view(-1, 1)
+        log_D1 = torch.log(torch.div(P_pos, P_pos + self.eps))
 
-        # Loss for negative pairs using in-batch negatives
-        P_neg = x[neg_mask & ~diag_mask].view(-1, 1)
-        log_D0 = torch.log(torch.div(eps, P_neg.add(eps)))
+         # Loss for negative pairs using in-batch negatives
+        P_neg = x[neg_mask].view(-1, 1)
+        log_D0 = torch.log(torch.div(self.eps, P_neg + self.eps))
 
         # Batch average loss (don't take into account variation in number of neg samples per image, is small overall)
         loss = - (log_D1.sum(0) + log_D0.sum(0)) / bsz
+        
         return loss
 
 
 class Embed(nn.Module):
-    def __init__(self, dim_in: int = 1024, dim_out: int = 128):
+    def __init__(self, 
+                 dim_in: int = 1024, 
+                 dim_out: int = 128,
+                 device: torch.device = torch.device("cuda")):
         super(Embed, self).__init__()
         self.linear = nn.Linear(dim_in, dim_out)
         self.l2norm = Normalize(2)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x.view(x.shape[0], -1)
+        x = x.view(x.shape[0], -1).to(self.device)
         x = self.linear(x)
         x = self.l2norm(x)
         return x
