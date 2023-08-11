@@ -40,6 +40,7 @@ def main(config: DistillConfig) -> None:
     """Command line:
     python run.py experiment@t_exp=exhaustive_0 experiment@s_exp=exhaustive_1
     """
+    is_sweep = config.is_sweep
     [t_exp_prefix, t_exp_idx] = config.experiment.config_filename.split("_")
     [s_exp_prefix, s_exp_idx] = config.experiment_s.config_filename.split("_")
     # From name field of config file
@@ -83,7 +84,7 @@ def main(config: DistillConfig) -> None:
     optimizer, scheduler = optimizer_constructor(config=config, model=student, train_loader=train_loader)
 
     ## Train
-    if config.is_sweep:
+    if is_sweep:
         config = update_with_wandb_config(config, sweep_params) # For wandb sweeps: update with wandb values
     train_distill(
         teacher=teacher,
@@ -132,6 +133,6 @@ if __name__ == "__main__":
             sweep=sweep_config,
             project=wandb_project_name
         )
-        wandb.agent(sweep_id, function=main, count=20)
+        wandb.agent(sweep_id, function=main, count=3)
     else:
         main()

@@ -13,8 +13,8 @@ name: jac_frac_sweep
 parameters: 
   nonbase_loss_frac: 
     distribution: log_uniform
-    min: -4.5
-    max: -0.7
+    min: -4
+    max: -2.3
 early_terminate: 
   type: hyperband
   min_iter: 5
