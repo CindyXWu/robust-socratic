@@ -17,7 +17,7 @@ dataset:
   output_size: null
   box_cue_size: 4
   box_cue_pattern: MANDELBROT
-  use_augmentation: true
+  use_augmentation: false
 augmentation:
   alpha: 2.0
   beta: 1.5
@@ -39,7 +39,8 @@ num_eval_batches: 50
 early_stop_patience: 20
 
 log_to_wandb: true
-is_sweep: false
+is_sweep: true
+sweep_num: 20
 save_model_as_artifact: false
 save_model: false
 teacher_save_path: null

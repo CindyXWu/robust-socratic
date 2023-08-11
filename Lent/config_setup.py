@@ -147,6 +147,7 @@ class MainConfig:
     # Logging
     log_to_wandb: bool = False
     is_sweep: bool = False
+    sweep_num: Optional[int] = 10
     save_model_as_artifact: bool = True
     wandb_project_name: Optional[str] = None
     wandb_run_name: Optional[str] = None # Initialise in main function

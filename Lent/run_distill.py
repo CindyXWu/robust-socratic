@@ -62,12 +62,8 @@ def main(config: DistillConfig) -> None:
         "config": OmegaConf.to_container(config, resolve=True, throw_on_missing=True),
         "mode": "disabled" if not config.log_to_wandb else "online",
     }
-    if not config.is_sweep:
-        wandb.init(**logger_params)
-    # Probably won't do sweeps over these - okay to put here relative to call to update_with_wandb_config() below
-    wandb.config.dataset_type = config.dataset_type
-    wandb.config.model_type = config.model_type
-    
+    wandb.init(**logger_params)
+
     ## Datasets
     train_loader, test_loader = create_dataloaders(config=config)
     # Epochs aren't logged faithfully to wandb, but is fine as it tends to be an upper bound due to early-stopping
@@ -108,7 +104,7 @@ def main(config: DistillConfig) -> None:
     except: # The most lazy way of saying 'this block of code is generating errors sometimes but it doesn't really matter so I'm not going to fix it'
         pass # I'm not sorry
     
-    # Needed to make sure each config file in multirun initialises separately
+    # Needed to make sure each config file in multirun initialises separately - this requires the previous run to close
     wandb.finish()
 
 
@@ -133,6 +129,6 @@ if __name__ == "__main__":
             sweep=sweep_config,
             project=wandb_project_name
         )
-        wandb.agent(sweep_id, function=main, count=3)
+        wandb.agent(sweep_id, function=main, count=config['sweep_num'])
     else:
         main()
