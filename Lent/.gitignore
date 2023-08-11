@@ -11,3 +11,5 @@ data/
 machine.*
 
 *.out
+
+**/.ipynb_checkpoints/
