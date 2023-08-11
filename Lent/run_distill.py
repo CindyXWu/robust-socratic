@@ -61,7 +61,8 @@ def main(config: DistillConfig) -> None:
         "config": OmegaConf.to_container(config, resolve=True, throw_on_missing=True),
         "mode": "disabled" if not config.log_to_wandb else "online",
     }
-    wandb.init(**logger_params)
+    if not config.is_sweep:
+        wandb.init(**logger_params)
     # Probably won't do sweeps over these - okay to put here relative to call to update_with_wandb_config() below
     wandb.config.dataset_type = config.dataset_type
     wandb.config.model_type = config.model_type
