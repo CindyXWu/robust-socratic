@@ -9,8 +9,9 @@ from einops import rearrange
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import logging
+from functools import partial
 from collections import defaultdict
-from typing import List, Dict
+from typing import List, Dict, Callable
 
 from losses.loss_common import *
 from losses.jacobian import get_jacobian_loss
@@ -78,6 +79,14 @@ def counterfactual_evaluate(teacher: nn.Module,
     student.train()
     
     return avg_acc, avg_KL, avg_top_1
+
+
+def mixup_accuracy(metric_fn: Callable, logits, label, label_2, lam):
+    """Update existing loss function for mixup.
+    This function is expected to only be relevant with hard label distillation.
+    Loss function should already have loss type and temperature set with functools partial.
+    """
+    return lam*metric_fn(logits, label) + (1-lam)*metric_fn(logits, label_2)
 
 
 def get_saliency_map(
@@ -332,9 +341,11 @@ def train_distill(
             scheduler.step()
             lr = scheduler.get_lr()
             train_loss = loss.detach().cpu().numpy()
+            if config.distill_loss_type == DistillLossType.JACOBIAN:
+                assert train_loss - jacobian_loss > 0, "Not logging correct total loss" 
 
-            if it == 0: 
-                check_grads(student)
+            # if it == 0: 
+            #     check_grads(student)
                 for name in cf_dataloaders:
                     batch_image = plot_PIL_batch(dataloader=cf_dataloaders[name], num_images=(batch_size//4))
                     wandb.log({name.split(":")[-1].strip().replace(' ', '_'): [wandb.Image(batch_image)]}, step=it)
@@ -393,7 +404,7 @@ def train_distill(
                 s_prob_str = ["Student - " + f"Class {i}: {p:.4f}" for i, p in enumerate(s_prob)]
                 t_prob_str = ["Teacher - " + f"Class {i}: {p:.4f}" for i, p in enumerate(t_prob)]
                 all_probs_str = "\n".join(s_prob_str + [""] + t_prob_str)
-                plt.figtext(0.85, 0.2, all_probs_str, fontsize=10, ha="center", va="center", bbox={'boxstyle': "round", 'facecolor': "white"})
+                plt.figtext(0.92, 0.5, all_probs_str, fontsize=10, ha="center", va="center", bbox={'boxstyle': "round", 'facecolor': "white"})
                 plt.tight_layout()  # Adjust the layout so that plots do not overlap
 
                 wandb.log({f"Iteration {it}": [wandb.Image(fig)]}, step=it)

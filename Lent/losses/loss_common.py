@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from config_setup import LossType
+from typing import Callable
 
 
 # Needs to be global scope
@@ -33,3 +34,11 @@ def base_distill_loss(
         )
     else:
         raise ValueError("Loss function not supported.")
+    
+
+def mixup_loss(loss_fn: Callable, logits, label, label_2, lam):
+    """Update existing loss function for mixup.
+    This function is expected to only be relevant with hard label distillation.
+    Loss function should already have loss type and temperature set with functools partial.
+    """
+    return lam*loss_fn(logits, label) + (1-lam)*loss_fn(logits, label_2)

@@ -1,17 +1,18 @@
 """Custom datasets and augmentation methods for training and testing."""
+import torch
 import torchvision.transforms.functional as TF
 from torchvision import datasets, transforms
-import torchvision.datasets as datasets
-import torchvision.transforms as T
+from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
-import torch
+
 import random
 import os
-from datasets.shapes_3D import *
 import einops
 
+from shapes_3D import Shapes3D
+
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-# Dataset for inheritance for AugDataset
+
 
 class AugShapes3D(Shapes3D):
     """Custom augmented dataset implementation for 3D shapes dataset.
@@ -103,72 +104,74 @@ class AugShapes3D(Shapes3D):
         x = TF.rotate(x, random.randint(0, angle))
         return x
 
-class AugCIFAR(datasets.CIFAR10):
-        """Custom augmented CIFAR10 implementation."""
-        def __init__(self, alpha, beta, mix_prob, crop_prob, flip_prob, rotate_prob, jitter_prob, erase_prob, *args, **kwargs):
-            """Set parameters for transform probability."""
-            super(AugCIFAR, self).__init__(*args, **kwargs)
-            # Params for beta distribution
-            self.alpha = alpha
-            self.beta = beta
-            self.mix_prob = mix_prob
-            self.crop_prob = crop_prob
-            self.flip_prob = flip_prob
-            self.rotate_prob = rotate_prob
-            self.jitter_prob = jitter_prob
-            self.erase_prob = erase_prob
 
-        def __getitem__(self, index):
-            """Turn x into torch tensor and permute to [c h w] format."""
-            x, y = super().__getitem__(index)
-            y = F.one_hot(torch.tensor(y), 10)
-            x, y = self.mixup(x, y, self.alpha, self.beta)
-            x = self.crop(x)
-            x = self.flip(x)
-            # x = self.rotate(x)
-            print(x, y)
+class AugmentedDataset(Dataset):
+    """Custom augmented Dataset implementation."""
+    def __init__(self, base_dataset, num_classes, alpha, beta, mix_prob, crop_prob, flip_prob, rotate_prob):
+        """Set parameters for transform probability."""
+        self.base_dataset = base_dataset
+        self.num_classes = num_classes
+        self.alpha = alpha
+        self.beta = beta
+        self.mix_prob = mix_prob
+        self.crop_prob = crop_prob
+        self.flip_prob = flip_prob
+        self.rotate_prob = rotate_prob
+
+    def __len__(self):
+        return len(self.base_dataset)
+
+    def __getitem__(self, index):
+        """Turn x into torch tensor and permute to [c h w] format."""
+        x, y = self.base_dataset[index]
+        y = F.one_hot(torch.tensor(y), self.num_classes)
+        x, y = self.mixup(x, y)
+        x = self.crop(x)
+        x = self.flip(x)
+        # x = self.rotate(x)
+        print(x, y)
+        return x, y
+
+    def mixup(self, x, y):
+        if torch.rand(1) > self.mix_prob:
             return x, y
+        index = random.randint(0, self.__len__() - 1)
+        lam = random.betavariate(self.alpha, self.beta)
+        x2, y2 = self.base_dataset[index]
+        mixed_x = x.mul(lam).add(x2, alpha=1 - lam)
+        mixed_y = y.mul(lam).add(F.one_hot(torch.tensor(y2), self.num_classes), alpha=1 - lam)
+        return mixed_x, mixed_y
 
-        def mixup(self, x, y, alpha, beta):
-            if torch.rand(1) > self.mix_prob:
-                return x, y
-            index = random.randint(0, self.__len__()-1)
-            # Lambda parameter, from beta distribution
-            lam = random.betavariate(alpha, beta)
-            # Return PIL.Image.Image, int
-            x2, y2 = self.__getitem__(index)
-            mixed_x = x.mul(lam).add(x2,alpha=1-lam)
-            mixed_y = y.mul(lam).add(F.one_hot(torch.tensor(y2), 10),alpha=1-lam)
-            return mixed_x, mixed_y
-
-        def crop(self, x):
-            """Randomly crop images and return resized to original size."""
-            if random.uniform(0,1) > self.crop_prob:
-                return x
-            h = w = x.shape[1]
-            # Randomly select top left corner of crop's y coordinate
-            i = random.randint(0, w - self.crop_size)
-            # Randomly select top left corner of crop's x coordinate
-            j = random.randint(0, h - self.crop_size)
-            cropped = TF.crop(x, j, i, self.crop_size, self.crop_size)
-            return TF.resize(cropped, (w, h))
-
-        def flip(self, x):
-            """Randomly flip images both horizontally and vertically with probability flip_prob."""
-            if random.uniform(0,1) < self.flip_prob:
-                x = TF.hflip(x)
-            if random.uniform(0,1) < self.flip_prob:
-                x = TF.vflip(x)
+    def crop(self, x):
+        """Randomly crop images and return resized to original size."""
+        if random.uniform(0,1) > self.crop_prob:
             return x
+        crop_size = int(random.uniform(0,1) * x.shape[0])
+        h = w = x.shape[1]
+        # Randomly select top left corner of crop's y coordinate
+        i = random.randint(0, w - crop_size)
+        # Randomly select top left corner of crop's x coordinate
+        j = random.randint(0, h - crop_size)
+        cropped = TF.crop(x, j, i, crop_size, crop_size)
+        return TF.resize(cropped, (w, h))
 
-        def rotate(self, x):
-            """Randomly rotate images with probability rotate_prob by a random angle."""
-            if random.uniform(0,1) > self.rotate_prob:
-                return x
-            angle = random.randint(0, 45)
-            x = TF.rotate(x, random.randint(0, angle))
+    def flip(self, x):
+        """Randomly flip images both horizontally and vertically with probability flip_prob."""
+        if random.uniform(0,1) < self.flip_prob:
+            x = TF.hflip(x)
+        if random.uniform(0,1) < self.flip_prob:
+            x = TF.vflip(x)
+        return x
+
+    def rotate(self, x):
+        """Randomly rotate images with probability rotate_prob by a random angle."""
+        if random.uniform(0,1) > self.rotate_prob:
             return x
-        
+        angle = random.randint(0, 45)
+        x = TF.rotate(x, random.randint(0, angle))
+        return x
+
+
 def load_cifar_10(dims):
     """Load CIFAR-10 dataset and return dataloaders.
     :param dims: tuple, dimensions of the images
@@ -182,6 +185,7 @@ def load_cifar_10(dims):
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, num_workers=0, shuffle=True, drop_last=True)
     testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, num_workers=0, shuffle=True, drop_last=True)
     return trainset, testset, trainloader, testloader
+
 
 if __name__ == "__main__":
     batch_size = 16

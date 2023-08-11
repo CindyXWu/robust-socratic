@@ -50,29 +50,27 @@ def plot_PIL_batch(dataloader: DataLoader, num_images: int) -> None:
     return fig
 
     
-def show_images_grid(imgs_, class_labels, num_images, title=None):
+def show_images_grid(imgs_, class_labels, num_images):
     """Now modified to show both [c h w] and [h w c] images."""
     ncols = int(np.ceil(num_images**0.5))
     nrows = int(np.ceil(num_images / ncols))
-    fig, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
+    _, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
     axes = axes.flatten()
 
     for ax_i, ax in enumerate(axes):
         if ax_i < num_images:
             img = imgs_[ax_i]
             if img.ndim == 3 and img.shape[0] == 3:
-                img = img.transpose(1, 2, 0)
+                img = einops.rearrange(img, 'c h w -> h w c')
             ax.imshow(img, cmap='Greys_r', interpolation='nearest')
             ax.set_title(f'Class: {class_labels[ax_i]}')  # Display the class label as title
             ax.set_xticks([])
             ax.set_yticks([])
         else:
             ax.axis('off')
-    if title:
-        plt.savefig(f'{image_dir}{title}.png')
-    else:
-        plt.show()
-        
+    print("showing plot")
+    plt.show()
+
 
 def plot_images(dataloader: DataLoader, num_images: int, title: Optional[str] = None):
     for i, (x, y) in enumerate(dataloader):

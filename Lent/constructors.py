@@ -7,7 +7,9 @@ from torch.utils.data import DataLoader, Dataset
 from typing import Tuple, Optional
 from dataclasses import asdict
 import numpy as np
+import omegaconf
 from omegaconf import OmegaConf
+from functools import partial
 
 import os
 
@@ -100,9 +102,15 @@ def create_dataloaders(config: MainConfig,
         batch_size = config.dataloader.test_bs
         im_frac, m1_frac, m2_frac, rand_im, rand_m1, rand_m2 = asdict(exp_config).values()
 
+    use_augmentation = config.dataset.use_augmentation
+    augmentation_params = omegaconf.to_container(config.augmentation, resolve=True)
+    box_cue_size = config.dataset.box_cue_size
+    
     if base_dataset == DatasetType.DOMINOES: # BOX: MECH 1, MNIST: MECH 2
-        train_loader = get_box_dataloader(load_type='train', base_dataset='Dominoes', batch_size=batch_size, randomize_img=rand_im, box_frac=m1_frac, mnist_frac=m2_frac, image_frac=im_frac, randomize_box=rand_m1, randomize_mnist=rand_m2)
-        test_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, randomize_img=rand_im, box_frac=m1_frac, mnist_frac=m2_frac, image_frac=im_frac, randomize_box=rand_m1, randomize_mnist=rand_m2)
+        partial_get_box_dataloader = partial(get_box_dataloader, base_dataset='Dominoes', batch_size=batch_size, randomize_img=rand_im, box_frac=m1_frac, mnist_frac=m2_frac, image_frac=im_frac, randomize_box=rand_m1, randomize_mnist=rand_m2, box_cue_size=box_cue_size, use_augmentation=use_augmentation, augmentation_params=augmentation_params)
+        
+        train_loader = partial_get_box_dataloader(load_type='train')
+        test_loader = partial_get_box_dataloader(load_type='test')
 
     elif base_dataset == DatasetType.SHAPES: # FLOOR: MECH 1, SCALE: MECH 2
         train_loader = dataloader_3D_shapes('train', batch_size=batch_size, randomise=rand_im, floor_frac=m1_frac, scale_frac=m2_frac)
@@ -110,8 +118,10 @@ def create_dataloaders(config: MainConfig,
     
     elif base_dataset in [DatasetType.CIFAR100, DatasetType.CIFAR10]: # Image frac isn't relevant - always 100 for these exps so don't pass in
         cue_type='box' if m1_frac != 0 else 'nocue'
-        train_loader = get_box_dataloader(load_type='train', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=m1_frac, randomize_cue=rand_m1, randomize_img = rand_im, batch_size=batch_size)
-        test_loader = get_box_dataloader(load_type ='test', base_dataset=base_dataset, cue_type=cue_type, cue_proportion=m1_frac, randomize_cue=rand_m1, randomize_img = rand_im, batch_size=batch_size)
+        partial_get_box_dataloader = partial(get_box_dataloader, base_dataset=base_dataset, cue_type=cue_type, batch_size=batch_size,  cue_proportion=m1_frac, randomize_cue=rand_m1, randomize_img = rand_im, box_cue_size=box_cue_size, use_augmentation=use_augmentation, augmentation_params=augmentation_params)
+        
+        train_loader = partial_get_box_dataloader(load_type='train')
+        test_loader = partial_get_box_dataloader(load_type='test')
  
     return train_loader, test_loader
 

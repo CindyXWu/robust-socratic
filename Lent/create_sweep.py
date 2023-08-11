@@ -23,8 +23,8 @@ def construct_sweep_config(main_config_name: str, sweep_config_name: str) -> dic
         "parameters": {
             "nonbase_loss_frac": {
                 "distribution": "log_uniform",
-                "min": 0.01,
-                "max": 0.5
+                "min": 0.005,
+                "max": 0.3
             },
         },
         'early_terminate': {'type': 'hyperband', 'min_iter': 5}

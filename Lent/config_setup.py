@@ -47,6 +47,11 @@ class OptimizerType(str, Enum):
 class ConfigType(str, Enum):
     TARGETED = "TARGETED" # Initial targeted experiments set out by Ekdeep
     EXHAUSTIVE = "EXHAUSTIVE"
+
+
+class BoxPatternType(str, Enum):
+    RANDOM = "RANDOM"
+    MANDELBROT = "MANDELBROT"
     
 
 @dataclass
@@ -60,10 +65,28 @@ class ResNetConfig:
 
 
 @dataclass
+class AugmentationConfig:
+    """
+    If alpha = beta = 1, distribution uniform.
+    If alpha >> beta, lam distribution skewed towards 1.
+    If alpha << beta, lam distribution skewed towards 0.
+    """
+    alpha: float = 1.0
+    beta: float = 1.0
+    mix_prob: float = 0.5
+    crop_prob: float = 0.5
+    flip_prob: float = 0.5
+    rotate_prob: float = 0.5
+    
+    
+@dataclass
 class DatasetConfig:
     data_folder: str = "data"
     output_size: Optional[int] = 10
+    use_augmentation: bool = False
     box_cue_size: Optional[int] = 4 # Inverse of fraction of image that box cue covers
+    box_cue_pattern: Optional[str] = BoxPatternType.MANDELBROT
+    augmentation: AugmentationConfig = field(default_factory=AugmentationConfig)
 
 
 @dataclass
