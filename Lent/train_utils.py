@@ -9,9 +9,10 @@ from einops import rearrange
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import logging
-from functools import partial
+import random
+from omegaconf import OmegaConf
 from collections import defaultdict
-from typing import List, Dict, Callable
+from typing import List, Dict
 
 from losses.loss_common import *
 from losses.jacobian import get_jacobian_loss
@@ -22,103 +23,7 @@ from models.resnet_ap import CustomResNet18, CustomResNet50
 from config_setup import MainConfig, DistillLossType, DistillConfig
 from constructors import get_counterfactual_dataloaders
 from plotting_common import plot_PIL_batch
-
-
-@torch.no_grad()
-def evaluate(model: nn.Module, 
-             dataloader: DataLoader, 
-             batch_size: int, 
-             num_eval_batches: int, 
-             device: torch.device = torch.device("cuda")) -> float:
-    """Accuracy for num_eval_batches batches."""
-    model.eval()
-    acc = 0
-    
-    for i, (features, labels) in enumerate(dataloader):
-        labels = labels.to(device)
-        features = features.to(device)
-        scores = model(features)
-        _, pred = torch.max(scores, 1)
-        acc += torch.sum(torch.eq(pred, labels)).item()
-        if num_eval_batches != 0 and i >= num_eval_batches:
-            break
-        
-    model.train()
-    
-    # Avg acc - frac data points correctly classified
-    return (acc*100 / ((i+1)*batch_size))
-
-
-@torch.no_grad()
-def counterfactual_evaluate(teacher: nn.Module, 
-                     student: nn.Module, 
-                     dataloader: DataLoader, 
-                     batch_size: int, 
-                     num_eval_batches: int, 
-                     device: torch.device = torch.device("cuda")) -> float:
-    """Student test accuracy, T-S KL and T-S top-1 accuracy for num_eval_batches batches."""
-    acc, KL, top_1 = 0, 0, 0
-    student.eval()
-    
-    for i, (features, labels) in enumerate(dataloader):
-        if num_eval_batches != 0 and i >= num_eval_batches:
-            break
-        
-        labels, features = labels.to(device), features.to(device)
-        targets, scores = teacher(features), student(features)
-        s_pred, t_pred = torch.argmax(scores, dim=1), torch.argmax(targets, dim=1)
-        
-        acc += torch.sum(torch.eq(s_pred, labels)).item() # Total accurate samples in batch
-        KL += kl_loss(F.log_softmax(scores, dim=1), F.softmax(targets, dim=1)) # Batchwise mean KL
-        top_1 += torch.eq(s_pred, t_pred).float().mean() # Batchwise mean top-1 accuracy
-        
-    avg_acc = acc*100/(i*batch_size)
-    avg_KL = KL/i
-    avg_top_1 = top_1*100/i
-    
-    student.train()
-    
-    return avg_acc, avg_KL, avg_top_1
-
-
-def mixup_accuracy(metric_fn: Callable, logits, label, label_2, lam):
-    """Update existing loss function for mixup.
-    This function is expected to only be relevant with hard label distillation.
-    Loss function should already have loss type and temperature set with functools partial.
-    """
-    return lam*metric_fn(logits, label) + (1-lam)*metric_fn(logits, label_2)
-
-
-def get_saliency_map(
-    model: nn.Module,
-    input: torch.Tensor) -> torch.Tensor:
-    """
-    Compute saliency map of an input.
-
-    Args:
-        model: PyTorch model.
-        input_tensor: PyTorch tensor, input for which saliency map is to be computed.
-        target_class: Class for which saliency map is computed.
-
-    Returns:
-        Saliency map as a PyTorch tensor.
-    """
-    model.eval()  # Switch the model to evaluation mode
-    assert input.requires_grad
-
-    scores = model(input)
-    score_max_class = scores.argmax()
-    # Zero out all other classes apart from target_class
-    score = scores[0, score_max_class]
-    score.backward()
-    """Saliency would be the gradient with respect to the input image now. But note that the input image has 3 channels,
-    R, G and B. To derive a single class saliency value for each pixel (i, j),  we take the maximum magnitude
-    across all colour channels."""
-    saliency, _ = torch.max(input.grad.data.abs(), dim=1)
-
-    model.train()  # Switch the model back to training mode
-    
-    return saliency
+from evaluate import evaluate, counterfactual_evaluate, mixup_accuracy
 
 
 class LRScheduler(object):
@@ -140,16 +45,7 @@ class LRScheduler(object):
     def get_lr(self):
         return self.current_lr
     
-
-def weight_reset(model: nn.Module):
-    """Reset weights of model at start of training."""
-    for module in model.modules():
-        if hasattr(module, 'reset_parameters'):
-            module.reset_parameters()
-        if isinstance(module, nn.Conv2d):
-            nn.init.kaiming_normal_(module.weight, mode="fan_out", nonlinearity="relu")
-
-
+    
 def train_teacher(teacher: nn.Module, 
                   train_loader: DataLoader, 
                   test_loader: DataLoader, 
@@ -239,11 +135,44 @@ def train_teacher(teacher: nn.Module,
             
             it += 1
 
-        wandb.log({f"image_and_saliency_map_it_{it}": [wandb.Image(fig)]}, step=it)
+        # Get saliency map
+        single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
+        saliency_t = get_saliency_map(teacher, single_image).squeeze().detach().cpu().numpy()
+        t_prob = F.softmax(teacher(single_image), dim=1).squeeze().detach().cpu().numpy()
+        
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))  # Create a figure with 2 subplots side by side
+        single_image = rearrange(single_image.squeeze(0).detach().cpu().numpy(), 'c h w -> h w c')
+        axs[0].imshow(single_image)
+        axs[0].set_title("Original Image")
+        axs[1].imshow(saliency_t)
+        axs[1].set_title("Teacher Saliency Map")
+        
+        t_prob_str = ["Teacher - " + f"Class {i}: {p:.4f}" for i, p in enumerate(t_prob)]
+        plt.figtext(0.92, 0.5, t_prob_str, fontsize=10, ha="center", va="center", bbox={'boxstyle': "round", 'facecolor': "white"})
+        plt.tight_layout()
+
+        wandb.log({f"Epoch {epoch}": [wandb.Image(fig)]}, step=it)
         
     save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
 
+
+def get_mixup_data(inputs: torch.Tensor, labels: torch.Tensor, augmentation_params: dict):
+    """Mixup within a batch of data, inputs.
     
+    Returns:
+        mixed_inputs: Mixed inputs based on in-batch shuffling.
+        random_labels: Shuffled labels in the same order as the randomly shuffled inputs.
+        lam: Mixing coefficient for mixup, drawn from beta distribution with parameters alpha and beta set by augmentation_params.
+    """
+    bsize = inputs.size()[0]
+    shuffled_idx = torch.randperm(bsize)
+    lam = random.betavariate(augmentation_params['alpha'], augmentation_params['beta'])
+    mixed_inputs = lam*inputs + (1-lam)*inputs[shuffled_idx, :]
+    random_labels = labels[shuffled_idx]
+    
+    return mixed_inputs, random_labels, lam
+
+
 def train_distill(
     teacher: Module, 
     student: Module, 
@@ -264,6 +193,8 @@ def train_distill(
         N_its: Number of iterations to train for.
         its_per_log: Number of iterations between logging.
     """
+    aug = config.dataset.use_augmentation
+    augmentation_params = OmegaConf.to_container(config.augmentation, resolve=True)
     # Some checks for model saving
     if config.is_sweep:
         assert config.save_model is False or config.save_model_as_artifact is False, "Don't save model during sweep"
@@ -291,16 +222,19 @@ def train_distill(
     
     for epoch in range(config.epochs):
         for inputs, labels in tqdm(train_loader):
-            inputs, labels = inputs.to(device), labels.to(device)
+            labels = labels.to(device)
+            if aug:
+                inputs, labels_2, lam = get_mixup_data(inputs, labels, augmentation_params)
+                labels_2 = labels_2.to(device)
+            inputs = inputs.to(device)
             inputs.requires_grad_()
-            scores, targets = student(inputs), teacher(inputs) 
             
+            scores, targets = student(inputs), teacher(inputs)
             loss = base_distill_loss(
                         scores=scores, 
                         targets=targets, 
                         loss_type=config.base_distill_loss_type,
-                        temp=config.dist_temp
-            )
+                        temp=config.dist_temp)
             jacobian_loss = None
             contrastive_loss = None
             
@@ -319,6 +253,7 @@ def train_distill(
                     loss = (1-config.nonbase_loss_frac)*loss + config.nonbase_loss_frac*jacobian_loss
                     
                 case DistillLossType.CONTRASTIVE:
+                    """Haven't edited this loss function for mixup yet."""
                     s_map = feature_extractor(student, inputs, config.s_layer).view(batch_size, -1).cuda()
                     t_map = feature_extractor(teacher, inputs, config.t_layer).view(batch_size, -1).cuda()
                     contrastive_loss = CRDLoss(
@@ -340,12 +275,10 @@ def train_distill(
             optimizer.step()
             scheduler.step()
             lr = scheduler.get_lr()
-            train_loss = loss.detach().cpu().numpy()
-            if config.distill_loss_type == DistillLossType.JACOBIAN:
-                assert train_loss - jacobian_loss > 0, "Not logging correct total loss" 
+            train_loss = loss.detach().cpu().numpy() 
 
-            # if it == 0: 
-            #     check_grads(student)
+            if it == 0:  # Debugging
+                check_grads(student)
                 for name in cf_dataloaders:
                     batch_image = plot_PIL_batch(dataloader=cf_dataloaders[name], num_images=(batch_size//4))
                     wandb.log({name.split(":")[-1].strip().replace(' ', '_'): [wandb.Image(batch_image)]}, step=it)
@@ -457,4 +390,44 @@ def print_saved_model(checkpoint: Dict) -> None:
     for key, value in checkpoint.items():
         print(f"Key: {key}")
         print(f"Value: {value}")
+    
 
+def get_saliency_map(
+    model: nn.Module,
+    input: torch.Tensor) -> torch.Tensor:
+    """
+    Compute saliency map of an input.
+
+    Args:
+        model: PyTorch model.
+        input_tensor: PyTorch tensor, input for which saliency map is to be computed.
+        target_class: Class for which saliency map is computed.
+
+    Returns:
+        Saliency map as a PyTorch tensor.
+    """
+    model.eval()  # Switch the model to evaluation mode
+    assert input.requires_grad
+
+    scores = model(input)
+    score_max_class = scores.argmax()
+    # Zero out all other classes apart from target_class
+    score = scores[0, score_max_class]
+    score.backward()
+    """Saliency would be the gradient with respect to the input image now. But note that the input image has 3 channels,
+    R, G and B. To derive a single class saliency value for each pixel (i, j),  we take the maximum magnitude
+    across all colour channels."""
+    saliency, _ = torch.max(input.grad.data.abs(), dim=1)
+
+    model.train()  # Switch the model back to training mode
+    
+    return saliency
+    
+
+def weight_reset(model: nn.Module):
+    """Reset weights of model at start of training."""
+    for module in model.modules():
+        if hasattr(module, 'reset_parameters'):
+            module.reset_parameters()
+        if isinstance(module, nn.Conv2d):
+            nn.init.kaiming_normal_(module.weight, mode="fan_out", nonlinearity="relu")

@@ -8,13 +8,12 @@ from torch.utils.data import DataLoader, Dataset
 
 import os
 import einops
-import random
+from enum import Enum
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from typing import Type, Union, Dict, Tuple, List
 
-from config_setup import BoxPatternType
 
 ## Uncomment out below lines for reproducibility
 # import torch.backends.cudnn as cudnn
@@ -22,6 +21,10 @@ from config_setup import BoxPatternType
 # cudnn.deterministic = True
 # cudnn.benchmark = False
 
+class BoxPatternType(str, Enum):
+    RANDOM = "RANDOM"
+    MANDELBROT = "MANDELBROT"
+    
 
 def get_box_mask(
     mask: torch.Tensor,
@@ -154,17 +157,13 @@ class domCueDataset(Dataset):
                  randomize_box: bool = False,
                  randomize_mnist: bool = False,
                  box_cue_size: int = 4,
-                 box_pattern: BoxPatternType = "MANDELBROT",
-                 use_augmentation: bool = False,
-                 augmentation_params: dict = None):
+                 box_pattern: BoxPatternType = "MANDELBROT"):
         self.dataset = dataset
         self.dataset_simple = dataset_simple
         self.n_classes = len(dataset.classes)
         self.targets = np.array(dataset.targets)
         self.box_cue_size = box_cue_size
         self.box_pattern = box_pattern
-        self.use_augmentation = use_augmentation
-        self.augmentation_params = augmentation_params
 
         self.image_frac, self.mnist_frac, self.box_frac =  image_frac, mnist_frac, box_frac
         self.randomize_img, self.randomize_box, self.randomize_mnist = randomize_img, randomize_box, randomize_mnist
@@ -181,19 +180,7 @@ class domCueDataset(Dataset):
         image, label = self.dataset[item]
         image = self.create_domino(image, label, item)
         
-        if self.use_augmentation:
-            """Will return both labels."""
-            image_2_idx = random.randint(0, self.__len__()-1)
-            lam = random.betavariate(self.augmentation_params['alpha'], self.augmentation_params['beta'])
-            
-            image_2, label_2 = self.dataset[image_2_idx]
-            image_2 = self.create_domino(image_2, label_2, image_2_idx)
-            
-            mixed_image = image.mul(lam).add(image_2, alpha=1-lam)
-            
-            return mixed_image, label, label_2, lam
-        
-        return image, label, None, None
+        return image, label
     
     def create_domino(self, image: torch.Tensor, label: torch.Tensor, idx: int) -> torch.Tensor:
         """Label should be passed in as non-vector."""
@@ -229,12 +216,12 @@ class domCueDataset(Dataset):
         return image
     
     def get_large_box(self, mask: torch.Tensor, label: int) -> torch.Tensor:
-        """Box is 1/3 of the width of the image.
+        """Box is 1/box_cue_size of the width of the image.
         
         Args:
             mask: Default Torch tensor of zeros with same shape as image.
         
-        Returns"
+        Returns
             mask: Torch tensor of zeros with box added.
         """
         loc = np.random.randint(0, 10) if self.randomize_box else (label % 10)
@@ -386,8 +373,7 @@ def get_box_dataloader(
     image_frac=1.0, box_frac=1.0, mnist_frac=1.0,
     randomize_img=False, randomize_box=False, randomize_mnist=False,
     box_cue_size: int = 4,
-    use_augmentation: bool = False,
-    augmentation_params: dict = None) -> DataLoader:
+    box_pattern: BoxPatternType = "MANDELBROT") -> DataLoader:
     """
     Return dataloaders for dominoes and box datasets. Main function to be called by other modules.
     
@@ -448,8 +434,7 @@ def get_box_dataloader(
             dset_simple, 
             image_frac=image_frac, box_frac=box_frac, mnist_frac=mnist_frac,  randomize_img=randomize_img, randomize_box=randomize_box, randomize_mnist=randomize_mnist,
             box_cue_size=box_cue_size,
-            use_augmentation=use_augmentation,
-            augmentation_params=augmentation_params)
+            box_pattern=box_pattern)
 
     if isinstance(subset_ids, np.ndarray):
         dset = torch.utils.data.Subset(dset, subset_ids)
@@ -459,10 +444,37 @@ def get_box_dataloader(
     return dataloader
 
 
+# def show_images_grid(imgs_, class_labels, num_images):
+#     """This version was for augmented label plots. Not currently in use."""
+#     ncols = int(np.ceil(num_images**0.5))
+#     nrows = int(np.ceil(num_images / ncols))
+#     _, axes = plt.subplots(nrows, ncols, figsize=(nrows * 3, ncols * 3))
+#     axes = axes.flatten()
+
+#     for ax_i, ax in enumerate(axes):
+#         if ax_i < num_images:
+#             img = imgs_[ax_i]
+#             if img.ndim == 3 and img.shape[0] == 3:
+#                 img = einops.rearrange(img, 'c h w -> h w c')
+#             ax.imshow(img, cmap='Greys_r', interpolation='nearest')
+            
+#             # Get non-zero indices
+#             non_zero_indices = np.where(class_labels[ax_i])[0]
+#             label = ", ".join(map(str, non_zero_indices))
+#             ax.set_title(f'Non-zero indices: {label}', fontsize=10)
+#             ax.set_xticks([])
+#             ax.set_yticks([])
+#         else:
+#             ax.axis('off')
+#     plt.tight_layout()
+#     plt.show()
+
+
 def show_images_grid(imgs_, class_labels, num_images):
+    """Now modified to show both [c h w] and [h w c] images."""
     ncols = int(np.ceil(num_images**0.5))
     nrows = int(np.ceil(num_images / ncols))
-    _, axes = plt.subplots(nrows, ncols, figsize=(nrows * 3, ncols * 3))
+    _, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
     axes = axes.flatten()
 
     for ax_i, ax in enumerate(axes):
@@ -471,30 +483,18 @@ def show_images_grid(imgs_, class_labels, num_images):
             if img.ndim == 3 and img.shape[0] == 3:
                 img = einops.rearrange(img, 'c h w -> h w c')
             ax.imshow(img, cmap='Greys_r', interpolation='nearest')
-            
-            # Get non-zero indices
-            non_zero_indices = np.where(class_labels[ax_i])[0]
-            label = ", ".join(map(str, non_zero_indices))
-            ax.set_title(f'Non-zero indices: {label}', fontsize=10)
+            ax.set_title(f'Class: {class_labels[ax_i]}')  # Display the class label as title
             ax.set_xticks([])
             ax.set_yticks([])
         else:
             ax.axis('off')
-    plt.tight_layout()
+    print("showing plot")
     plt.show()
 
         
 if __name__ == "__main__":
-    augmentation_params = {
-    "alpha": 1.0,
-    "beta": 1.0,
-    "mix_prob": 0.9,
-    "crop_prob": 0.5,
-    "flip_prob": 0.5,
-    "rotate_prob": 0.5
-    }
     batch_size = 20
-    train_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, cue_type='domcues', box_frac=1.0, mnist_frac=1.0, image_frac=0, randomize_box=False, randomize_mnist=True, randomize_img=False, box_cue_size=4, use_augmentation=True, augmentation_params=augmentation_params)
+    train_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, cue_type='domcues', box_frac=1.0, mnist_frac=1.0, image_frac=0, randomize_box=False, randomize_mnist=True, randomize_img=False, box_cue_size=4)
     for i, (x, y) in enumerate(train_loader):
         show_images_grid(x, y, num_images=batch_size)
         break

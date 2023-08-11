@@ -102,12 +102,11 @@ def create_dataloaders(config: MainConfig,
         batch_size = config.dataloader.test_bs
         im_frac, m1_frac, m2_frac, rand_im, rand_m1, rand_m2 = asdict(exp_config).values()
 
-    use_augmentation = config.dataset.use_augmentation
-    augmentation_params = omegaconf.to_container(config.augmentation, resolve=True)
     box_cue_size = config.dataset.box_cue_size
+    box_pattern = config.dataset.box_cue_pattern
     
     if base_dataset == DatasetType.DOMINOES: # BOX: MECH 1, MNIST: MECH 2
-        partial_get_box_dataloader = partial(get_box_dataloader, base_dataset='Dominoes', batch_size=batch_size, randomize_img=rand_im, box_frac=m1_frac, mnist_frac=m2_frac, image_frac=im_frac, randomize_box=rand_m1, randomize_mnist=rand_m2, box_cue_size=box_cue_size, use_augmentation=use_augmentation, augmentation_params=augmentation_params)
+        partial_get_box_dataloader = partial(get_box_dataloader, base_dataset='Dominoes', batch_size=batch_size, randomize_img=rand_im, box_frac=m1_frac, mnist_frac=m2_frac, image_frac=im_frac, randomize_box=rand_m1, randomize_mnist=rand_m2, box_cue_size=box_cue_size, box_pattern=box_pattern)
         
         train_loader = partial_get_box_dataloader(load_type='train')
         test_loader = partial_get_box_dataloader(load_type='test')
@@ -118,7 +117,7 @@ def create_dataloaders(config: MainConfig,
     
     elif base_dataset in [DatasetType.CIFAR100, DatasetType.CIFAR10]: # Image frac isn't relevant - always 100 for these exps so don't pass in
         cue_type='box' if m1_frac != 0 else 'nocue'
-        partial_get_box_dataloader = partial(get_box_dataloader, base_dataset=base_dataset, cue_type=cue_type, batch_size=batch_size,  cue_proportion=m1_frac, randomize_cue=rand_m1, randomize_img = rand_im, box_cue_size=box_cue_size, use_augmentation=use_augmentation, augmentation_params=augmentation_params)
+        partial_get_box_dataloader = partial(get_box_dataloader, base_dataset=base_dataset, cue_type=cue_type, batch_size=batch_size,  cue_proportion=m1_frac, randomize_cue=rand_m1, randomize_img = rand_im, box_cue_size=box_cue_size, box_pattern=box_pattern)
         
         train_loader = partial_get_box_dataloader(load_type='train')
         test_loader = partial_get_box_dataloader(load_type='test')

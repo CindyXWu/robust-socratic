@@ -36,7 +36,7 @@ def base_distill_loss(
         raise ValueError("Loss function not supported.")
     
 
-def mixup_loss(loss_fn: Callable, logits, label, label_2, lam):
+def mixup_loss(loss_fn: Callable, logits: torch.Tensor, label: torch.Tensor, label_2: torch.Tensor, lam: float):
     """Update existing loss function for mixup.
     This function is expected to only be relevant with hard label distillation.
     Loss function should already have loss type and temperature set with functools partial.

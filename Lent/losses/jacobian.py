@@ -13,7 +13,7 @@ def get_jacobian_loss(
     inputs: torch.Tensor,
     config: MainConfig,
     input_dim: int,
-    approx=True):
+    approx=True) -> torch.Tensor:
     """Eq 10, no hard targets used.
     
     Args:
