@@ -7,9 +7,8 @@ from hydra.core.hydra_config import HydraConfig
 from hydra.utils import get_original_cwd
 import logging
 from omegaconf import OmegaConf
-from functools import partial
 
-from create_sweep import construct_sweep_config, load_config
+from create_sweep import load_config
 from train_utils import train_teacher
 from config_setup import MainConfig
 from constructors import model_constructor, optimizer_constructor, create_dataloaders, get_dataset_output_size

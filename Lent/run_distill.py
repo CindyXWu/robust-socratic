@@ -4,13 +4,12 @@ import os
 import wandb
 import hydra
 import warnings
-from functools import partial
 from hydra.core.config_store import ConfigStore
 from hydra.core.hydra_config import HydraConfig
 from hydra.utils import get_original_cwd
 from omegaconf import OmegaConf
 
-from create_sweep import construct_sweep_config, load_config
+from create_sweep import load_config
 from train_utils import train_distill
 from config_setup import DistillConfig, DistillLossType
 from constructors import model_constructor, get_model_intermediate_layer, optimizer_constructor, create_dataloaders, get_dataset_output_size, get_nonbase_loss_frac
