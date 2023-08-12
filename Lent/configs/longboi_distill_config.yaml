@@ -1,7 +1,7 @@
 model_type: RN18AP
 dataset_type: DOMINOES
 config_type: EXHAUSTIVE
-distill_loss_type: CONTRASTIVE
+distill_loss_type: BASE
 aug_type: NONE
 
 optimization:
@@ -32,8 +32,8 @@ resnet_config:
   blocks_per_stage: 3
   _width_factor: 1
 epochs: null
-num_iters: 8000
-min_iters: 300
+num_iters: 15000
+min_iters: 2000
 eval_frequency: 100
 num_eval_batches: 50
 early_stop_patience: 20
@@ -41,8 +41,8 @@ early_stop_patience: 20
 log_to_wandb: true
 is_sweep: false
 sweep_num: 20
-save_model_as_artifact: false
-save_model: false
+save_model_as_artifact: true
+save_model: true
 teacher_save_path: null
 wandb_project_name: null
 wandb_run_name: null

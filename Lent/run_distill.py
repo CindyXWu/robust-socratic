@@ -53,7 +53,7 @@ def main(config: DistillConfig) -> None:
     config.dataset.output_size = get_dataset_output_size(config)
             
     ## wandb
-    config.wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type}"
+    config.wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type} {config.dataset.box_cue_pattern}"
     config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}, S Mech: {s_exp_idx} {s_exp_name}, Loss: {config.distill_loss_type}"
     logger_params = {
         "name": config.wandb_run_name,
@@ -119,11 +119,13 @@ def update_with_wandb_config(config: OmegaConf, sweep_params: list[str]) -> Omeg
 
 if __name__ == "__main__":
     """May have to edit this hard coding opening one single config file in the future."""
+    sweep_filename = "longboi_distill_config"
+    
     # Ugly global variables because WandB sweep agent is annoying AF
     config: dict = load_config('configs/distill_config.yaml')
     if config.get("is_sweep"):
         wandb_project_name = f"DISTILL {config['model_type']} {config['dataset_type']} {config['config_type']}"
-        sweep_config = construct_sweep_config('distill_config', 'sweep_configs')
+        sweep_config = construct_sweep_config('distill_config', sweep_filename)
         sweep_params = list(sweep_config['parameters'].keys())
         sweep_id = wandb.sweep(
             sweep=sweep_config,
