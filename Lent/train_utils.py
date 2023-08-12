@@ -101,8 +101,7 @@ def train_teacher(teacher: nn.Module,
             lr = scheduler.get_lr()
             train_loss = loss.detach().cpu().numpy()
             
-            if it == 0:
-                check_grads(teacher)
+            check_grads(teacher)
                 
             if it % config.eval_frequency == 0:
                 train_acc = evaluate(teacher, train_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)

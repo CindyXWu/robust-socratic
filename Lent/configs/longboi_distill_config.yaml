@@ -44,7 +44,7 @@ sweep_num: 20
 save_model_as_artifact: true
 save_model: true
 teacher_save_path: null
-wandb_project_name: null
+wandb_project_name: ""
 wandb_run_name: null
 
 use_early_stop: false
