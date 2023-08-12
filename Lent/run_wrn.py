@@ -9,7 +9,7 @@ import logging
 from omegaconf import OmegaConf
 from functools import partial
 
-from create_sweep import construct_sweep_config, load_config
+from create_sweep import load_config
 from train_utils import train_teacher
 from config_setup import MainConfig
 from constructors import model_constructor, optimizer_constructor, create_dataloaders, get_dataset_output_size
@@ -113,7 +113,7 @@ if __name__ == "__main__":
     config: dict = load_config(f"configs/{config_filename}.yaml")
     if config.get("is_sweep"):
         wandb_project_name = f"{config['wandb_project_name']} DISTILL {config['model_type']} {config['dataset_type']} {config['config_type']} {config['dataset']['box_cue_pattern']}"
-        sweep_config = construct_sweep_config(config_filename, sweep_filename)
+        sweep_config = load_config(f"configs/{sweep_filename}.yaml")
         sweep_params = list(sweep_config['parameters'].keys())
         sweep_id = wandb.sweep(
             sweep=sweep_config,
