@@ -27,8 +27,12 @@ cs.store(name="config_base", node=DistillConfig)
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         
-        
-@hydra.main(config_path="configs/", config_name="distill_config", version_base=None)
+# CHANGE THESE  
+config_filename = "main_config"
+sweep_filename = "jac_acc_sweep"
+
+  
+@hydra.main(config_path="configs/", config_name=config_filename, version_base=None)
 def main(config: DistillConfig) -> None:
     """config is typed as MainConfig for duck-typing, but during runtime it's actually an OmegaConf object.
     
@@ -117,15 +121,10 @@ def update_with_wandb_config(config: OmegaConf, sweep_params: list[str]) -> Omeg
 
 
 if __name__ == "__main__":
-    """May have to edit this hard coding opening one single config file in the future."""
-    sweep_filename = "jac_acc_sweep"
-    
-    # Ugly global variables because WandB sweep agent is annoying AF
-    sweep_filename = 'jac_acc_sweep'
-    config: dict = load_config('configs/distill_config.yaml')
+    config: dict = load_config(f"configs/{config_filename}.yaml")
     if config.get("is_sweep"):
-        wandb_project_name = f"DISTILL {config['model_type']} {config['dataset_type']} {config['config_type']} {config['dataset']['box_cue_pattern']}"
-        sweep_config = construct_sweep_config('distill_config', sweep_filename)
+        wandb_project_name = f"{config.wandb_project_name} DISTILL {config['model_type']} {config['dataset_type']} {config['config_type']} {config['dataset']['box_cue_pattern']}"
+        sweep_config = construct_sweep_config(config_filename, sweep_filename)
         sweep_params = list(sweep_config['parameters'].keys())
         sweep_id = wandb.sweep(
             sweep=sweep_config,
