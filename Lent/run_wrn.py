@@ -31,7 +31,7 @@ sweep_filename = "jac_acc_sweep"
 
 
 @hydra.main(config_path="configs/", config_name=config_filename, version_base=None)
-def main(config: MainConfig, sweep_params: list[str] = None) -> None:
+def main(config: MainConfig) -> None:
     """config is typed as MainConfig for duck-typing, but during runtime it's actually an OmegaConf object.
     
     The MainConfig class (or any dataclass you use as a type hint for the config parameter) doesn't restrict what keys can be in the configuration; it only provides additional information to your editor and to Hydra's instantiate function. The actual contents of the configuration are determined entirely by the configuration files and command line arguments.
@@ -74,6 +74,7 @@ def main(config: MainConfig, sweep_params: list[str] = None) -> None:
     
     ## Train
     if config.is_sweep:
+        sweep_params = list(sweep_config['parameters'].keys())
         config = update_with_wandb_config(config, sweep_params) # For wandb sweeps: update with wandb values
     train_teacher(
         teacher=teacher,
