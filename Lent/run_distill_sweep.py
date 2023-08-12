@@ -124,7 +124,7 @@ def update_with_wandb_config(config: OmegaConf, sweep_params: list[str]) -> Omeg
 if __name__ == "__main__":
     config: dict = load_config(f"configs/{config_filename}.yaml")
     if config.get("is_sweep"):
-        wandb_project_name = f"{config.wandb_project_name} DISTILL {config['model_type']} {config['dataset_type']} {config['config_type']} {config['dataset']['box_cue_pattern']}"
+        wandb_project_name = f"{config['wandb_project_name']} DISTILL {config['model_type']} {config['dataset_type']} {config['config_type']} {config['dataset']['box_cue_pattern']}"
         sweep_config = construct_sweep_config(config_filename, sweep_filename)
         sweep_params = list(sweep_config['parameters'].keys())
         sweep_id = wandb.sweep(
