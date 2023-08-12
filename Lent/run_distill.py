@@ -57,7 +57,7 @@ def main(config: DistillConfig) -> None:
     logger_params = {
         "name": config.wandb_run_name,
         "project": config.wandb_project_name,
-#         "settings": wandb.Settings(start_method="thread"),
+        "settings": wandb.Settings(start_method="thread"),
         "config": OmegaConf.to_container(config, resolve=True, throw_on_missing=True),
         "mode": "disabled" if not config.log_to_wandb else "online",
     }
@@ -118,7 +118,7 @@ def update_with_wandb_config(config: OmegaConf, sweep_params: list[str]) -> Omeg
 
 if __name__ == "__main__":
     """May have to edit this hard coding opening one single config file in the future."""
-    sweep_filename = "longboi_distill_config"
+    sweep_filename = "jac_acc_sweep"
     
     # Ugly global variables because WandB sweep agent is annoying AF
     sweep_filename = 'jac_acc_sweep'

@@ -12,6 +12,7 @@ class CustomResNet18(models.ResNet):
             layers=[2, 2, 2, 2],
             num_classes=num_classes
         )
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=1, padding=3, bias=False) # Reduce input stride
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * models.resnet.BasicBlock.expansion, num_classes)
 

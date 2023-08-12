@@ -2,6 +2,7 @@ model_type: RN18AP
 dataset_type: DOMINOES
 config_type: EXHAUSTIVE
 aug_type: NONE
+
 optimization:
   optimizer_type: SGD
   base_lr: 0.1
@@ -14,6 +15,14 @@ dataset:
   data_folder: "data"
   output_size: null
   box_cue_size: 4
+  box_cue_pattern: MANDELBROT
+  use_augmentation: false
+augmentation:
+  alpha: 2.0
+  beta: 1.5
+  mix_prob: 0.6
+  crop_prob: 0.7
+  flip_prob: 0.8
 dataloader:
   train_bs: 64
   test_bs: 64
@@ -21,14 +30,18 @@ dataloader:
 resnet_config:
   blocks_per_stage: 3
   _width_factor: 1
+
 epochs: null
 num_iters: 20000
 eval_frequency: 100
-num_eval_batches: 50
-early_stop_patience: 20
-is_sweep: false
+num_eval_batches: 100
+early_stop_patience: 50
+
 log_to_wandb: true
-save_model_as_artifact: true
+is_sweep: false
+sweep_num: 5
+save_model_as_artifact: false
+save_model: false
 teacher_save_path: null
 wandb_project_name: null
 wandb_run_name: null

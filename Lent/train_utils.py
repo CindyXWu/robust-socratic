@@ -65,6 +65,8 @@ def train_teacher(teacher: nn.Module,
         - teacher_save_path: Where to save the teacher model.
         - wandb_project_name: Name of wandb project.
     """
+    aug = config.dataset.use_augmentation
+    augmentation_params = OmegaConf.to_container(config.augmentation, resolve=True)
     # Really important: reset model weights compared to default initialisation
     if isinstance(teacher, CustomResNet18) or isinstance(teacher, CustomResNet50):
         teacher.weight_reset()
@@ -80,12 +82,15 @@ def train_teacher(teacher: nn.Module,
     cf_dataloaders = get_counterfactual_dataloaders(config, cf_groupname)
     
     for epoch in range(config.epochs):
-        print("Epoch: ", epoch)
         teacher.train()
-        train_loss = []
 
         for inputs, labels in tqdm(train_loader, desc=f"Training iterations within epoch {epoch}"):
-            inputs, labels = inputs.to(device), labels.to(device)
+            labels = labels.to(device)
+            if aug:
+                inputs, labels_2, lam = get_mixup_data(inputs, labels, augmentation_params)
+                labels_2 = labels_2.to(device)
+            inputs = inputs.to(device)
+            inputs.requires_grad_()
             scores = teacher(inputs)
 
             optimizer.zero_grad()
@@ -94,8 +99,11 @@ def train_teacher(teacher: nn.Module,
             optimizer.step()
             scheduler.step()
             lr = scheduler.get_lr()
-            train_loss.append(loss.detach().cpu().numpy())
+            train_loss = loss.detach().cpu().numpy()
             
+            if it == 0:
+                check_grads(teacher)
+                
             if it % config.eval_frequency == 0:
                 train_acc = evaluate(teacher, train_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
                 test_acc = evaluate(teacher, test_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
@@ -112,15 +120,15 @@ def train_teacher(teacher: nn.Module,
                         num_eval_batches=config.num_eval_batches,
                         device=device)
                 
-                print(f'Project {config.wandb_project_name}, Epoch: {epoch}, Train accuracy: {train_acc}, Test accuracy: {test_acc}, LR {lr}')
+                print(f'Project {config.wandb_project_name}, Epoch: {epoch}, Train accuracy: {train_acc}, Test accuracy: {test_acc}, Loss: {train_loss}, LR {lr}')
                 
                 results_dict = {**cf_accs, **{
                     "Train Acc": train_acc, 
                     "Test Acc": test_acc, 
-                    "Loss": np.mean(train_loss), 
+                    "Loss": train_loss, 
                     "LR": lr}}
                 
-                wandb.log(results_dict) # Can also optionally add step here
+                wandb.log(results_dict, step=it) # Can also optionally add step here
         
                 # Early stopping logic
                 if test_acc > best_test_acc:
@@ -148,7 +156,7 @@ def train_teacher(teacher: nn.Module,
         axs[1].set_title("Teacher Saliency Map")
         
         t_prob_str = ["Teacher - " + f"Class {i}: {p:.4f}" for i, p in enumerate(t_prob)]
-        plt.figtext(0.92, 0.5, t_prob_str, fontsize=10, ha="center", va="center", bbox={'boxstyle': "round", 'facecolor': "white"})
+        plt.figtext(0.5, -0.1, t_prob_str, fontsize=10, ha="center", va="center", bbox={'boxstyle': "round", 'facecolor': "white"})
         plt.tight_layout()
 
         wandb.log({f"Epoch {epoch}": [wandb.Image(fig)]}, step=it)
@@ -221,7 +229,7 @@ def train_distill(
     cf_dataloaders = get_counterfactual_dataloaders(config, cf_groupname)
     
     for epoch in range(config.epochs):
-        for inputs, labels in tqdm(train_loader):
+        for inputs, labels in tqdm(train_loader, desc=f"Training iterations within epoch {epoch}"):
             labels = labels.to(device)
             if aug:
                 inputs, labels_2, lam = get_mixup_data(inputs, labels, augmentation_params)
@@ -313,7 +321,7 @@ def train_distill(
                     "Contrastive Loss": contrastive_loss
                 }}
                 
-                wandb.log(results_dict)
+                wandb.log(results_dict, step=it)
                 
                 # Get saliency map
                 single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
@@ -337,7 +345,7 @@ def train_distill(
                 s_prob_str = ["Student - " + f"Class {i}: {p:.4f}" for i, p in enumerate(s_prob)]
                 t_prob_str = ["Teacher - " + f"Class {i}: {p:.4f}" for i, p in enumerate(t_prob)]
                 all_probs_str = "\n".join(s_prob_str + [""] + t_prob_str)
-                plt.figtext(0.92, 0.5, all_probs_str, fontsize=10, ha="center", va="center", bbox={'boxstyle': "round", 'facecolor': "white"})
+                plt.figtext(1.1, 0.5, all_probs_str, fontsize=10, ha="center", va="center", bbox={'boxstyle': "round", 'facecolor': "white"})
                 plt.tight_layout()  # Adjust the layout so that plots do not overlap
 
                 wandb.log({f"Iteration {it}": [wandb.Image(fig)]}, step=it)
