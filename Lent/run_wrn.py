@@ -27,7 +27,7 @@ DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # CHANGE THESE  
 config_filename = "wrn_config"
-sweep_filename = "jac_acc_sweep"
+sweep_filename = "wrn_LR_sweep"
 
 
 @hydra.main(config_path="configs/", config_name=config_filename, version_base=None)
@@ -116,10 +116,12 @@ if __name__ == "__main__":
         wandb_project_name = f"{config['wandb_project_name']} DISTILL {config['model_type']} {config['dataset_type']} {config['config_type']} {config['dataset']['box_cue_pattern']}"
         sweep_config = load_config(f"configs/{sweep_filename}.yaml")
         sweep_params = list(sweep_config['parameters'].keys())
+        logging.info(sweep_params)
         sweep_id = wandb.sweep(
             sweep=sweep_config,
             project=wandb_project_name
         )
         wandb.agent(sweep_id, function=main, count=config['sweep_num'])
     else:
+        sweep_params=[]
         main()

@@ -1,0 +1,13 @@
+method: bayes
+metric: 
+  name: S Loss
+  goal: minimize
+name: WRN LR sweep
+parameters: 
+  optimization.base_lr: 
+    distribution: log_uniform
+    min: -10
+    max: -2
+# early_terminate: 
+#   type: hyperband
+#   min_iter: 5

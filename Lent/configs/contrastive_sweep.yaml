@@ -8,6 +8,14 @@ parameters:
     distribution: uniform
     min: 0.01
     max: 0.1
+  optimization.base_lr: 
+    distribution: log_uniform
+    min: -10
+    max: -2
+  nonbase_loss_frac:
+    distribution: log_uniform
+    min: 0.001
+    max: 0.1
 early_terminate: 
   type: hyperband
   min_iter: 5
