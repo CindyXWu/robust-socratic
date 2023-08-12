@@ -53,17 +53,13 @@ class BoxPatternType(str, Enum):
     RANDOM = "RANDOM"
     MANDELBROT = "MANDELBROT"
     
-
+    
 @dataclass
-class ResNetConfig:
-    blocks_per_stage: int = 3 # Gives ResNet20: 3 blocks * 3 stages * 2 layers per block + input layer + output layer
-    _width_factor: int = field(default=1, repr=False) # Hide this field for repr
-
-    @property
-    def width_factor(self):
-        return self._width_factor
-
-
+class WRNArchitectureConfig:
+    blocks_per_stage: Optional[int] = None
+    width_factor: Optional[int] = None
+        
+        
 @dataclass
 class AugmentationConfig:
     """
@@ -128,11 +124,11 @@ class MainConfig:
     dataloader: DataLoaderConfig = field(default_factory=DataLoaderConfig)
 
     # Model-specific init
-    resnet_config: Optional[ResNetConfig] = field(default_factory=ResNetConfig)
+    wrn_config: Optional[WRNArchitectureConfig] = field(default_factory=WRNArchitectureConfig)
 
     # Training
     epochs: Optional[int] = None # Instantiate in main function
-    num_iters: int = 20000 # Upper bound - see early stopping
+    num_iters: int = 20000 # Upper bound - see early stopping - do not set lower than iterations for 1 epoch or will not run
     min_iters: int = 8000
     eval_frequency: int = 100
     """How many iterations between evaluations. If None, assumed to be 1 epoch, if the dataset is not Iterable."""

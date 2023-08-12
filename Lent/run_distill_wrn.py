@@ -28,7 +28,7 @@ cs.store(name="config_base", node=DistillConfig)
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         
         
-@hydra.main(config_path="configs/", config_name="distill_config", version_base=None)
+@hydra.main(config_path="configs/", config_name="wrn_config", version_base=None)
 def main(config: DistillConfig) -> None:
     """config is typed as MainConfig for duck-typing, but during runtime it's actually an OmegaConf object.
     
@@ -52,7 +52,7 @@ def main(config: DistillConfig) -> None:
     config.dataset.output_size = get_dataset_output_size(config)
             
     ## wandb
-    config.wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type} {config.dataset.box_cue_pattern}"
+    config.wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type}"
     config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}, S Mech: {s_exp_idx} {s_exp_name}, Loss: {config.distill_loss_type}"
     logger_params = {
         "name": config.wandb_run_name,
