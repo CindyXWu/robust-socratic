@@ -49,8 +49,8 @@ def model_constructor(config: MainConfig) -> nn.Module:
         )
     elif config.model_type == ModelType.RESNE20_WIDE:
         model = wide_resnet_constructor(
-            blocks_per_stage=config.resnet_config.blocks_per_stage,
-            width_factor=config.resnet_config.width_factor,
+            blocks_per_stage=config.wrn_config.blocks_per_stage,
+            width_factor=config.wrn_config.width_factor,
             output_size=config.dataset.output_size,
         )
     elif config.model_type == ModelType.RESNET18_ADAPTIVE_POOLING:

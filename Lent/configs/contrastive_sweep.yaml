@@ -1,0 +1,13 @@
+method: bayes
+metric: 
+  name: S Loss
+  goal: minimize
+name: Contrastive Temperature Sweep
+parameters: 
+  contrast_temp: 
+    distribution: uniform
+    min: 0.01
+    max: 0.1
+early_terminate: 
+  type: hyperband
+  min_iter: 5

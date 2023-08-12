@@ -1,7 +1,6 @@
-model_type: RN18AP
+model_type: RN20W
 dataset_type: DOMINOES
 config_type: EXHAUSTIVE
-distill_loss_type: CONTRASTIVE
 aug_type: NONE
 
 optimization:
@@ -28,10 +27,12 @@ dataloader:
   train_bs: 64
   test_bs: 64
   num_workers: 1
+wrn_config:
+  blocks_per_stage: 2
+  width_factor: 2
 
 epochs: null
-num_iters: 800
-min_iters: 300
+num_iters: 20000
 eval_frequency: 100
 num_eval_batches: 50
 early_stop_patience: 20
@@ -44,14 +45,3 @@ save_model: false
 teacher_save_path: null
 wandb_project_name: null
 wandb_run_name: null
-
-use_early_stop: false
-base_distill_loss_type: KL
-jacobian_loss_type: MSE
-nonbase_loss_frac: 0.5
-dist_temp: 30
-jac_temp: 1
-contrast_temp: 0.1
-s_layer: null
-t_layer: null
-student_save_path: null
