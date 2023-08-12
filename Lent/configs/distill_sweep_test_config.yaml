@@ -32,8 +32,8 @@ dataloader:
 epochs: null
 num_iters: 800
 min_iters: 300
-eval_frequency: 100
-num_eval_batches: 100
+eval_frequency: 200
+num_eval_batches: 50
 early_stop_patience: 50
 
 log_to_wandb: true
