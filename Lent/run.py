@@ -13,10 +13,8 @@ from train_utils import train_teacher
 from config_setup import MainConfig
 from constructors import model_constructor, optimizer_constructor, create_dataloaders, get_dataset_output_size
 
-
 # Change directory to one this file is in
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
 
 # Register the defaults from the structured dataclass config schema:
 cs = ConfigStore.instance()
@@ -26,7 +24,7 @@ DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # CHANGE THESE  
 config_filename = "wrn_config"
-sweep_filename = "jac_acc_sweep"
+sweep_filename = "wrn_LR_sweep"
 
 
 @hydra.main(config_path="configs/", config_name=config_filename, version_base=None)

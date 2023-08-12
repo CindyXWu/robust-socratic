@@ -1,10 +1,10 @@
 import torch
+from torch import autograd
 import logging
 import os
 import wandb
 import hydra
 import warnings
-from functools import partial
 from hydra.core.config_store import ConfigStore
 from hydra.core.hydra_config import HydraConfig
 from hydra.utils import get_original_cwd
@@ -20,6 +20,9 @@ logging.getLogger("matplotlib").setLevel(logging.ERROR)
 
 # Change directory to one this file is in
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+# Logging for error messages
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', filename='app.log', level=logging.INFO)
 
 # Register the defaults from the structured dataclass config schema:
 cs = ConfigStore.instance()

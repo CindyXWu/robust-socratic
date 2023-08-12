@@ -96,6 +96,7 @@ def train_teacher(teacher: nn.Module,
             optimizer.zero_grad()
             loss = ce_loss(scores, labels)
             loss.backward()
+                
             optimizer.step()
             scheduler.step()
             lr = scheduler.get_lr()
@@ -257,6 +258,8 @@ def train_distill(
                         config=config,
                         input_dim=input_dim
                     )
+                    # Debug
+                    if has_nan_or_inf(jacobian_loss): logging.error("NaN or Inf detected in jacobian_loss!")
                     loss = (1-config.nonbase_loss_frac)*loss + config.nonbase_loss_frac*jacobian_loss
                     
                 case DistillLossType.CONTRASTIVE:
@@ -276,9 +279,20 @@ def train_distill(
                 #     s_map = student.attention_map(inputs, layer)
                 #     t_map = teacher.attention_map(inputs, layer).detach() 
                     # loss = feature_map_diff(scores, targets, s_map, t_map, T=1, alpha=0.2, loss_fn=mse_loss, aggregate_chan=False)
-
+                    
+            # Debug for backward generating error
+            if has_nan_or_inf(loss):
+                logging.error("NaN or Inf detected in loss!")
             optimizer.zero_grad()
-            loss.backward()
+            # Debug
+            try:
+                loss.backward()
+            except Exception as e:
+                memory_info = get_gpu_memory_usage()
+                logging.info(f"Error occurred! GPU Memory Usage: {memory_info}")
+                wandb.log({"Error GPU Memory Usage": memory_info["free_memory"]})
+                 # Re-raise the error to see its traceback
+                raise e
             optimizer.step()
             scheduler.step()
             lr = scheduler.get_lr()
@@ -368,6 +382,39 @@ def train_distill(
         save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
 
 
+def has_nan_or_inf(tensor):
+    """Helper function for function below."""
+    return torch.isnan(tensor).any() or torch.isinf(tensor).any()
+
+
+def check_model_for_nan_and_inf(model):
+    """Detects if gradient clipping needed."""
+    nan_inf_params = []
+    nan_inf_grads = []
+
+    for name, param in model.named_parameters():
+        if has_nan_or_inf(param.data):
+            nan_inf_params.append(name)
+        if param.grad is not None and has_nan_or_inf(param.grad.data):
+            nan_inf_grads.append(name)
+
+    return nan_inf_params, nan_inf_grads
+
+
+def get_gpu_memory_usage(device_id=0):
+    """Return GPU memory usage in GB."""
+    total_memory = torch.cuda.get_device_properties(device_id).total_memory / 1e9  # in GB
+    reserved_memory = torch.cuda.memory_reserved(device_id) / 1e9  # in GB
+    allocated_memory = torch.cuda.memory_allocated(device_id) / 1e9  # in GB
+
+    return {
+        "total_memory": total_memory,
+        "reserved_memory": reserved_memory,
+        "allocated_memory": allocated_memory,
+        "free_memory": total_memory - reserved_memory
+    }
+    
+    
 def check_grads(model: nn.Module):
     for param in model.parameters():
         assert param.grad is not None
