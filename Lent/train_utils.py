@@ -305,7 +305,7 @@ def train_distill(
             
             # Clip gradients
             if clip_grad < float('inf'):
-                torch.nn.utils.clip_grad_norm_(model.parameters(), clip_grad)
+                torch.nn.utils.clip_grad_norm_(student.parameters(), clip_grad)
             optimizer.step()
             scheduler.step()
             lr = scheduler.get_lr()
@@ -372,7 +372,7 @@ def train_distill(
                 t_prob_str = ["Teacher - " + f"Class {i}: {p:.4f}" for i, p in enumerate(t_prob)]
                 all_probs_str = "\n".join(s_prob_str + [""] + t_prob_str)
                 plt.figtext(1.1, 0.5, all_probs_str, fontsize=10, ha="center", va="center", bbox={'boxstyle': "round", 'facecolor': "white"})
-                plt.tight_layout()  # Adjust the layout so that plots do not overlap
+                # plt.tight_layout()  # Adjust the layout so that plots do not overlap
 
                 wandb.log({f"Iteration {it}": [wandb.Image(fig)]}, step=it)
 
