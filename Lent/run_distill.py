@@ -27,7 +27,7 @@ cs.store(name="config_base", node=DistillConfig)
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         
 # CHANGE THESE  
-config_filename = "main_config"
+config_filename = "distill_config"
 sweep_filename = "jac_acc_sweep"
 
   

@@ -38,7 +38,7 @@ eval_frequency: 100
 num_eval_batches: 50
 early_stop_patience: 20
 
-log_to_wandb: false
+log_to_wandb: true
 is_sweep: true
 sweep_num: 5
 save_model_as_artifact: false

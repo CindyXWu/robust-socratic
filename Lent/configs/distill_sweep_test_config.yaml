@@ -1,7 +1,7 @@
 model_type: RN18AP
 dataset_type: DOMINOES
 config_type: EXHAUSTIVE
-distill_loss_type: BASE
+distill_loss_type: JACOBIAN
 aug_type: NONE
 
 optimization:
@@ -31,16 +31,16 @@ dataloader:
   num_workers: 1
 
 epochs: null
-num_iters: 800
+num_iters: 8000
 min_iters: 300
 eval_frequency: 200
 num_eval_batches: 50
 early_stop_patience: 50
-run_description: "Debugging Base sweep - 1 epoch, 4 run sweep with logging"
+run_description: "Jacobian sweep for loss fraction using Hydra"
 
 log_to_wandb: true
-is_sweep: true
-sweep_num: 4
+is_sweep: false
+sweep_num: 20
 save_model_as_artifact: false
 save_model: false
 teacher_save_path: null
