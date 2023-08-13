@@ -321,7 +321,7 @@ def train_distill(
                         batch_size=config.dataloader.test_bs,
                         num_eval_batches=config.num_eval_batches
                         )
-                print(f"Project: {config.wandb_run_name}, Iteration: {it}, Epoch: {epoch}, Loss: {train_loss}, LR: {lr}, Base Temperature: {config.dist_temp}, Jacobian Temperature: {config.jac_temp}, Contrastive Temperature: {config.contrast_temp}, Nonbase Loss Frac: {config.nonbase_loss_frac}, ")
+                print(f"{config.run_description} Project: {config.wandb_run_name}, Iteration: {it}, Epoch: {epoch}, Loss: {train_loss}, LR: {lr}, Base Temperature: {config.dist_temp}, Jacobian Temperature: {config.jac_temp}, Contrastive Temperature: {config.contrast_temp}, Nonbase Loss Frac: {config.nonbase_loss_frac}, ")
 
                 results_dict = {**cf_evals, **{
                     "T-S KL": test_KL, 

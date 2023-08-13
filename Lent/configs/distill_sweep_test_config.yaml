@@ -35,6 +35,7 @@ min_iters: 300
 eval_frequency: 200
 num_eval_batches: 50
 early_stop_patience: 50
+run_description: "Debugging Jacobian sweep - 1 epoch, 4 run sweep with logging"
 
 log_to_wandb: true
 is_sweep: true

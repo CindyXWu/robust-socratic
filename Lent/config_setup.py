@@ -139,6 +139,7 @@ class MainConfig:
     """
     early_stop_patience: int = 20 # Number of epochs with no accuracy improvement before training stops
     teacher_save_path: Optional[str] = None
+    run_description: Optional[str] = ""
 
     # Logging
     log_to_wandb: bool = False
