@@ -203,14 +203,19 @@ def train_distill(
     """
     aug = config.dataset.use_augmentation
     augmentation_params = OmegaConf.to_container(config.augmentation, resolve=True)
+    clip_grad = config.optimization.clip_grad
+    num_errors = 0 # For debug
+    
     # Some checks for model saving
     if config.is_sweep:
         assert config.save_model is False or config.save_model_as_artifact is False, "Don't save model during sweep"
+        
     # Really important: reset model weights compared to default initialisation
     if isinstance(student, CustomResNet18) or isinstance(student, CustomResNet50):
         student.weight_reset()  
     teacher.eval()
     student.train()
+    
     train_acc_list, test_acc_list = [], []
     it = 0
     no_improve_count = 0
@@ -259,7 +264,7 @@ def train_distill(
                         input_dim=input_dim
                     )
                     # Debug
-                    if has_nan_or_inf(jacobian_loss): logging.error("NaN or Inf detected in jacobian_loss!")
+                    if has_nan_or_inf(jacobian_loss): wandb.log({"NaN or Inf detected in jacobian_loss!"})
                     loss = (1-config.nonbase_loss_frac)*loss + config.nonbase_loss_frac*jacobian_loss
                     
                 case DistillLossType.CONTRASTIVE:
@@ -283,6 +288,7 @@ def train_distill(
             # Debug for backward generating error
             if has_nan_or_inf(loss):
                 logging.error("NaN or Inf detected in loss!")
+                wandb.log({"NaN or Inf detected in loss": loss})
             optimizer.zero_grad()
             # Debug
             try:
@@ -290,9 +296,16 @@ def train_distill(
             except Exception as e:
                 memory_info = get_gpu_memory_usage()
                 logging.info(f"Error occurred! GPU Memory Usage: {memory_info}")
-                wandb.log({"Error GPU Memory Usage": memory_info["free_memory"]})
-                 # Re-raise the error to see its traceback
-                raise e
+                logging.error(f"Error occurred during backward pass on batch {it}: {str(e)}")
+                wandb.log({f"Error at iteration {it}": memory_info["free_memory"]})
+                num_errors += 1
+                # Re-raise the error to see its traceback
+                # raise e
+                continue # Cursed
+            
+            # Clip gradients
+            if clip_grad < float('inf'):
+                torch.nn.utils.clip_grad_norm_(model.parameters(), clip_grad)
             optimizer.step()
             scheduler.step()
             lr = scheduler.get_lr()
@@ -321,7 +334,7 @@ def train_distill(
                         batch_size=config.dataloader.test_bs,
                         num_eval_batches=config.num_eval_batches
                         )
-                print(f"{config.run_description} Project: {config.wandb_run_name}, Iteration: {it}, Epoch: {epoch}, Loss: {train_loss}, LR: {lr}, Base Temperature: {config.dist_temp}, Jacobian Temperature: {config.jac_temp}, Contrastive Temperature: {config.contrast_temp}, Nonbase Loss Frac: {config.nonbase_loss_frac}, ")
+                print(f"{config.run_description} Project: {config.wandb_run_name}, Iteration: {it}, Epoch: {epoch}, Loss: {train_loss}, LR: {lr}, Base Temperature: {config.dist_temp}, Jacobian Temperature: {config.jac_temp}, Contrastive Temperature: {config.contrast_temp}, Nonbase Loss Frac: {config.nonbase_loss_frac}, Error Count: {num_errors}")
 
                 results_dict = {**cf_evals, **{
                     "T-S KL": test_KL, 

@@ -106,6 +106,7 @@ class OptimizerConfig:
     momentum: float = 0.0
     # For cosine LR scheduler
     final_lr: float = 1e-3
+    clip_grad: float = float("inf")
     cosine_lr_schedule: bool = True
     optimizer_kwargs: Optional[dict[str, Any]] = field(default_factory=dict)
 
