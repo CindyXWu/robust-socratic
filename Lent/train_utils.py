@@ -309,7 +309,7 @@ def train_distill(
             optimizer.step()
             scheduler.step()
             lr = scheduler.get_lr()
-            train_loss = loss.detach().cpu().numpy() 
+            train_loss = loss.detach().cpu().item()
 
             if it == 0:  # Debugging
                 check_grads(student)
@@ -343,8 +343,8 @@ def train_distill(
                     "S Test": test_acc, 
                     "S Loss": train_loss, 
                     "S LR": lr, 
-                    "Jacobian Loss": jacobian_loss, 
-                    "Contrastive Loss": contrastive_loss
+                    "Jacobian Loss": jacobian_loss.detach().cpu().item(),
+                    "Contrastive Loss": contrastive_loss.current_loss,
                 }}
                 
                 wandb.log(results_dict, step=it)

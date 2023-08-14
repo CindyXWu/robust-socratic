@@ -48,6 +48,7 @@ class CRDLoss(nn.Module):
         dot_product = torch.mm(f_s, f_t.t())
         out_s = torch.exp(torch.div(dot_product, self.T))
         s_loss = self.criterion_s(out_s, y)
+        self.current_loss = s_loss.detach().item() # Save for logging later
         return s_loss
 
     
