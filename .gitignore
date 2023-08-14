@@ -11,3 +11,5 @@ data/*
 **/outputs/
 
 **/multirun/
+
+**/.ipynb_checkpoints/
