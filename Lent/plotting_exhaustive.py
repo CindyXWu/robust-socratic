@@ -32,12 +32,17 @@ sns.set_palette("pastel")
 
 def heatmap_get_data(project_name: str,
                      loss_name: str,
-                     groupby_metrics: List[str],) -> List[pd.DataFrame]:
+                     groupby_metrics: List[str],
+                     second_project_name: str = None) -> List[pd.DataFrame]:
     """Get data from wandb for experiment set, filter and group. 
     
     Calculate mean/var of metrics and return a list of history dataframes with mean/var interleaved.
     """
-    runs = api.runs(project_name) 
+    runs = api.runs(project_name)
+    if second_project_name: # Optional: combine runs from two projects
+        runs_2 = api.runs(second_project_name)
+        runs = runs + runs_2
+        
     filtered_runs = []
     min_step = 300 # Filter partially logged/unfinished runs
 
@@ -47,11 +52,11 @@ def heatmap_get_data(project_name: str,
         if run.config.get('distill_loss_type') == loss_name:
             history = run.history()
             if '_step' in history.columns and history['_step'].max() >= min_step:
-                filtered_runs.append(run)
-                history = drop_image_columns(history) # Remove artifacts
+                history = drop_non_numeric_columns(history) # Remove artifacts
                 history = clean_history(history) # Remove NaNs
                 #history = smooth_history(history)
                 run.history  = history
+                filtered_runs.append(run)
     # Check list of runs is not empty
     assert(len(filtered_runs) > 0), "No runs found with the given settings"
     
@@ -129,7 +134,8 @@ def wandb_get_data(project_name: str,
                 history = run.history
             if '_step' in history.columns and history['_step'].max() >= min_step:
                 filtered_runs.append(run)
-                history = drop_image_columns(history) # Remove artifacts
+                # history = drop_image_columns(history) # Remove artifacts
+                history = drop_non_numeric_columns(history) # Remove artifacts
                 history = clean_history(history) # Remove NaNs
                 run.history = smooth_history(history) # Smooth bumpy plots
 
@@ -177,19 +183,35 @@ def plot_counterfactual_heatmaps(
         ax.set_ylabel('Student Training Mechanism', fontsize=15)
         # ax.set_title(f'Counterfactual {key.replace("_", " ")} Test Accuracy - {loss} Loss')
         plt.savefig(f'images/heatmaps/{loss_name}_{box_pattern}/{key}.png', dpi=300, bbox_inches='tight')
+            
 
-
-def drop_image_columns(df):
-    """Where images have been logged, run.history will return artifacts also. 
-    This function removes these artifacts from the history dictionary.
-    """
+def drop_non_numeric_columns(df):
+    """Drop columns that cannot be converted entirely to numeric values."""
     cols_to_drop = []
+    
     for col in df.columns:
-        if any(isinstance(i, dict) for i in df[col]):
+        try:
+            pd.to_numeric(df[col])
+        except:
             cols_to_drop.append(col)
+                
     df = df.drop(columns=cols_to_drop)
     return df
-            
+
+
+# def clean_history(history: pd.DataFrame) -> pd.DataFrame:
+#     """Remove any NaN datapoints individually due to data logging bug where wandb believes logging data as separate dictionaries is a new timstep at each call."""
+#     history_clean = pd.DataFrame()
+    
+#     for col in history.columns:
+#         if not col.startswith('_'):
+#             col_array = history[col].values
+#             col_array_clean = col_array[~np.isnan(col_array)]
+#             history_clean[col] = pd.Series(col_array_clean)
+#     history_clean.reset_index(drop=True, inplace=True)
+    
+#     return history_clean
+
 
 def clean_history(history: pd.DataFrame) -> pd.DataFrame:
     """Remove any NaN datapoints individually due to data logging bug where wandb believes logging data as separate dictionaries is a new timstep at each call."""
@@ -198,8 +220,12 @@ def clean_history(history: pd.DataFrame) -> pd.DataFrame:
     for col in history.columns:
         if not col.startswith('_'):
             col_array = history[col].values
-            col_array_clean = col_array[~np.isnan(col_array)]
-            history_clean[col] = pd.Series(col_array_clean)
+            if np.issubdtype(col_array.dtype, np.number):  # Check if the data type is numeric
+                col_array_clean = col_array[~np.isnan(col_array)]
+                history_clean[col] = pd.Series(col_array_clean)
+            else:
+                # Handle non-numeric columns, e.g., copy them as is
+                history_clean[col] = history[col]
     history_clean.reset_index(drop=True, inplace=True)
     
     return history_clean
@@ -381,7 +407,8 @@ if __name__ == "__main__":
     # Somewhat immutable things
     exp_names = [config.name for config in ConfigGroups.exhaustive]
     actual_group_names = ["I", "A", "B", "AB", "IB", "IA", "IAB"] # Actual order of names here
-    loss_names = ['BASE', 'JACOBIAN']
+    # loss_names = ['BASE', 'JACOBIAN']
+    loss_names = ['CONTRASTIVE']
     # loss_names = [loss_type.value for loss_type in DistillLossType]
     use_pattern_distinguish = False # Old set of runs
     
@@ -391,6 +418,8 @@ if __name__ == "__main__":
         config = yaml.safe_load(stream)
     config = recursive_namespace(config)
     box_pattern = config.dataset.box_cue_pattern
+    
+    second_wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type} {box_pattern}"
     
     if use_pattern_distinguish:
         wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type} {box_pattern}"

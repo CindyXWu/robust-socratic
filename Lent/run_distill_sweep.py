@@ -47,7 +47,10 @@ def main(config: DistillConfig) -> None:
     """Command line:
     python run.py experiment@t_exp=exhaustive_0 experiment@s_exp=exhaustive_1
     """
-    is_sweep = config.is_sweep
+    if config.is_sweep: # For wandb sweeps: update with wandb values
+        config = update_with_wandb_config(config, sweep_params)
+    
+    ## Filenames, save paths and all that stuff
     [t_exp_prefix, t_exp_idx] = config.experiment.config_filename.split("_")
     [s_exp_prefix, s_exp_idx] = config.experiment_s.config_filename.split("_")
     # From name field of config file
@@ -56,9 +59,10 @@ def main(config: DistillConfig) -> None:
     config.student_save_path = f"trained_students/{config.model_type}_{config.dataset_type}_{s_exp_prefix}_{s_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_student"
     
     ## Update config file before logging config values to wandb
-    config.nonbase_loss_frac = get_nonbase_loss_frac(config)
+    if 'nonbase_loss_frac' not in sweep_params:
+        config.nonbase_loss_frac = get_nonbase_loss_frac(config)
     config.dataset.output_size = get_dataset_output_size(config)
-            
+    
     ## wandb
     config.wandb_project_name = f"{config.wandb_project_name} DISTILL {config.model_type} {config.dataset_type} {config.config_type} {config.dataset.box_cue_pattern}"
     config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}, S Mech: {s_exp_idx} {s_exp_name}, Loss: {config.distill_loss_type}"
@@ -86,9 +90,6 @@ def main(config: DistillConfig) -> None:
     ## Optimizer
     optimizer, scheduler = optimizer_constructor(config=config, model=student, train_loader=train_loader)
 
-    ## Train
-    if is_sweep:
-        config = update_with_wandb_config(config, sweep_params) # For wandb sweeps: update with wandb values
     train_distill(
         teacher=teacher,
         student=student,
