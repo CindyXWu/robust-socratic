@@ -23,8 +23,8 @@ cs.store(name="config_base", node=MainConfig)
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # CHANGE THESE  
-config_filename = "wrn_config"
-sweep_filename = "wrn_LR_sweep"
+config_filename = "main_config"
+sweep_filename = ""
 
 
 @hydra.main(config_path="configs/", config_name=config_filename, version_base=None)
@@ -38,13 +38,15 @@ def main(config: MainConfig) -> None:
     """Command line:
     python run.py experiment@t_exp=exhaustive_0 experiment@s_exp=exhaustive_1
     """
-    # logging.info(OmegaConf.to_container(config.experiment))
+    if config.is_sweep:
+        config = update_with_wandb_config(config, sweep_params)
+
     [t_exp_prefix, t_exp_idx] = config.experiment.config_filename.split("_")
     t_exp_name = config.experiment.name.split(":")[-1].strip()
     config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_teacher"
     
     ## WandB
-    config.wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type} {config.dataset.box_cue_pattern}:{config.wandb_project_name}"
+    config.wandb_project_name = f"{config.model_type} {config.dataset_type} {config.config_type} {config.dataset.box_cue_pattern}{config.wandb_project_name}"
     config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}"
     logger_params = {
     "name": config.wandb_run_name,
@@ -69,9 +71,6 @@ def main(config: MainConfig) -> None:
     config.epochs = config.num_iters//(len(train_loader))  
     optimizer, scheduler = optimizer_constructor(config=config, model=teacher, train_loader=train_loader)
     
-    ## Train
-    if config.is_sweep:
-        config = update_with_wandb_config(config, sweep_params) # For wandb sweeps: update with wandb values
     train_teacher(
         teacher=teacher,
         train_loader=train_loader,

@@ -50,7 +50,7 @@ run_description: ""
 use_early_stop: false
 base_distill_loss_type: KL
 jacobian_loss_type: MSE
-nonbase_loss_frac: 0.01
+nonbase_loss_frac: null
 dist_temp: 30
 jac_temp: 1
 contrast_temp: 0.1

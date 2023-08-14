@@ -27,8 +27,8 @@ cs.store(name="config_base", node=DistillConfig)
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         
 # CHANGE THESE  
-config_filename = "distill_config"
-sweep_filename = "jac_acc_sweep"
+config_filename = "distill_sweep_test_config"
+sweep_filename = "jac_acc_sweep" # not currently using WandB sweeps
 
   
 @hydra.main(config_path="configs/", config_name=config_filename, version_base=None)
@@ -54,12 +54,12 @@ def main(config: DistillConfig) -> None:
     config.student_save_path = f"trained_students/{config.model_type}_{config.dataset_type}_{s_exp_prefix}_{s_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_student"
     
     ## Update config file before logging config values to wandb
-    if 'nonbase_loss_frac' not in sweep_params:
+    if config.nonbase_loss_frac is None:
         config.nonbase_loss_frac = get_nonbase_loss_frac(config)
     config.dataset.output_size = get_dataset_output_size(config)
             
     ## wandb
-    config.wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type} {config.dataset.box_cue_pattern}:{config.wandb_project_name}"
+    config.wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type} {config.dataset.box_cue_pattern}{config.wandb_project_name}"
     config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}, S Mech: {s_exp_idx} {s_exp_name}, Loss: {config.distill_loss_type}"
     logger_params = {
         "name": config.wandb_run_name,
