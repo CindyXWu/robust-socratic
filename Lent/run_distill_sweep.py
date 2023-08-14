@@ -52,8 +52,8 @@ def main(config: DistillConfig) -> None:
     [s_exp_prefix, s_exp_idx] = config.experiment_s.config_filename.split("_")
     # From name field of config file
     t_exp_name, s_exp_name = config.experiment.name.split(":")[-1].strip(), config.experiment_s.name.split(":")[-1].strip()
-    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_teacher" # Where to load teacher
-    config.student_save_path = f"trained_students/{config.model_type}_{config.dataset_type}_{s_exp_prefix}_{s_exp_name.replace(' ', '_')}_student"
+    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_teacher" # Where to load teacher
+    config.student_save_path = f"trained_students/{config.model_type}_{config.dataset_type}_{s_exp_prefix}_{s_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_student"
     
     ## Update config file before logging config values to wandb
     config.nonbase_loss_frac = get_nonbase_loss_frac(config)

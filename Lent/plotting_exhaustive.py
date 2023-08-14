@@ -5,6 +5,7 @@ import os
 from types import SimpleNamespace
 import yaml
 import logging
+from enum import Enum
 import wandb
 from wandb.sdk.wandb_run import Run
 
@@ -15,7 +16,7 @@ from scipy.signal import savgol_filter
 import seaborn as sns
 from typing import List, Optional, Dict, Tuple
 
-from config_setup import ConfigGroups, DistillConfig
+from config_setup import ConfigGroups, DistillConfig, BoxPatternType, DistillLossType
 
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -145,7 +146,8 @@ def wandb_get_data(project_name: str,
 def plot_counterfactual_heatmaps(
     combined_history: List[pd.DataFrame], 
     exp_names: str,
-    loss_name: str) -> Dict[str, np.ndarray]:
+    loss_name: DistillLossType,
+    box_pattern: BoxPatternType) -> Dict[str, np.ndarray]:
     """
     Args:
         exp_names: ordered list of experiment names to plot.
@@ -174,7 +176,7 @@ def plot_counterfactual_heatmaps(
         ax.set_xlabel('Teacher Training Mechanism', fontsize=15)
         ax.set_ylabel('Student Training Mechanism', fontsize=15)
         # ax.set_title(f'Counterfactual {key.replace("_", " ")} Test Accuracy - {loss} Loss')
-        plt.savefig(f'images/heatmaps/{loss_name}/{key}.png', dpi=300, bbox_inches='tight')
+        plt.savefig(f'images/heatmaps/{loss_name}_{box_pattern}/{key}.png', dpi=300, bbox_inches='tight')
 
 
 def drop_image_columns(df):
@@ -380,13 +382,20 @@ if __name__ == "__main__":
     exp_names = [config.name for config in ConfigGroups.exhaustive]
     actual_group_names = ["I", "A", "B", "AB", "IB", "IA", "IAB"] # Actual order of names here
     loss_names = ['BASE', 'JACOBIAN']
+    # loss_names = [loss_type.value for loss_type in DistillLossType]
+    use_pattern_distinguish = False # Old set of runs
     
     # Configs - amazing part of using config YAML is I can load all settings in
     config_filename = "distill_config"
     with open(f"configs/{config_filename}.yaml", 'r') as stream:
         config = yaml.safe_load(stream)
     config = recursive_namespace(config)
-    wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type}"
+    box_pattern = config.dataset.box_cue_pattern
+    
+    if use_pattern_distinguish:
+        wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type} {box_pattern}"
+    else:
+        wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type}"
     
     # To be changed
     mode = 0 # 0 for heatmap, 1 for plots
@@ -396,8 +405,7 @@ if __name__ == "__main__":
         for loss_name in loss_names:
             # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
             histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, groupby_metrics=groupby_metrics)
-        
-            plot_counterfactual_heatmaps(histories, exp_names, loss_name)
+            plot_counterfactual_heatmaps(histories, exp_names, loss_name, box_pattern)
             
     elif mode == 1:
         for t_exp_name in exp_names:
@@ -405,5 +413,4 @@ if __name__ == "__main__":
                 title = f"{config.model_type} {config.experiment.name} {config.distill_loss_type}"
                 # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
                 histories = wandb_get_data(project_name=wandb_project_name, config=config, groupby_metrics=groupby_metrics, plot_tmechs_together=False)
-                
                 wandb_plot(histories, title)

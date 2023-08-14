@@ -41,10 +41,10 @@ def main(config: MainConfig) -> None:
     # logging.info(OmegaConf.to_container(config.experiment))
     [t_exp_prefix, t_exp_idx] = config.experiment.config_filename.split("_")
     t_exp_name = config.experiment.name.split(":")[-1].strip()
-    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_teacher"
+    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_teacher"
     
-    ## wandb
-    config.wandb_project_name = f"{config.wandb_project_name} {config.model_type} {config.dataset_type} {config.config_type}"
+    ## WandB
+    config.wandb_project_name = f"{config.wandb_project_name} {config.model_type} {config.dataset_type} {config.config_type} {config.dataset.box_cue_pattern}"
     config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}"
     logger_params = {
     "name": config.wandb_run_name,
