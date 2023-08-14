@@ -44,7 +44,7 @@ sweep_num: 20
 save_model_as_artifact: false
 save_model: false
 teacher_save_path: null
-wandb_project_name: "Sweep test"
+wandb_project_name: "sweep test"
 wandb_run_name: null
 
 use_early_stop: false

@@ -37,6 +37,7 @@ num_iters: 20000
 eval_frequency: 100
 num_eval_batches: 50
 early_stop_patience: 20
+run_description: "Wide ResNet teacher with Mandelbrot pattern"
 
 log_to_wandb: true
 is_sweep: true

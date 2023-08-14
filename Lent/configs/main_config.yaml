@@ -35,8 +35,9 @@ resnet_config:
 epochs: null
 num_iters: 20000
 eval_frequency: 100
-num_eval_batches: 100
+num_eval_batches: 50
 early_stop_patience: 50
+run_description: "Training original RN18 teacher for Mandelbrot pattern"
 
 log_to_wandb: true
 is_sweep: false
@@ -46,3 +47,4 @@ save_model: false
 teacher_save_path: null
 wandb_project_name: ""
 wandb_run_name: null
+
