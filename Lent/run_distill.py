@@ -59,7 +59,7 @@ def main(config: DistillConfig) -> None:
     config.dataset.output_size = get_dataset_output_size(config)
             
     ## WandB - note project now hyphenated by default
-    config.wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type} {config.dataset.box_cue_pattern}{config.wandb_project_name}"
+    config.wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type}-{config.dataset.box_cue_pattern}{config.wandb_project_name}"
 
     config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}, S Mech: {s_exp_idx} {s_exp_name}, Loss: {config.distill_loss_type}"
     logger_params = {

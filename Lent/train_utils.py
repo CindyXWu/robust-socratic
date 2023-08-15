@@ -496,8 +496,9 @@ def get_saliency_map(
     """Saliency would be the gradient with respect to the input image now. But note that the input image has 3 channels,
     R, G and B. To derive a single class saliency value for each pixel (i, j),  we take the maximum magnitude
     across all colour channels."""
-    saliency, _ = torch.max(input.grad.data.abs(), dim=1).squeeze().detach().cpu().numpy()
-
+    saliency, _ = torch.max(input.grad.data.abs(), dim=1)
+    saliency = saliency.squeeze().detach().cpu().numpy()
+    
     model.train()  # Switch the model back to training mode
     
     return saliency
