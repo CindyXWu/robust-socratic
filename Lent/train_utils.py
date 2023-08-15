@@ -192,17 +192,6 @@ def train_distill(
     scheduler: LRScheduler,
     config: DistillConfig,
     device: torch.device = torch.device("cuda")) -> None:
-    """
-    Args:
-        base_dataset: Which dataset: CIFAR10, CIFAR100, Dominoes or Shapes.
-        contrast_temp: Contrastive loss temperature.
-        temp: Base distillation loss temperature.
-        nonbase_loss_frac: Contrastive and Jacobian loss weight compared to base.
-        s_layer, t_layer: Layer to extract features from for contrastive loss
-        loss_num: Index of loss dictionary (in info_dicts.py) describing which loss fn to use.
-        N_its: Number of iterations to train for.
-        its_per_log: Number of iterations between logging.
-    """
     aug = config.dataset.use_augmentation
     augmentation_params = OmegaConf.to_container(config.augmentation, resolve=True)
     clip_grad = config.optimization.clip_grad
@@ -265,8 +254,6 @@ def train_distill(
                         config=config,
                         input_dim=input_dim
                     )
-                    # Debug
-                    if has_nan_or_inf(jacobian_loss): wandb.log({"NaN or Inf detected in jacobian_loss!"})
                     loss = (1-config.nonbase_loss_frac)*loss + config.nonbase_loss_frac*jacobian_loss
                     
                 case DistillLossType.CONTRASTIVE:
@@ -291,24 +278,28 @@ def train_distill(
             # if has_nan_or_inf(loss):
             #     logging.error("NaN or Inf detected in loss!")
             #     wandb.log({"NaN or Inf detected in loss": loss})
-            optimizer.zero_grad()
-            # Debug
-            try:
-                loss.backward()
-            except Exception as e:
-                print_memory_usage()
-                memory_info = get_gpu_memory_usage()
-                logging.info(f"Error occurred! GPU Memory Usage: {memory_info}")
-                logging.error(f"Error occurred during backward pass on batch {it}: {str(e)}")
-                wandb.log({f"Error at iteration {it}": memory_info["free_memory"]})
-                num_errors += 1
-                # Re-raise the error to see its traceback - run with env var HYDRA_FULL_ERROR=1
-                raise e
-                # continue # Cursed
             
-            # Clip gradients
-            if clip_grad < float('inf'):
-                torch.nn.utils.clip_grad_norm_(student.parameters(), clip_grad)
+            optimizer.zero_grad()
+            loss.backward()
+            
+            # # Debug
+            # try:
+            #     loss.backward()
+            # except Exception as e:
+            #     print_memory_usage()
+            #     memory_info = get_gpu_memory_usage()
+            #     logging.info(f"Error occurred! GPU Memory Usage: {memory_info}")
+            #     logging.error(f"Error occurred during backward pass on batch {it}: {str(e)}")
+            #     wandb.log({f"Error at iteration {it}": memory_info["free_memory"]})
+            #     num_errors += 1
+            #     # Re-raise the error to see its traceback - run with env var HYDRA_FULL_ERROR=1
+            #     raise e
+            #     # continue # Cursed
+            
+            # # Clip gradients
+            # if clip_grad < float('inf'):
+            #     torch.nn.utils.clip_grad_norm_(student.parameters(), clip_grad)
+            
             optimizer.step()
             scheduler.step()
             lr = scheduler.get_lr()
