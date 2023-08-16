@@ -13,3 +13,5 @@ data/*
 **/multirun/
 
 **/.ipynb_checkpoints/
+
+**/trained_teachers_old/*

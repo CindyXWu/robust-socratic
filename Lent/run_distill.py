@@ -13,6 +13,7 @@ from create_sweep import load_config
 from train_utils import train_distill
 from config_setup import DistillConfig, DistillLossType
 from constructors import model_constructor, get_model_intermediate_layer, optimizer_constructor, create_dataloaders, get_dataset_output_size, get_nonbase_loss_frac
+from teacher_check import load_model_and_get_accs
 
 warnings.filterwarnings("ignore")
 logging.getLogger("matplotlib").setLevel(logging.ERROR)
@@ -57,6 +58,7 @@ def main(config: DistillConfig) -> None:
     if config.nonbase_loss_frac is None:
         config.nonbase_loss_frac = get_nonbase_loss_frac(config)
     config.dataset.output_size = get_dataset_output_size(config)
+    config.teacher_accs = load_model_and_get_accs(config.teacher_save_path)
             
     ## WandB - note project now hyphenated by default
     config.wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type}-{config.dataset.box_cue_pattern}{config.wandb_project_name}"
