@@ -47,18 +47,19 @@ def main(config: MainConfig) -> None:
     
     ## WandB
     config.wandb_project_name = f"{config.model_type} {config.dataset_type} {config.config_type} {config.dataset.box_cue_pattern}{config.wandb_project_name}"
-    config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}"
+    config_dict = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)   
+    extra_params = { # To log to WandB but not needed otherwise
+        "Git commit hash": get_previous_commit_hash(),
+    }
+    config_dict.update(extra_params)
     logger_params = {
         "name": config.wandb_run_name,
         "project": config.wandb_project_name,
         "settings": wandb.Settings(start_method="thread"),
-        "config": OmegaConf.to_container(config, resolve=True, throw_on_missing=True),
+        "config": config_dict,
         "mode": "disabled" if not config.log_to_wandb else "online",
     }
-    extra_params = {
-        "Git commit hash": get_previous_commit_hash(),
-    }
-    logger_params.update(extra_params)
+    wandb.init(**logger_params)
     wandb.init(**logger_params)
     # Probably won't do sweeps over these - okay to put here relative to call to update_with_wandb_config() below
     wandb.config.dataset_type = config.dataset_type
