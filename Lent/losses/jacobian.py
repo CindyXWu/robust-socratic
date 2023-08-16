@@ -57,11 +57,17 @@ def get_approx_jacobian(
     """
     assert x.requires_grad
     jacobian = torch.zeros(batch_size, output_dim, x.numel() // batch_size, device=x.device)
+    
     for idx in range(top_k_idx.shape[1]):
         grad_output = torch.zeros(batch_size, output_dim, device=x.device)
         grad_output.scatter_(1, top_k_idx[:, idx].unsqueeze(1), 1)
-        grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True, retain_graph=True)[0]
+        
+        # Release memory on last iteration
+        retain_graph = True if idx < top_k_idx-1 else False
+        
+        grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True, retain_graph=retain_graph)[0]
         jacobian[:, top_k_idx[:, idx], :] = grad_input.view(batch_size, -1)
+        
     return jacobian.view(batch_size, -1)
 
 
@@ -69,12 +75,18 @@ def get_jacobian(output, x, batch_size, input_dim, output_dim):
     """Autograd method. Need to keep grads, so set create_graph to True."""
     assert output.requires_grad
     jacobian = torch.zeros(batch_size, output_dim, input_dim, device=x.device)
+    
     for i in range(output_dim):
         grad_output = torch.zeros(batch_size, output_dim, device=x.device)
         grad_output[:, i] = 1
-        grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True)[0]
+        
+        # Release memory on last iteration
+        retain_graph = True if i < output_dim-1 else False
+        
+        grad_input = torch.autograd.grad(output, x, grad_output, create_graph=True, retain_graph=retain_graph)[0]
         jacobian[:, i, :] = grad_input.view(batch_size, input_dim)
-    return jacobian.view(batch_size, -1) # Flatten
+        
+    return jacobian.view(batch_size, -1)
 
 
 # def get_approx_jacobian(output, x, batch_size, output_dim, i=None):

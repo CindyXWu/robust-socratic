@@ -168,6 +168,7 @@ class DistillConfig(MainConfig):
     use_early_stop = False
     save_model: Optional[bool] = False
     student_save_path: Optional[str] = None
+    teacher_accs: Optional[list[float]] = None
 
 
 @dataclass

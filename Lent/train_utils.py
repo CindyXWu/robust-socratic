@@ -12,6 +12,8 @@ import logging
 import random
 from omegaconf import OmegaConf
 from collections import defaultdict
+import psutil
+import gc
 from typing import List, Dict
 
 from losses.loss_common import *
@@ -23,7 +25,7 @@ from models.resnet_ap import CustomResNet18, CustomResNet50
 from config_setup import MainConfig, DistillLossType, DistillConfig
 from constructors import get_counterfactual_dataloaders
 from plotting_common import plot_PIL_batch
-from evaluate import evaluate, counterfactual_evaluate, mixup_accuracy
+from evaluate import evaluate, counterfactual_evaluate
 
 
 class LRScheduler(object):
@@ -134,16 +136,16 @@ def train_teacher(teacher: nn.Module,
                 if test_acc > best_test_acc:
                     best_test_acc = test_acc
                     no_improve_count = 0
-                    save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
                 else:
                     no_improve_count += 1
                 if no_improve_count >= config.early_stop_patience:
+                    save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
                     print("Early stopping due to no improvement in test accuracy.")
                     return
             
             it += 1
-
-        # Get saliency map
+        
+        # Get saliency map at end of epoch
         single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
         saliency_t = get_saliency_map(teacher, single_image).squeeze().detach().cpu().numpy()
         t_prob = F.softmax(teacher(single_image), dim=1).squeeze().detach().cpu().numpy()
@@ -160,7 +162,7 @@ def train_teacher(teacher: nn.Module,
         plt.tight_layout()
 
         wandb.log({f"Epoch {epoch}": [wandb.Image(fig)]}, step=it)
-        
+    
     save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
 
 
@@ -190,17 +192,6 @@ def train_distill(
     scheduler: LRScheduler,
     config: DistillConfig,
     device: torch.device = torch.device("cuda")) -> None:
-    """
-    Args:
-        base_dataset: Which dataset: CIFAR10, CIFAR100, Dominoes or Shapes.
-        contrast_temp: Contrastive loss temperature.
-        temp: Base distillation loss temperature.
-        nonbase_loss_frac: Contrastive and Jacobian loss weight compared to base.
-        s_layer, t_layer: Layer to extract features from for contrastive loss
-        loss_num: Index of loss dictionary (in info_dicts.py) describing which loss fn to use.
-        N_its: Number of iterations to train for.
-        its_per_log: Number of iterations between logging.
-    """
     aug = config.dataset.use_augmentation
     augmentation_params = OmegaConf.to_container(config.augmentation, resolve=True)
     clip_grad = config.optimization.clip_grad
@@ -263,8 +254,6 @@ def train_distill(
                         config=config,
                         input_dim=input_dim
                     )
-                    # Debug
-                    if has_nan_or_inf(jacobian_loss): wandb.log({"NaN or Inf detected in jacobian_loss!"})
                     loss = (1-config.nonbase_loss_frac)*loss + config.nonbase_loss_frac*jacobian_loss
                     
                 case DistillLossType.CONTRASTIVE:
@@ -286,26 +275,31 @@ def train_distill(
                     # loss = feature_map_diff(scores, targets, s_map, t_map, T=1, alpha=0.2, loss_fn=mse_loss, aggregate_chan=False)
                     
             # Debug for backward generating error
-            if has_nan_or_inf(loss):
-                logging.error("NaN or Inf detected in loss!")
-                wandb.log({"NaN or Inf detected in loss": loss})
-            optimizer.zero_grad()
-            # Debug
-            try:
-                loss.backward()
-            except Exception as e:
-                memory_info = get_gpu_memory_usage()
-                logging.info(f"Error occurred! GPU Memory Usage: {memory_info}")
-                logging.error(f"Error occurred during backward pass on batch {it}: {str(e)}")
-                wandb.log({f"Error at iteration {it}": memory_info["free_memory"]})
-                num_errors += 1
-                # Re-raise the error to see its traceback
-                # raise e
-                continue # Cursed
+            # if has_nan_or_inf(loss):
+            #     logging.error("NaN or Inf detected in loss!")
+            #     wandb.log({"NaN or Inf detected in loss": loss})
             
-            # Clip gradients
-            if clip_grad < float('inf'):
-                torch.nn.utils.clip_grad_norm_(student.parameters(), clip_grad)
+            optimizer.zero_grad()
+            loss.backward()
+            
+            # # Debug
+            # try:
+            #     loss.backward()
+            # except Exception as e:
+            #     print_memory_usage()
+            #     memory_info = get_gpu_memory_usage()
+            #     logging.info(f"Error occurred! GPU Memory Usage: {memory_info}")
+            #     logging.error(f"Error occurred during backward pass on batch {it}: {str(e)}")
+            #     wandb.log({f"Error at iteration {it}": memory_info["free_memory"]})
+            #     num_errors += 1
+            #     # Re-raise the error to see its traceback - run with env var HYDRA_FULL_ERROR=1
+            #     raise e
+            #     # continue # Cursed
+            
+            # # Clip gradients
+            # if clip_grad < float('inf'):
+            #     torch.nn.utils.clip_grad_norm_(student.parameters(), clip_grad)
+            
             optimizer.step()
             scheduler.step()
             lr = scheduler.get_lr()
@@ -344,15 +338,14 @@ def train_distill(
                     "S Loss": train_loss, 
                     "S LR": lr, 
                     "Jacobian Loss": jacobian_loss.detach().cpu().item() if jacobian_loss else None,
-                    "Contrastive Loss": contrastive_loss.current_loss if contrastive_loss else None,
+                    "Contrastive Loss": contrastive_loss.current_loss.detach() if contrastive_loss else None,
                 }}
                 
                 wandb.log(results_dict, step=it)
                 
                 # Get saliency map
                 single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
-                saliency_t = get_saliency_map(teacher, single_image).squeeze().detach().cpu().numpy()
-                saliency_s = get_saliency_map(student, single_image).squeeze().detach().cpu().numpy()
+                saliency_t, saliency_s = get_saliency_map(teacher, single_image), get_saliency_map(student, single_image)
                 
                 # Plot saliency map
                 s_prob = F.softmax(student(single_image), dim=1).squeeze().detach().cpu().numpy()
@@ -393,7 +386,10 @@ def train_distill(
 
     if config.save_model:
         save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
-
+    # Prevent memory leak in sweeps
+    torch.cuda.empty_cache()
+    gc.collect()
+    
 
 def has_nan_or_inf(tensor):
     """Helper function for function below."""
@@ -426,6 +422,13 @@ def get_gpu_memory_usage(device_id=0):
         "allocated_memory": allocated_memory,
         "free_memory": total_memory - reserved_memory
     }
+    
+def print_memory_usage():
+    memory_info = psutil.virtual_memory()
+    print(f"Total memory: {memory_info.total / (1024 ** 3):.2f} GB")
+    print(f"Used memory: {memory_info.used / (1024 ** 3):.2f} GB")
+    print(f"Free memory: {memory_info.free / (1024 ** 3):.2f} GB")
+    print(f"Memory percentage used: {memory_info.percent}%")
     
     
 def check_grads(model: nn.Module):
@@ -485,7 +488,8 @@ def get_saliency_map(
     R, G and B. To derive a single class saliency value for each pixel (i, j),  we take the maximum magnitude
     across all colour channels."""
     saliency, _ = torch.max(input.grad.data.abs(), dim=1)
-
+    saliency = saliency.squeeze().detach().cpu().numpy()
+    
     model.train()  # Switch the model back to training mode
     
     return saliency

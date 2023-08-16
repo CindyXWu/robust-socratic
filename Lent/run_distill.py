@@ -13,6 +13,7 @@ from create_sweep import load_config
 from train_utils import train_distill
 from config_setup import DistillConfig, DistillLossType
 from constructors import model_constructor, get_model_intermediate_layer, optimizer_constructor, create_dataloaders, get_dataset_output_size, get_nonbase_loss_frac
+from teacher_check import load_model_and_get_accs
 
 warnings.filterwarnings("ignore")
 logging.getLogger("matplotlib").setLevel(logging.ERROR)
@@ -27,7 +28,7 @@ cs.store(name="config_base", node=DistillConfig)
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         
 # CHANGE THESE  
-config_filename = "distill_sweep_test_config"
+config_filename = "distill_config"
 sweep_filename = "jac_acc_sweep" # not currently using WandB sweeps
 
   
@@ -57,9 +58,11 @@ def main(config: DistillConfig) -> None:
     if config.nonbase_loss_frac is None and config.distill_loss_type != DistillLossType.BASE:
         config.nonbase_loss_frac = get_nonbase_loss_frac(config)
     config.dataset.output_size = get_dataset_output_size(config)
+    config.teacher_accs = load_model_and_get_accs(config.teacher_save_path)
             
-    ## wandb
-    config.wandb_project_name = f"DISTILL {config.model_type} {config.dataset_type} {config.config_type} {config.dataset.box_cue_pattern}{config.wandb_project_name}"
+    ## WandB - note project now hyphenated by default
+    config.wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type}-{config.dataset.box_cue_pattern}{config.wandb_project_name}"
+
     config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}, S Mech: {s_exp_idx} {s_exp_name}, Loss: {config.distill_loss_type}"
     logger_params = {
         "name": config.wandb_run_name,
