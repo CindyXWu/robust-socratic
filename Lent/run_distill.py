@@ -10,7 +10,7 @@ from hydra.utils import get_original_cwd
 from omegaconf import OmegaConf
 
 from create_sweep import load_config
-from train_utils import train_distill
+from train_utils import train_distill, get_previous_commit_hash
 from config_setup import DistillConfig, DistillLossType
 from constructors import model_constructor, get_model_intermediate_layer, optimizer_constructor, create_dataloaders, get_dataset_output_size, get_nonbase_loss_frac
 from teacher_check import load_model_and_get_accs
@@ -58,7 +58,6 @@ def main(config: DistillConfig) -> None:
     if config.nonbase_loss_frac is None and config.distill_loss_type != DistillLossType.BASE:
         config.nonbase_loss_frac = get_nonbase_loss_frac(config)
     config.dataset.output_size = get_dataset_output_size(config)
-    config.teacher_accs = load_model_and_get_accs(config.teacher_save_path)
             
     ## WandB - note project now hyphenated by default
     config.wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type}-{config.dataset.box_cue_pattern}{config.wandb_project_name}"
@@ -71,6 +70,11 @@ def main(config: DistillConfig) -> None:
         "config": OmegaConf.to_container(config, resolve=True, throw_on_missing=True),
         "mode": "disabled" if not config.log_to_wandb else "online",
     }
+    extra_params = { # To log to WandB but not needed otherwise
+        "teacher accs": load_model_and_get_accs(config.teacher_save_path),
+        "Git commit hash": get_previous_commit_hash(),
+    }
+    logger_params.update(extra_params)
     wandb.init(**logger_params)
 
     ## Datasets

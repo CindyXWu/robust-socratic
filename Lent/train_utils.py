@@ -9,6 +9,7 @@ from einops import rearrange
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import logging
+import subprocess
 import random
 from omegaconf import OmegaConf
 from collections import defaultdict
@@ -502,3 +503,14 @@ def weight_reset(model: nn.Module):
             module.reset_parameters()
         if isinstance(module, nn.Conv2d):
             nn.init.kaiming_normal_(module.weight, mode="fan_out", nonlinearity="relu")
+
+
+def get_previous_commit_hash():
+    """Used to get Github commit hash."""
+    try:
+        # Execute the git command to get the previous commit hash
+        commit_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD~1'], stderr=subprocess.STDOUT).decode('utf-8').strip()
+        return commit_hash
+    except subprocess.CalledProcessError as e:
+        print(f"Error: {e.output.decode('utf-8')}")
+        return None
