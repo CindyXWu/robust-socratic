@@ -54,7 +54,7 @@ def main(config: DistillConfig) -> None:
     config.student_save_path = f"trained_students/{config.model_type}_{config.dataset_type}_{s_exp_prefix}_{s_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_student"
     
     ## Update config file before logging config values to wandb
-    if config.nonbase_loss_frac is None:
+    if config.nonbase_loss_frac is None and config.distill_loss_type != DistillLossType.BASE:
         config.nonbase_loss_frac = get_nonbase_loss_frac(config)
     config.dataset.output_size = get_dataset_output_size(config)
             
