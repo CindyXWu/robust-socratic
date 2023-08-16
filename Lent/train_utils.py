@@ -136,16 +136,16 @@ def train_teacher(teacher: nn.Module,
                 if test_acc > best_test_acc:
                     best_test_acc = test_acc
                     no_improve_count = 0
-                    save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
                 else:
                     no_improve_count += 1
                 if no_improve_count >= config.early_stop_patience:
+                    save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
                     print("Early stopping due to no improvement in test accuracy.")
                     return
             
             it += 1
-
-        # Get saliency map
+        
+        # Get saliency map at end of epoch
         single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
         saliency_t = get_saliency_map(teacher, single_image).squeeze().detach().cpu().numpy()
         t_prob = F.softmax(teacher(single_image), dim=1).squeeze().detach().cpu().numpy()
