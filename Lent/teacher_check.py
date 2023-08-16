@@ -15,5 +15,5 @@ def print_final_accs(folder_path: str) -> None:
             
 
 if __name__ == "__main__":
-    folder_path = "Lent/trained_teachers_old"
+    folder_path = "Lent/trained_teachers"
     print_final_accs(folder_path)
