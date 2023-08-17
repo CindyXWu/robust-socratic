@@ -1,3 +1,4 @@
+program: Lent/distill_sweep.py
 method: bayes
 metric: 
   name: S Loss
