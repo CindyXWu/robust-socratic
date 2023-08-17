@@ -23,8 +23,10 @@ from models.mlp import mlp_constructor
 
 
 def get_nonbase_loss_frac(distill_config: DistillConfig):
-    """To be called by main function. Contains all necessary dictionaries."""
-    nonbase_loss_frac_dict = {DistillLossType.JACOBIAN: 0.5, DistillLossType.CONTRASTIVE: 0.01}
+    """To be called by main function. Contains all necessary dictionaries.
+    Jacobian currently fixed via empirical experimental results. Contrastive not yet fixed.
+    """
+    nonbase_loss_frac_dict = {DistillLossType.JACOBIAN: 0.15, DistillLossType.CONTRASTIVE: 0.01}
     return nonbase_loss_frac_dict.get(distill_config.distill_loss_type)
 
 

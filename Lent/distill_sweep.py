@@ -28,7 +28,7 @@ cs.store(name="config_base", node=DistillConfig)
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         
 # CHANGE THESE  
-config_filename = "distill_config"
+config_filename = "distill_sweep_test_config"
 sweep_filename = "jac_acc_sweep" # not currently using WandB sweeps
 
   

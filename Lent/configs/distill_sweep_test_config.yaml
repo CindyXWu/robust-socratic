@@ -1,7 +1,7 @@
 model_type: RN18AP
 dataset_type: DOMINOES
 config_type: EXHAUSTIVE
-distill_loss_type: JACOBIAN
+distill_loss_type: CONTRASTIVE
 aug_type: NONE
 
 optimization:
@@ -36,7 +36,7 @@ min_iters: 300
 eval_frequency: 100
 num_eval_batches: 50
 early_stop_patience: 50
-run_description: "Jacobian sweep for loss fraction using Hydra"
+run_description: "Contrastive sweep for loss fraction using Hydra"
 
 log_to_wandb: true
 is_sweep: false
@@ -47,7 +47,7 @@ teacher_save_path: null
 wandb_project_name: "sweep test"
 wandb_run_name: null
 
-use_early_stop: true
+use_early_stop: false
 base_distill_loss_type: KL
 jacobian_loss_type: MSE
 nonbase_loss_frac: null

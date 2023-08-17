@@ -339,7 +339,7 @@ def train_distill(
                     "S Loss": train_loss, 
                     "S LR": lr, 
                     "Jacobian Loss": jacobian_loss.detach().cpu().item() if jacobian_loss else None,
-                    "Contrastive Loss": contrastive_loss.current_loss.detach() if contrastive_loss else None,
+                    "Contrastive Loss": contrastive_loss.current_loss if contrastive_loss else None,
                 }}
                 
                 wandb.log(results_dict, step=it)
