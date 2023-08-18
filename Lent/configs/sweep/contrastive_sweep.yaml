@@ -1,8 +1,8 @@
 program: Lent/distill_sweep.py
 method: bayes
 metric: 
-  name: S Loss
-  goal: minimize
+  name: S Test
+  goal: maximize
 name: Contrastive Temperature Sweep
 parameters: 
   contrast_temp: 
@@ -19,4 +19,4 @@ parameters:
     max: 0.1
 early_terminate: 
   type: hyperband
-  min_iter: 5
+  min_iter: 10

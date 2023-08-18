@@ -23,7 +23,7 @@ cs.store(name="config_base", node=MainConfig)
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # CHANGE THESE  
-config_filename = "wrn_config"
+config_filename = "main_config"
 sweep_filename = ""
 
 
