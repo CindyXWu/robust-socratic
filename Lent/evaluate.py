@@ -14,7 +14,7 @@ def evaluate(model: nn.Module,
              device: torch.device = torch.device("cuda")) -> float:
     """Accuracy for num_eval_batches batches."""
     model.eval()
-    acc = 0
+    acc = 0.0
     
     for i, (features, labels) in enumerate(dataloader):
         labels = labels.to(device)
@@ -39,7 +39,7 @@ def counterfactual_evaluate(teacher: nn.Module,
                      num_eval_batches: int, 
                      device: torch.device = torch.device("cuda")) -> float:
     """Student test accuracy, T-S KL and T-S top-1 accuracy for num_eval_batches batches."""
-    acc, KL, top_1 = 0, 0, 0
+    acc, KL, top_1 = 0.0, 0.0, 0.0
     student.eval()
     
     for i, (features, labels) in enumerate(dataloader):
