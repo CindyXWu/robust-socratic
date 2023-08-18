@@ -223,22 +223,49 @@ class ConfigGroups:
         ExpConfig("Randomize S2: 100 100 R", ExperimentConfig(im_frac=1, m1_frac=1, m2_frac=1, rand_im=False, rand_m1=False, rand_m2=True)),
         ExpConfig("Randomize image, both spurious: R 100 100", ExperimentConfig(im_frac=1, m1_frac=1, m2_frac=1, rand_im=True, rand_m1=False, rand_m2=False))
     )
+    
+    frac = (
+        ExpConfig("10 0 0", ExperimentConfig(im_frac=0.1, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("25 0 0", ExperimentConfig(im_frac=0.25, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("50 0 0", ExperimentConfig(im_frac=0.5, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("75 0 0", ExperimentConfig(im_frac=0.75, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("90 0 0", ExperimentConfig(im_frac=0.9, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
+        
+        ExpConfig("100 10 0", ExperimentConfig(im_frac=1, m1_frac=0.1, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("100 25 0", ExperimentConfig(im_frac=1, m1_frac=0.25, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("100 50 0", ExperimentConfig(im_frac=1, m1_frac=0.5, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("100 75 0", ExperimentConfig(im_frac=1, m1_frac=0.75, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("100 90 0", ExperimentConfig(im_frac=1, m1_frac=0.9, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
+        
+        ExpConfig("100 0 10", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.1, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("100 0 25", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.25, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("100 0 50", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.5, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("100 0 75", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.75, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("100 0 90", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.9, rand_im=False, rand_m1=False, rand_m2=False)),
+        
+        ExpConfig("100 10 100", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.1, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("100 25 100", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.25, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("0 50 100", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.5, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("0 75 100", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.75, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("0 90 100", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.9, rand_im=False, rand_m1=False, rand_m2=False)),
+    )
 
 
 def config_to_yaml(configs, filename_prefix):
     for i, config in enumerate(configs):
-        filename = f"lent/configs/experiment/{filename_prefix}_{i}.yaml"
+        filename = f"Lent/configs/experiment/{filename_prefix}_{i}.yaml"
         with open(filename, 'w') as file:
             yaml.dump({'config_filename': f"{filename_prefix}_{i}", 'name': config.name, 'experiment_config': vars(config.experiment_config)}, file)
-        filename = f"lent/configs/experiment_s/{filename_prefix}_{i}.yaml"
+        filename = f"Lent/configs/experiment_s/{filename_prefix}_{i}.yaml"
         with open(filename, 'w') as file:
             yaml.dump({'config_filename': f"{filename_prefix}_{i}", 'name': config.name, 'experiment_config': vars(config.experiment_config)}, file)
 
 
 def create_new_configs():
     # config_to_yaml(ConfigGroups.targeted, 'targeted')
-    config_to_yaml(ConfigGroups.exhaustive, 'exhaustive')
+#     config_to_yaml(ConfigGroups.exhaustive, 'exhaustive')
     # config_to_yaml(ConfigGroups.targeted_cf, 'lent/configs/counterfactual/cf')
+    config_to_yaml(ConfigGroups.frac, 'frac')
         
 if __name__ == "__main__":
     create_new_configs()
