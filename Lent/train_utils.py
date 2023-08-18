@@ -148,7 +148,7 @@ def train_teacher(teacher: nn.Module,
         
         # Get saliency map at end of epoch
         single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
-        saliency_t = get_saliency_map(teacher, single_image).squeeze().detach().cpu().numpy()
+        saliency_t = get_saliency_map(teacher, single_image)
         t_prob = F.softmax(teacher(single_image), dim=1).squeeze().detach().cpu().numpy()
         
         fig, axs = plt.subplots(1, 2, figsize=(10, 5))  # Create a figure with 2 subplots side by side

@@ -1,19 +1,35 @@
+"""While Python-based WandB sweep agents are initialised for the other files too,
+this is the only one that interfaces with bash and the CLI called version."""
 import torch
 import logging
 import os
+import sys
 import wandb
-import hydra
 import warnings
-from hydra.core.config_store import ConfigStore
-from hydra.core.hydra_config import HydraConfig
-from hydra.utils import get_original_cwd
-from omegaconf import OmegaConf
+
+# Capture the original arguments
+original_args = sys.argv[1:]
+sweep_params = {arg.split('=')[0].replace('--', ''): arg.split('=')[1] for arg in original_args}
+# Process the original arguments to fit Hydra's format or your specific needs.
+# For example: ['--contrast_temp=0.06966'] to ['contrast_temp=0.06966']
+processed_args = [arg.replace('--', '') for arg in original_args]
+# Manually add Hydra-specific arguments
+# Example: Use a specific config file and override some values
+# Update sys.argv
+sys.argv[1:] = processed_args
 
 from create_sweep import load_config
 from train_utils import train_distill, get_previous_commit_hash
 from config_setup import DistillConfig, DistillLossType
 from constructors import model_constructor, get_model_intermediate_layer, optimizer_constructor, create_dataloaders, get_dataset_output_size, get_nonbase_loss_frac
 from teacher_check import load_model_and_get_accs
+
+import hydra
+from hydra.experimental import initialize, compose
+from hydra.core.config_store import ConfigStore
+from hydra.core.hydra_config import HydraConfig
+from hydra.utils import get_original_cwd
+from omegaconf import OmegaConf
 
 warnings.filterwarnings("ignore")
 logging.getLogger("matplotlib").setLevel(logging.ERROR)
@@ -27,12 +43,19 @@ cs.store(name="config_base", node=DistillConfig)
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         
-# CHANGE THESE  
+# CHANGE THESE
 config_filename = "distill_sweep_test_config"
-sweep_filename = "jac_acc_sweep" # not currently using WandB sweeps
+initialize(config_path="configs", job_name="my_app")
+# Used as argument in main function
+config = compose(
+    config_name=config_filename, 
+    overrides=[
+        "+experiment=exhaustive_0",
+        "+experiment_s=exhaustive_0"
+    ]
+)
 
-  
-@hydra.main(config_path="configs/", config_name=config_filename, version_base=None)
+      
 def main(config: DistillConfig) -> None:
     """config is typed as MainConfig for duck-typing, but during runtime it's actually an OmegaConf object.
     
@@ -120,25 +143,31 @@ def main(config: DistillConfig) -> None:
     wandb.finish()
 
 
-def update_with_wandb_config(config: OmegaConf, sweep_params: list[str]) -> OmegaConf:
-    """Check if each parameter exists in wandb.config and update it if it does."""
-    for param in sweep_params:
-        if param in wandb.config:
-            print("Updating param with value from wandb config: ", param)
-            OmegaConf.update(config, param, wandb.config[param], merge=True)
+def update_with_wandb_config(config: DistillConfig, params: dict) -> DistillConfig:
+    """
+    Update the Hydra configuration object with values from the command line.
+    
+    Args:
+        config: The Hydra configuration object.
+        params: Dictionary of parameters and their values.
+    """
+    for key, value_str in params.items():
+        
+        # Convert strings that look like numbers to actual numbers
+        if value_str.replace('.', '', 1).isdigit():
+            value = float(value_str) if '.' in value_str else int(value_str)
+        else:
+            value = value_str
+        
+        # Handle nested keys (e.g., optimization.base_lr)
+        keys = key.split('.')
+        sub_config = config
+        for k in keys[:-1]:
+            sub_config = sub_config[k]
+        sub_config[keys[-1]] = value
+    
     return config
 
-
+        
 if __name__ == "__main__":
-    config: dict = load_config(f"configs/{config_filename}.yaml")
-    if config.get("is_sweep"):
-        wandb_project_name = f"{config['wandb_project_name']} DISTILL {config['model_type']} {config['dataset_type']} {config['config_type']} {config['dataset']['box_cue_pattern']}"
-        sweep_config = load_config(f"configs/sweep/{sweep_filename}.yaml")
-        sweep_params = list(sweep_config['parameters'].keys())
-        sweep_id = wandb.sweep(
-            sweep=sweep_config,
-            project=wandb_project_name
-        )
-        wandb.agent(sweep_id, function=main, count=config['sweep_num'])
-    else:
-        main()
+    main(config)

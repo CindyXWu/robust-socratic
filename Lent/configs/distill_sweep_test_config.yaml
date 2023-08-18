@@ -39,8 +39,8 @@ early_stop_patience: 50
 run_description: "Contrastive sweep for loss fraction using Hydra"
 
 log_to_wandb: true
-is_sweep: false
-sweep_num: 20
+is_sweep: true
+sweep_num: 30
 save_model_as_artifact: false
 save_model: false
 teacher_save_path: null
