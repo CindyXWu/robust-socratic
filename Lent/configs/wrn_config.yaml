@@ -40,7 +40,7 @@ early_stop_patience: 20
 run_description: "Wide ResNet teacher with Mandelbrot pattern"
 
 log_to_wandb: true
-is_sweep: true
+is_sweep: false
 sweep_num: 5
 save_model_as_artifact: false
 save_model: false

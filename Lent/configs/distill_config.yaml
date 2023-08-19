@@ -45,7 +45,7 @@ save_model: false
 teacher_save_path: null
 wandb_project_name: ""
 wandb_run_name: null
-run_description: "Multirun x5 base, Mandelbrot, exhaustive"
+run_description: "Multirun x5 Jacobian, random, exhaustive"
 
 use_early_stop: false
 base_distill_loss_type: KL

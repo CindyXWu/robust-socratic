@@ -110,9 +110,10 @@ def train_teacher(teacher: nn.Module,
             if it % config.eval_frequency == 0:
                 train_acc = evaluate(teacher, train_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
                 test_acc = evaluate(teacher, test_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
+                test_loss = get_teacher_test_loss(teacher, test_loader, config.num_eval_batches, device)
                 train_acc_list.append(train_acc)
                 test_acc_list.append(test_acc)
-
+                
                 # Counterfactual evaluations for teacher
                 cf_accs = defaultdict(float)
                 for name in cf_dataloaders:
@@ -123,7 +124,7 @@ def train_teacher(teacher: nn.Module,
                         num_eval_batches=config.num_eval_batches,
                         device=device)
                 
-                print(f'Project {config.wandb_project_name}, Epoch: {epoch}, Train accuracy: {train_acc}, Test accuracy: {test_acc}, Loss: {train_loss}, LR {lr}')
+                print(f'Project {config.wandb_project_name}, Epoch: {epoch}, Train accuracy: {train_acc}, Test accuracy: {test_acc}, Loss: {train_loss}, Log Test Loss: {np.log(test_loss)} LR {lr}')
                 
                 results_dict = {**cf_accs, **{
                     "Train Acc": train_acc, 
@@ -132,23 +133,23 @@ def train_teacher(teacher: nn.Module,
                     "LR": lr}}
                 
                 wandb.log(results_dict, step=it) # Can also optionally add step here
-        
-                # Early stopping logic
-                if test_acc > best_test_acc:
-                    best_test_acc = test_acc
+               
+                if np.log(test_loss) < np.log(best_test_loss):  # Looking for a decrease in log loss
+                    best_test_loss = loss
                     no_improve_count = 0
+                    if config.save_model:
+                        save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
                 else:
                     no_improve_count += 1
                 if no_improve_count >= config.early_stop_patience:
-                    save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
-                    print("Early stopping due to no improvement in test accuracy.")
+                    print("Early stopping due to no improvement in test log loss.")
                     return
             
             it += 1
         
         # Get saliency map at end of epoch
         single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
-        saliency_t = get_saliency_map(teacher, single_image).squeeze().detach().cpu().numpy()
+        saliency_t = get_saliency_map(teacher, single_image)
         t_prob = F.softmax(teacher(single_image), dim=1).squeeze().detach().cpu().numpy()
         
         fig, axs = plt.subplots(1, 2, figsize=(10, 5))  # Create a figure with 2 subplots side by side
@@ -211,7 +212,7 @@ def train_distill(
     train_acc_list, test_acc_list = [], []
     it = 0
     no_improve_count = 0
-    best_test_acc = 0.0
+    best_test_loss = 100.0 # Initial high value
 
     sample = next(iter(train_loader))
     batch_size, c, w, h = sample[0].shape
@@ -317,6 +318,7 @@ def train_distill(
                 test_acc, test_KL, test_top1 = counterfactual_evaluate(teacher, student, test_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
                 train_acc_list.append(train_acc)
                 test_acc_list.append(test_acc)
+                test_loss = get_distill_test_loss(teacher, student, config, config.num_eval_batches, device)
                 
                 # Dictionary holds counterfactual acc, KL and top 1 fidelity for each dataset
                 cf_evals = defaultdict(float)
@@ -329,7 +331,7 @@ def train_distill(
                         batch_size=config.dataloader.test_bs,
                         num_eval_batches=config.num_eval_batches
                         )
-                print(f"{config.run_description} Project: {config.wandb_run_name}, Iteration: {it}, Epoch: {epoch}, Loss: {train_loss}, LR: {lr}, Base Temperature: {config.dist_temp}, Jacobian Temperature: {config.jac_temp}, Contrastive Temperature: {config.contrast_temp}, Nonbase Loss Frac: {config.nonbase_loss_frac}, Error Count: {num_errors}")
+                print(f"{config.run_description} Project: {config.wandb_run_name}, Iteration: {it}, Epoch: {epoch}, Loss: {train_loss}, Log Test Loss: {np.log(test_loss)}, LR: {lr}, Base Temperature: {config.dist_temp}, Jacobian Temperature: {config.jac_temp}, Contrastive Temperature: {config.contrast_temp}, Nonbase Loss Frac: {config.nonbase_loss_frac}, Error Count: {num_errors}")
 
                 results_dict = {**cf_evals, **{
                     "T-S KL": test_KL, 
@@ -339,7 +341,7 @@ def train_distill(
                     "S Loss": train_loss, 
                     "S LR": lr, 
                     "Jacobian Loss": jacobian_loss.detach().cpu().item() if jacobian_loss else None,
-                    "Contrastive Loss": contrastive_loss.current_loss.detach() if contrastive_loss else None,
+                    "Contrastive Loss": contrastive_loss.current_loss if contrastive_loss else None,
                 }}
                 
                 wandb.log(results_dict, step=it)
@@ -370,17 +372,18 @@ def train_distill(
 
                 wandb.log({f"Iteration {it}": [wandb.Image(fig)]}, step=it)
 
-                if it > config.min_iters and config.use_early_stop: # Only consider early stopping beyond certain threshold, and if we set the model to train with early-stop
+                if it > config.min_iters and config.use_early_stop: 
+                    # Only consider early stopping beyond certain threshold, and if we set the model to train with early-stop
                     # Early stopping logic
-                    if test_acc > best_test_acc:
-                        best_test_acc = test_acc
+                    if np.log(test_loss) < np.log(best_test_loss):  # Looking for a decrease in log loss
+                        best_test_loss = loss
                         no_improve_count = 0
-                        if config.save_model: # May run sweeps where you don't want to save model
+                        if config.save_model:  # May run sweeps where you don't want to save model
                             save_model(f"{config.student_save_path}", epoch, student, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
                     else:
                         no_improve_count += 1
                     if no_improve_count >= config.early_stop_patience:
-                        print("Early stopping due to no improvement in test accuracy.")
+                        print("Early stopping due to no improvement in test log loss.")
                         return
              
             it += 1 

@@ -1,0 +1,9 @@
+config_filename: frac_18
+experiment_config:
+  im_frac: 1
+  m1_frac: 0
+  m2_frac: 0.75
+  rand_im: false
+  rand_m1: false
+  rand_m2: false
+name: 0 75 100

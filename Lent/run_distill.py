@@ -56,6 +56,7 @@ def main(config: DistillConfig) -> None:
     
     ## Update config file before logging config values to wandb
     if config.nonbase_loss_frac is None and config.distill_loss_type != DistillLossType.BASE:
+        # If nonbase_loss_frac not specified via command line
         config.nonbase_loss_frac = get_nonbase_loss_frac(config)
     config.dataset.output_size = get_dataset_output_size(config)
             
