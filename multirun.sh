@@ -4,7 +4,7 @@
 # It does not manage the sweep file name as of 14/08
 SCRIPT_PATH="Lent/run_distill.py"
 config_filename="distill_config"
-experiment="exhaustive_2"
+experiment="exhaustive_3"
 experiment_s="exhaustive_0,exhaustive_1,exhaustive_2,exhaustive_3,exhaustive_4,exhaustive_5,exhaustive_6"
 args="distill_loss_type=JACOBIAN dataset.box_cue_pattern=RANDOM"
 

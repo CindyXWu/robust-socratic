@@ -58,7 +58,7 @@ def get_distill_test_loss(
     student.eval()
     total_loss = 0.0
     
-    for i, (inputs, _) in test_loader:
+    for i, (inputs, labels) in enumerate(test_loader):
         if num_eval_batches != 0 and i >= num_eval_batches:
             break
         inputs = inputs.to(device)
@@ -70,7 +70,6 @@ def get_distill_test_loss(
             temp=config.dist_temp
         )
         total_loss += loss.item()
-
     avg_test_loss = total_loss / num_eval_batches
     
     return avg_test_loss
@@ -86,7 +85,7 @@ def get_teacher_test_loss(
     model.eval()
     total_loss = 0.0
     
-    for i, (inputs, labels) in test_loader:
+    for i, (inputs, labels) in enumerate(test_loader):
         if num_eval_batches != 0 and i >= num_eval_batches:
             break
         inputs, labels = inputs.to(device), labels.to(device)
