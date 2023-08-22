@@ -318,7 +318,7 @@ def train_distill(
                 test_acc, test_KL, test_top1 = counterfactual_evaluate(teacher, student, test_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
                 train_acc_list.append(train_acc)
                 test_acc_list.append(test_acc)
-                test_loss = get_distill_test_loss(teacher, student, config, config.num_eval_batches, device)
+                test_loss = get_distill_test_loss(teacher, student, test_loader, config, config.num_eval_batches, device)
                 
                 # Dictionary holds counterfactual acc, KL and top 1 fidelity for each dataset
                 cf_evals = defaultdict(float)
