@@ -70,7 +70,6 @@ def get_distill_test_loss(
             temp=config.dist_temp
         )
         total_loss += loss.item()
-
     avg_test_loss = total_loss / num_eval_batches
     
     return avg_test_loss
