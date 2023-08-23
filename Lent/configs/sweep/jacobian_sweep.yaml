@@ -1,0 +1,15 @@
+program: Lent/distill_sweep.py 
+method: grid
+metric: 
+  name: S Test
+  goal: maximize
+name: Jacobian Frac Sweep - Metric Test Acc (test)
+parameters: 
+  nonbase_loss_frac: 
+#     distribution: log_uniform
+#     min: -3
+#     max: -1
+    values: [0.75,0.5,0.4,0.3,0.2,0.1,0.07,0.03,0.1]
+# early_terminate: 
+#   type: hyperband
+#   min_iter: 5
