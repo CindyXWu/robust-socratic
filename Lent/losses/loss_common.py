@@ -58,7 +58,7 @@ def get_distill_test_loss(
     student.eval()
     total_loss = 0.0
     
-    for i, (inputs, labels) in enumerate(test_loader):
+    for i, (inputs, _) in enumerate(test_loader):
         if num_eval_batches != 0 and i >= num_eval_batches:
             break
         inputs = inputs.to(device)
