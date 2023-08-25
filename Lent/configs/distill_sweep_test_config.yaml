@@ -26,8 +26,8 @@ augmentation:
   crop_prob: 0.7
   flip_prob: 0.8
 dataloader:
-  train_bs: 64
-  test_bs: 64
+  train_bs: 128
+  test_bs: 128
   num_workers: 1
 
 epochs: null
@@ -40,7 +40,7 @@ run_description: "Jacobian sweep for loss fraction using WandB"
 
 log_to_wandb: true
 is_sweep: true
-sweep_num: 30
+sweep_num: 50
 save_model_as_artifact: false
 save_model: false
 teacher_save_path: null

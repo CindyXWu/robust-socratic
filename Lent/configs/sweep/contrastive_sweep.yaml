@@ -1,5 +1,5 @@
 program: Lent/distill_sweep.py
-method: grid
+method: bayes
 metric: 
   name: S Test
   goal: maximize
@@ -16,7 +16,7 @@ parameters:
   nonbase_loss_frac:
     distribution: log_uniform_values
     min: 0.01
-    max: 0.5
+    max: 0.75
 # early_terminate: 
 #   type: hyperband
 #   min_iter: 10

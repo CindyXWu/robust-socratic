@@ -310,7 +310,7 @@ def train_distill(
             if it == 0:  # Debugging
                 check_grads(student)
                 for name in cf_dataloaders:
-                    batch_image = plot_PIL_batch(dataloader=cf_dataloaders[name], num_images=(batch_size//4))
+                    batch_image = plot_PIL_batch(dataloader=cf_dataloaders[name], num_images=16)
                     wandb.log({name.split(":")[-1].strip().replace(' ', '_'): [wandb.Image(batch_image)]}, step=it)
                     
             if it % config.eval_frequency == 0:
