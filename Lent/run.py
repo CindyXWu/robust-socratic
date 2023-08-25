@@ -47,6 +47,7 @@ def main(config: MainConfig) -> None:
     
     ## WandB
     config.wandb_project_name = f"TEACHER-{config.model_type}-{config.dataset_type}-{config.config_type}-{config.dataset.box_cue_pattern}{config.wandb_project_name}"
+    config.wandb_run_name = f"T Mech: {t_exp_idx} {t_exp_name}, Loss: {config.distill_loss_type}"
     config_dict = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)   
     extra_params = { # To log to WandB but not needed otherwise
         "Git commit hash": get_previous_commit_hash(),
