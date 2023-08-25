@@ -47,6 +47,7 @@ class OptimizerType(str, Enum):
 class ConfigType(str, Enum):
     TARGETED = "TARGETED" # Initial targeted experiments set out by Ekdeep
     EXHAUSTIVE = "EXHAUSTIVE"
+    FRAC = "FRAC" # Explore effect of fraction of spurious mech present in T/S dataset
 
 
 class BoxPatternType(str, Enum):
@@ -225,12 +226,6 @@ class ConfigGroups:
     )
     
     frac = (
-        ExpConfig("10 0 0", ExperimentConfig(im_frac=0.1, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
-        ExpConfig("25 0 0", ExperimentConfig(im_frac=0.25, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
-        ExpConfig("50 0 0", ExperimentConfig(im_frac=0.5, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
-        ExpConfig("75 0 0", ExperimentConfig(im_frac=0.75, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
-        ExpConfig("90 0 0", ExperimentConfig(im_frac=0.9, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
-        
         ExpConfig("100 10 0", ExperimentConfig(im_frac=1, m1_frac=0.1, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
         ExpConfig("100 25 0", ExperimentConfig(im_frac=1, m1_frac=0.25, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
         ExpConfig("100 50 0", ExperimentConfig(im_frac=1, m1_frac=0.5, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
@@ -248,6 +243,11 @@ class ConfigGroups:
         ExpConfig("0 50 100", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.5, rand_im=False, rand_m1=False, rand_m2=False)),
         ExpConfig("0 75 100", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.75, rand_im=False, rand_m1=False, rand_m2=False)),
         ExpConfig("0 90 100", ExperimentConfig(im_frac=1, m1_frac=0, m2_frac=0.9, rand_im=False, rand_m1=False, rand_m2=False)),
+    )
+    
+    frac_cf = (
+        ExpConfig("100 0 0", ExperimentConfig(im_frac=1.0, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("0 100 0", ExperimentConfig(im_frac=0, m1_frac=1.0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False))
     )
 
 

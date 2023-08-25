@@ -36,7 +36,7 @@ min_iters: 300
 eval_frequency: 100
 num_eval_batches: 50
 early_stop_patience: 50
-run_description: "Contrastive sweep with WandB"
+run_description: "Jacobian sweep for loss fraction using WandB"
 
 log_to_wandb: true
 is_sweep: true

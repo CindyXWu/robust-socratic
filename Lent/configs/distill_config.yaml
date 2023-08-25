@@ -1,6 +1,6 @@
 model_type: RN18AP
 dataset_type: DOMINOES
-config_type: EXHAUSTIVE
+config_type: TARGETED
 distill_loss_type: BASE
 aug_type: NONE
 
@@ -45,7 +45,7 @@ save_model: false
 teacher_save_path: null
 wandb_project_name: ""
 wandb_run_name: null
-run_description: "Multirun x5 Jacobian, random, exhaustive"
+run_description: "Multirun x3 base, random, targeted"
 
 use_early_stop: false
 base_distill_loss_type: KL

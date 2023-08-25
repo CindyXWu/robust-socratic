@@ -51,7 +51,7 @@ config = compose(
     config_name=config_filename, 
     overrides=[
         "+experiment=exhaustive_0",
-        "+experiment_s=exhaustive_0"
+        "+experiment_s=exhaustive_5"
     ]
 )
 
