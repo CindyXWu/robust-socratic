@@ -234,7 +234,8 @@ class ConfigGroups:
     
     frac_cf = (
         ExpConfig("100 0 0", ExperimentConfig(im_frac=1.0, m1_frac=0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
-        ExpConfig("0 100 0", ExperimentConfig(im_frac=0, m1_frac=1.0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False))
+        ExpConfig("0 100 0", ExperimentConfig(im_frac=0, m1_frac=1.0, m2_frac=0, rand_im=False, rand_m1=False, rand_m2=False)),
+        ExpConfig("0 0 100", ExperimentConfig(im_frac=0, m1_frac=0, m2_frac=1.0, rand_im=False, rand_m1=False, rand_m2=False)),
     )
 
 

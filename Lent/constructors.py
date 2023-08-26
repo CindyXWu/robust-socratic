@@ -7,13 +7,14 @@ from torch.utils.data import DataLoader, Dataset
 from typing import Tuple, Optional
 from dataclasses import asdict
 import numpy as np
+import logging
 import omegaconf
 from omegaconf import OmegaConf
 from functools import partial
 
 import os
 
-from config_setup import MainConfig, DistillConfig, ModelType, DatasetType, DistillLossType, DatasetConfig, ConfigGroups, ExperimentConfig, OptimizerType
+from config_setup import MainConfig, DistillConfig, ModelType, DatasetType, DistillLossType, DatasetConfig, ConfigGroups, ExperimentConfig, OptimizerType, ConfigType
 from datasets.dominoes_box import get_box_dataloader
 from datasets.shapes_3D import dataloader_3D_shapes
 from models.resnet import wide_resnet_constructor
@@ -198,13 +199,16 @@ def optimizer_constructor(
     return optim, scheduler
 
 
-def change_frac_filename(config: MainConfig, exp_idx: int, is_student: bool = False) -> None:
+def change_frac_filename(config: MainConfig, exp_idx: int, is_student: bool = False) -> str:
     match (exp_idx, is_student):
-        case (0 or 2, False):
-            config.experiment.name = config.experiment.name.replace("x", m1_frac)
-        case (0 or 2, True):
-            config.experiment.name = config.experiment_s.name.replace("x", m1_frac)
-        case (1 or 3, False):
-            config.experiment.name = config.experiment.name.replace("x", m2_frac)
-        case (1 or 3, True):
-            config.experiment.name = config.experiment_s.name.replace("x", m2_frac)
+        case ("0", False) | ("2", False):
+            name = config.experiment.name.replace("x", str(config.experiment.experiment_config.m1_frac))
+        case ("0", True) | ("2", True):
+            name = config.experiment_s.name.replace("x", str(config.experiment.experiment_config.m1_frac))
+        case ("1", False) | ("3", False):
+            name = config.experiment.name.replace("x", str(config.experiment.experiment_config.m2_frac))
+        case ("1", True) | ("3", True):
+            name = config.experiment_s.name.replace("x", str(config.experiment.experiment_config.m2_frac))
+        case _:
+            raise ValueError(f"Unsupported values for exp_idx ({exp_idx}) and is_student ({is_student})")
+    return name

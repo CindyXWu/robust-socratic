@@ -78,10 +78,13 @@ def train_teacher(teacher: nn.Module,
     no_improve_count = 0
     best_test_acc = 0.0
     
+    print(config.config_type)
     if config.config_type == "TARGETED":
         cf_groupname = "targeted_cf"
     elif config.config_type == "EXHAUSTIVE":
         cf_groupname = "exhaustive"
+    elif config.config_type == "FRAC":
+        cf_groupname = "frac_cf"
     cf_dataloaders = get_counterfactual_dataloaders(config, cf_groupname)
     
     for epoch in range(config.epochs):
@@ -223,6 +226,8 @@ def train_distill(
         cf_groupname = "targeted_cf"
     elif config.config_type == "EXHAUSTIVE":
         cf_groupname = "exhaustive"
+    elif config.config_type == "FRAC":
+        cf_groupname = "frac_cf"
     
     cf_dataloaders = get_counterfactual_dataloaders(config, cf_groupname)
     
