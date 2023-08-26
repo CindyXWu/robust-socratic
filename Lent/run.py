@@ -11,7 +11,7 @@ from omegaconf import OmegaConf
 from create_sweep import load_config
 from train_utils import train_teacher, get_previous_commit_hash
 from config_setup import MainConfig
-from constructors import model_constructor, optimizer_constructor, create_dataloaders, get_dataset_output_size
+from constructors import model_constructor, optimizer_constructor, create_dataloaders, get_dataset_output_size, change_frac_filename
 
 # Change directory to one this file is in
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -25,7 +25,7 @@ DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # CHANGE THESE  
 config_filename = "main_config"
 sweep_filename = ""
-
+    
 
 @hydra.main(config_path="configs/", config_name=config_filename, version_base=None)
 def main(config: MainConfig) -> None:
@@ -41,7 +41,10 @@ def main(config: MainConfig) -> None:
     if config.is_sweep:
         config = update_with_wandb_config(config, sweep_params)
 
-    [t_exp_prefix, t_exp_idx] = config.experiment.config_filename.split("_")
+    [t_exp_prefix, t_exp_idx] = config.experiment.config_filename.split("_")   
+    # Update filename if frac conf - only experiment set where exact vals of fractions of each mech are passed in via CLI and Hydra
+    if config.config_type == ConfigType.FRAC:
+        change_frac_filename(config, t_exp_idx)
     t_exp_name = config.experiment.name.split(":")[-1].strip()
     config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_teacher"
     

@@ -1,9 +1,9 @@
 config_filename: frac_0
 experiment_config:
-  im_frac: 0.1
+  im_frac: 1
   m1_frac: 0
   m2_frac: 0
   rand_im: false
   rand_m1: false
   rand_m2: false
-name: 10 0 0
+name: 'Vary S1: 100 x 0'

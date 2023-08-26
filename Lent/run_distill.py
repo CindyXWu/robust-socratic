@@ -12,7 +12,7 @@ from omegaconf import OmegaConf
 from create_sweep import load_config
 from train_utils import train_distill, get_previous_commit_hash
 from config_setup import DistillConfig, DistillLossType
-from constructors import model_constructor, get_model_intermediate_layer, optimizer_constructor, create_dataloaders, get_dataset_output_size, get_nonbase_loss_frac
+from constructors import model_constructor, get_model_intermediate_layer, optimizer_constructor, create_dataloaders, get_dataset_output_size, get_nonbase_loss_frac, change_frac_filename
 from teacher_check import load_model_and_get_accs
 
 warnings.filterwarnings("ignore")
@@ -49,6 +49,10 @@ def main(config: DistillConfig) -> None:
     ## Filenames and all that stuff
     [t_exp_prefix, t_exp_idx] = config.experiment.config_filename.split("_")
     [s_exp_prefix, s_exp_idx] = config.experiment_s.config_filename.split("_")
+    # Update filename if frac conf - only experiment set where exact vals of fractions of each mech are passed in via CLI and Hydra
+    if config.config_type == ConfigType.FRAC:
+        change_frac_filename(config, t_exp_idx)
+        change_frac_filename(config, s_exp_idx, True)
     # From name field of config file
     t_exp_name, s_exp_name = config.experiment.name.split(":")[-1].strip(), config.experiment_s.name.split(":")[-1].strip()
     config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_teacher"

@@ -196,3 +196,15 @@ def optimizer_constructor(
         scheduler = LRScheduler(optim, config.epochs, base_lr=config.optimization.base_lr, final_lr=config.optimization.final_lr, iter_per_epoch=len(train_loader))
         
     return optim, scheduler
+
+
+def change_frac_filename(config: MainConfig, exp_idx: int, is_student: bool = False) -> None:
+    match (exp_idx, is_student):
+        case (0 or 2, False):
+            config.experiment.name = config.experiment.name.replace("x", m1_frac)
+        case (0 or 2, True):
+            config.experiment.name = config.experiment_s.name.replace("x", m1_frac)
+        case (1 or 3, False):
+            config.experiment.name = config.experiment.name.replace("x", m2_frac)
+        case (1 or 3, True):
+            config.experiment.name = config.experiment_s.name.replace("x", m2_frac)
