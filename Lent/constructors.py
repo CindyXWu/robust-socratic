@@ -202,13 +202,13 @@ def optimizer_constructor(
 def change_frac_filename(config: MainConfig, exp_idx: int, is_student: bool = False) -> str:
     match (exp_idx, is_student):
         case ("0", False) | ("2", False):
-            name = config.experiment.name.replace("x", str(config.experiment.experiment_config.m1_frac))
+            name = config.experiment.name.replace("x", str(config.experiment_s.experiment_config.m1_frac))
         case ("0", True) | ("2", True):
-            name = config.experiment_s.name.replace("x", str(config.experiment.experiment_config.m1_frac))
+            name = config.experiment_s.name.replace("x", str(config.experiment_s.experiment_config.m1_frac))
         case ("1", False) | ("3", False):
-            name = config.experiment.name.replace("x", str(config.experiment.experiment_config.m2_frac))
+            name = config.experiment.name.replace("x", str(config.experiment_s.experiment_config.m2_frac))
         case ("1", True) | ("3", True):
-            name = config.experiment_s.name.replace("x", str(config.experiment.experiment_config.m2_frac))
+            name = config.experiment_s.name.replace("x", str(config.experiment_s.experiment_config.m2_frac))
         case _:
             raise ValueError(f"Unsupported values for exp_idx ({exp_idx}) and is_student ({is_student})")
     return name
