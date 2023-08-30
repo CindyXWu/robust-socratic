@@ -33,6 +33,7 @@ api = wandb.Api(overrides=None, timeout=None, api_key =None)
 
 def heatmap_get_data(project_name: str,
                      loss_name: str,
+                     box_pattern: str,
                      groupby_metrics: List[str],
                      second_project_name: str = None) -> List[pd.DataFrame]:
     """Get data from wandb for experiment set, filter and group. 
@@ -68,6 +69,10 @@ def heatmap_get_data(project_name: str,
     # Compute means/var for all metrics for each group of runs
     histories = create_histories_list(grouped_runs, mode='exhaustive')
     
+    file_name = f"heatmap {loss_name} {box_pattern}"
+    with open(file_name, "wb") as f:
+        pickle.dump(histories, f)
+        
     return histories
 
     
@@ -75,6 +80,7 @@ def wandb_get_data(project_name: str,
                    t_exp_name: str,
                    loss_name: str,
                    model_name: str,
+                   box_pattern: str,
                    groupby_metrics: List[str],
                    grid: bool = True,
                    min_step: int = 300) -> List[pd.DataFrame]:
@@ -113,7 +119,7 @@ def wandb_get_data(project_name: str,
     grouped_runs: Dict = get_grouped_runs(filtered_runs, groupby_metrics)
     histories = create_histories_list(grouped_runs, mode='vstime', grid=grid)
     
-    file_name = f"vstime {loss_name} grid" if grid else f"vstime {t_exp_name} {loss_name}"
+    file_name = f"vstime {loss_name} {box_pattern} grid" if grid else f"vstime {t_exp_name} {loss_name}"
     with open(file_name, "wb") as f:
         pickle.dump(histories, f)
         
@@ -365,9 +371,9 @@ def make_new_plot(histories: List[pd.DataFrame],
     # Find all text objects in the figure
     text_objects = [obj for obj in plt.gcf().findobj() if isinstance(obj, plt.Text)]
 
-    # Extract the content and position of each text object
-    text_contents = [(text_obj.get_text(), text_obj.get_position()) for text_obj in text_objects]
-    print(text_contents)
+    # # Extract the content and position of each text object
+    # text_contents = [(text_obj.get_text(), text_obj.get_position()) for text_obj in text_objects]
+    # print(text_contents)
     plt.savefig('images/exhaustivevstime/grid/'+title+'.png', dpi=300, bbox_inches='tight')
 
 
@@ -501,8 +507,8 @@ if __name__ == "__main__":
     # Somewhat immutable things
     exp_names = [config.name for config in ConfigGroups.exhaustive]
     label_group_names = ["IAB", "IA", "IB", "AB", "B", "A", "I"] # Actual order of names here
-    loss_names = ['BASE']
-    # loss_names = [loss_type.value for loss_type in DistillLossType]
+    # loss_names = ['JACOBIAN', 'CONTRASTIVE']
+    loss_names = [loss_type.value for loss_type in DistillLossType]
     
     # Configs - amazing part of using config YAML is I can load all settings in
     config_filename = "distill_config"
@@ -516,13 +522,13 @@ if __name__ == "__main__":
     second_wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type}-{box_pattern}"
 
     # To be changed
-    mode = 2 # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot)
+    mode = 0 # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot)
     groupby_metrics = ["experiment.name", "experiment_s.name"]
 
     if mode == 0:
         for loss_name in loss_names:
             # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-            histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, groupby_metrics=groupby_metrics)
+            histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics)
             plot_counterfactual_heatmaps(histories, exp_names, loss_name, box_pattern)
             
     elif mode == 1:
@@ -534,7 +540,7 @@ if __name__ == "__main__":
                     with open(filename, "rb") as f: histories = pickle.load(f)
                 except:
                     # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-                    histories = wandb_get_data(project_name=wandb_project_name, t_exp_name=t_exp_name, loss_name=loss_name, model_name=model_name, groupby_metrics=groupby_metrics, grid=False, plot_tmechs_together=False)
+                    histories = wandb_get_data(project_name=wandb_project_name, t_exp_name=t_exp_name, loss_name=loss_name, model_name=model_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, grid=False, plot_tmechs_together=False)
                 wandb_plot(histories, title, grid=False)
     
     elif mode == 2:
@@ -545,5 +551,5 @@ if __name__ == "__main__":
                 with open(filename, "rb") as f: histories = pickle.load(f)
             except: 
                 # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-                histories = wandb_get_data(project_name=wandb_project_name, t_exp_name=None, loss_name=loss_name, model_name=model_name, groupby_metrics=groupby_metrics, grid=True)
+                histories = wandb_get_data(project_name=wandb_project_name, t_exp_name=None, loss_name=loss_name, model_name=model_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, grid=True)
             wandb_plot(histories, title, grid=True)

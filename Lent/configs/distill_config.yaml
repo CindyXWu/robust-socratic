@@ -1,6 +1,6 @@
 model_type: RN18AP
 dataset_type: DOMINOES
-config_type: FRAC
+config_type: EXHAUSTIVE
 distill_loss_type: JACOBIAN
 aug_type: NONE
 
