@@ -17,7 +17,7 @@ from scipy.signal import savgol_filter
 import seaborn as sns
 from typing import List, Optional, Dict, Tuple
 
-from config_setup import ConfigGroups, DistillConfig, BoxPatternType, DistillLossType
+from config_setup import ConfigGroups, BoxPatternType, DistillLossType
 
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -48,10 +48,9 @@ def heatmap_get_data(project_name: str,
     filtered_runs = []
     min_step = 300 # Filter partially logged/unfinished runs
 
-    # Don't filter for teacher experiment type for heatmap data
-    # Filter for loss and remove crashed/incomplete runs
+    # Filter for loss and correct experiment name, and remove crashed/incomplete runs
     for run in runs:
-        if run.config.get('distill_loss_type') == loss_name:
+        if run.config.get('distill_loss_type') == loss_name and run.config.get("experiment", {}).get("name") in label_group_names:
             history = run.history()
             if '_step' in history.columns and history['_step'].max() >= min_step:
                 history = drop_non_numeric_columns(history) # Remove artifacts
