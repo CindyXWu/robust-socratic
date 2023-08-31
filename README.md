@@ -22,8 +22,7 @@ For all possible combinations of mechanisms in dominoes dataset:
 
 ## Example commands to run: student distillation
 For teacher trained on plain CIFAR10 images and student distilled on all possible combinations of mechanisms in dominoes dataset, with Jacobian matching loss:
-```python Lent/run_distill.py -m +experiment=exhaustive_0 +experiment_s=exhaustive_0,exhaustive_1,exhaustive_2,exhaustive_3,exhaustive_4,exhaustive_5,exhaustive_6 distill_loss_type=JACOBIAN
-```
+```python Lent/run_distill.py -m +experiment=exhaustive_0 +experiment_s=exhaustive_0,exhaustive_1,exhaustive_2,exhaustive_3,exhaustive_4,exhaustive_5,exhaustive_6 distill_loss_type=JACOBIAN```
 
 
 ## Recommended hyperparameters from search
