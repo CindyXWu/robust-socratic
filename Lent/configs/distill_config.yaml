@@ -6,7 +6,7 @@ aug_type: NONE
 
 optimization:
   optimizer_type: SGD
-  base_lr: 0.1
+  base_lr: 0.05
   weight_decay: 0.0
   momentum: 0.0
   final_lr: 0.01
@@ -17,7 +17,7 @@ dataset:
   data_folder: "data"
   output_size: null
   box_cue_size: 4
-  box_cue_pattern: MANDELBROT
+  box_cue_pattern: RANDOM
   use_augmentation: false
 augmentation:
   alpha: 2.0
@@ -45,7 +45,7 @@ save_model: false
 teacher_save_path: null
 wandb_project_name: ""
 wandb_run_name: null
-run_description: "Frac Mandelbrot"
+run_description: "Exhaustive Mandelbrot Jacobian"
 
 use_early_stop: false
 base_distill_loss_type: KL
