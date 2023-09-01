@@ -76,7 +76,7 @@ def train_teacher(teacher: nn.Module,
     train_acc_list, test_acc_list = [], []
     it = 0
     no_improve_count = 0
-    best_test_acc = 0.0
+    best_test_loss = 0.0
     
     print(config.config_type)
     if config.config_type == "TARGETED":

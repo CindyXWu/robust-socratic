@@ -1,6 +1,7 @@
 model_type: RN20W
 dataset_type: DOMINOES
 config_type: EXHAUSTIVE
+distill_loss_type: JACOBIAN
 aug_type: NONE
 
 optimization:
@@ -28,22 +29,31 @@ dataloader:
   train_bs: 128
   test_bs: 128
   num_workers: 1
-wrn_config:
-  blocks_per_stage: 2
-  width_factor: 2
 
 epochs: null
 num_iters: 20000
+min_iters: 800
 eval_frequency: 100
 num_eval_batches: 50
 early_stop_patience: 20
-run_description: "Wide ResNet teacher random"
 
 log_to_wandb: true
 is_sweep: false
 sweep_num: 5
-save_model_as_artifact: true
-save_model: true
+save_model_as_artifact: false
+save_model: false
 teacher_save_path: null
 wandb_project_name: ""
 wandb_run_name: null
+run_description: "Exhaustive Mandelbrot Jacobian"
+
+use_early_stop: false
+base_distill_loss_type: KL
+jacobian_loss_type: MSE
+nonbase_loss_frac: null
+dist_temp: 30
+jac_temp: 1
+contrast_temp: 0.1
+s_layer: null
+t_layer: null
+student_save_path: null
