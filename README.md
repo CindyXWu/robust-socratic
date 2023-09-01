@@ -28,7 +28,7 @@ For teacher trained on plain CIFAR10 images and student distilled on all possibl
 ## Recommended hyperparameters from search
 Contrastive:
 ```
-nonbase_loss_frac: 0.3
+nonbase_loss_frac: 0.03
 base_lr: 0.05
 contrast_temp: 0.1 # Not so important
 ```
