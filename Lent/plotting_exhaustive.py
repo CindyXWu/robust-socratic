@@ -2,23 +2,19 @@ from collections import defaultdict
 import pandas as pd
 import numpy as np
 import os
-from types import SimpleNamespace
 import yaml
 import pickle
-import ast
 import logging
 import wandb
-from wandb.sdk.wandb_run import Run
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from labellines import labelLines
-from scipy.signal import savgol_filter
 import seaborn as sns
-from typing import List, Optional, Dict, Tuple
+from typing import List, Dict
 
 from config_setup import ConfigGroups, BoxPatternType, DistillLossType
-
+from plotting_common import drop_non_numeric_columns, clean_history, smooth_history, get_grouped_runs, custom_sort, recursive_namespace, create_histories_list
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 image_dir = "images/"
@@ -68,7 +64,7 @@ def heatmap_get_data(project_name: str,
     # Compute means/var for all metrics for each group of runs
     histories = create_histories_list(grouped_runs, mode='exhaustive')
     
-    file_name = f"heatmap {loss_name} {box_pattern}"
+    file_name = f"run_data/heatmap {loss_name} {box_pattern}"
     with open(file_name, "wb") as f:
         pickle.dump(histories, f)
         
@@ -118,49 +114,10 @@ def wandb_get_data(project_name: str,
     grouped_runs: Dict = get_grouped_runs(filtered_runs, groupby_metrics)
     histories = create_histories_list(grouped_runs, mode='vstime', grid=grid)
     
-    file_name = f"vstime {loss_name} {box_pattern} grid" if grid else f"vstime {t_exp_name} {loss_name}"
+    file_name = f"run_data/vstime {loss_name} {box_pattern} grid" if grid else f"vstime {t_exp_name} {loss_name}"
     with open(file_name, "wb") as f:
         pickle.dump(histories, f)
         
-    return histories
-
-
-def create_histories_list(
-    grouped_runs: Dict[tuple, List],
-    mode: str,
-    **kwargs) -> List[pd.DataFrame]:
-
-    histories = []
-    for key, runs in grouped_runs.items():
-        metrics = defaultdict(list)
-        for run in runs:
-            history = run.history
-            for metric in history.columns:
-                metrics[metric].append(history[[metric]])
-
-        means_and_vars_list = []
-        for metric, metric_values in metrics.items():
-            combined = pd.concat(metric_values)
-            mean = combined.groupby(combined.index)[metric].mean().rename(f'{metric} Mean')
-            var = combined.groupby(combined.index)[metric].var().rename(f'{metric} Var')
-            means_and_vars_list.append(pd.concat([mean, var], axis=1))
-
-        combined = pd.concat(means_and_vars_list, axis=1)
-
-        if mode == 'exhaustive': # For heatmaps
-            combined['Group Name'] = [{'T': key[0], 'S': key[1]}]*len(combined)
-        elif mode == 'vstime': # For vstime - must pass in extra info via kwargs
-            grid = kwargs.get('grid')
-            if grid is None:
-                raise ValueError("Whether to use grid must be provided")
-            if grid:
-                combined['Group Name'] = [{'T': key[0], 'S': key[1]}] * len(combined)
-            else: # Student only in Group Name
-                combined['Group Name'] = [key[1]] * len(combined)
-        else: raise ValueError("Mode must be 'exhaustive' or 'vstime'")
-                
-        histories.append(combined)
-
     return histories
     
     
@@ -205,7 +162,7 @@ def make_plot(histories: List[pd.DataFrame],
               title: str, 
               mode: str) -> None:
     """
-    For plots over time.
+    For plots over time. Plots each teacher separately.
     
     Args:
         histories: List of dataframes containing historical information for each group of runs.
@@ -293,7 +250,7 @@ def make_new_plot(histories: List[pd.DataFrame],
                   title: str, 
                   mode: str) -> None:
     """
-    For plots over time.
+    For plots over time. Plots all teachers and all students on a 7x7 grid.
     
     Args:
         histories: List of dataframes containing historical information for each student-teacher pair.
@@ -382,9 +339,9 @@ def counterfactual_plot(histories: pd.DataFrame, exp_dict: Dict[str, List], titl
     acc_mean_cols = [col for col in histories[0].columns if col.replace(' Mean', '') in metric_names]
     kl_mean_cols = [col for col in histories[0].columns if col.replace(' T-S KL Mean', '') in metric_names]
     top1_mean_cols = [col for col in histories[0].columns if col.replace(' T-S Top 1 Fidelity Mean', '') in metric_names]
-    acc_mean_cols.sort(key=lambda col: custom_sort(col, 'acc'))
-    kl_mean_cols.sort(key=lambda col: custom_sort(col, 'kl'))
-    top1_mean_cols.sort(key=lambda col: custom_sort(col, 'fidelity'))
+    acc_mean_cols.sort(key=lambda col: custom_sort(col, 'acc', exp_names))
+    kl_mean_cols.sort(key=lambda col: custom_sort(col, 'kl', exp_names))
+    top1_mean_cols.sort(key=lambda col: custom_sort(col, 'fidelity', exp_names))
 
     make_plot(histories, acc_mean_cols, "Counterfactual Test Accuracy"+title)
     make_plot(histories, kl_mean_cols, "Counterfactual T-S KL"+title)
@@ -394,119 +351,18 @@ def counterfactual_plot(histories: pd.DataFrame, exp_dict: Dict[str, List], titl
 def wandb_plot(histories: List[pd.DataFrame], title: str, grid: bool = True) -> None:
     """Extract unique column group names and plot them on separate plots - for plotting over training time."""
     mean_cols = [col for col in histories[0].columns if col.replace(' Mean', '') in exp_names]
-    mean_cols.sort(key=lambda col: custom_sort(col, 'acc'))
+    mean_cols.sort(key=lambda col: custom_sort(col, 'acc', exp_names))
     
     if grid:
         make_new_plot(histories, mean_cols, title, 'acc')
     else:
         make_new_plot(histories, mean_cols, title, 'acc')
-    
-## =========================================================================
-# Helper functions
-## =========================================================================
-
-
-def drop_non_numeric_columns(df):
-    """Drop columns that cannot be converted entirely to numeric values."""
-    cols_to_drop = []
-    
-    for col in df.columns:
-        try:
-            pd.to_numeric(df[col])
-        except:
-            cols_to_drop.append(col)
-                
-    df = df.drop(columns=cols_to_drop)
-    return df
-
-
-def clean_history(history: pd.DataFrame) -> pd.DataFrame:
-    """Remove any NaN datapoints individually due to data logging bug where wandb believes logging data as separate dictionaries is a new timstep at each call."""
-    history_clean = pd.DataFrame()
-    
-    for col in history.columns:
-        if not col.startswith('_'):
-            col_array = history[col].values
-            if np.issubdtype(col_array.dtype, np.number):  # Check if the data type is numeric
-                col_array_clean = col_array[~np.isnan(col_array)]
-                history_clean[col] = pd.Series(col_array_clean)
-            else:
-                # Handle non-numeric columns, e.g., copy them as is
-                history_clean[col] = history[col]
-    history_clean.reset_index(drop=True, inplace=True)
-    
-    return history_clean
-
-
-def smooth_history(history: pd.DataFrame, 
-                   window_length: Optional[int]=5, 
-                   polyorder: Optional[int] = 3) -> pd.DataFrame:
-    """Smooth each column in the DataFrame, interpolating for NaNs."""
-    nan_mask = history.isna()
-    filtered_history = history.interpolate().apply(lambda x: savgol_filter(x, window_length, polyorder, mode='mirror'))
-    filtered_history[nan_mask] = np.nan # Apply the NaN mask to the filtered history
-    
-    return filtered_history
-
-        
-def get_grouped_runs(runs: List[Run], groupby_metrics: List[str]) -> Dict[Tuple[str, ...], List[Run]]:
-    """Key = value of metrics specified in groupby_metrics (e.g. "teacher mechanism"). Values = list of runs satisfying these metric values."""
-    grouped_runs = defaultdict(list)
-    
-    for run in runs:
-        key = tuple([get_nested_value(run.config, m) for m in groupby_metrics])
-        grouped_runs[key].append(run)
-        
-    return grouped_runs
-
-
-def get_nested_value(d: dict, keys_str: str):
-    """Helper function for the above get_grouped_runs function which deals with nested dictionaries."""
-    keys = keys_str.split('.')
-    for key in keys:
-        if d is None or not isinstance(d, dict):
-            return None
-        d = d.get(key)
-    return d
-
-
-def get_order_list(exp_names: List) -> List:
-    """Order of subplots by metric name - used to make grouped plots make sense"""
-    const_graph_list = ['T-S Top 1 Fidelity', 'T-S KL', 'T-S Test Difference']
-    order_list = exp_names + const_graph_list
-    return order_list
-
-
-def custom_sort(col: str, type: str) -> int:
-    order_list = get_order_list(exp_names)
-    
-    """Used to sort the order of the subplots in the grouped plots."""
-    match type:
-        case 'acc':
-            metric_name = col.replace(' Mean', '')
-        case 'kl':
-            metric_name = col.replace(' T_S KL Mean', '')
-        case 'fidelity':
-            metric_name = col.replace(' T_S Top 1 Fidelity Mean', '')
-            
-    if metric_name in order_list:
-        return order_list.index(metric_name)
-    else:
-        return len(order_list) + 1
-
-
-def recursive_namespace(data):
-    """Unpack YAML file into dot notation indexable form."""
-    if isinstance(data, dict):
-        return SimpleNamespace(**{k: recursive_namespace(v) for k, v in data.items()})
-    return data
 
 
 if __name__ == "__main__":
     # Somewhat immutable things
     exp_names = [config.name for config in ConfigGroups.exhaustive]
     label_group_names = ["IAB", "IA", "IB", "AB", "B", "A", "I"] # Actual order of names here
-    # loss_names = ['JACOBIAN', 'CONTRASTIVE']
     loss_names = [loss_type.value for loss_type in DistillLossType]
     
     # Configs - amazing part of using config YAML is I can load all settings in
@@ -526,16 +382,20 @@ if __name__ == "__main__":
 
     if mode == 0:
         for loss_name in loss_names:
-            # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-            histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics)
-            plot_counterfactual_heatmaps(histories, exp_names, loss_name, box_pattern)
+            try:
+                filename = f"run_data/heatmap {loss_name} {box_pattern}"
+                with open(filename, "rb") as f: histories = pickle.load(f)
+            except:
+                # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
+                histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics)
+                plot_counterfactual_heatmaps(histories, exp_names, loss_name, box_pattern)
             
     elif mode == 1:
         for t_exp_name in exp_names:
             for loss_name in loss_names:
                 title = f"{config.model_type} {t_exp_name} {loss_name}"
                 try: # Files already calculated and exist
-                    filename = f"vstime {t_exp_name} {loss_name}"
+                    filename = f"run_data/vstime {t_exp_name} {loss_name}"
                     with open(filename, "rb") as f: histories = pickle.load(f)
                 except:
                     # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
@@ -546,7 +406,7 @@ if __name__ == "__main__":
         for loss_name in loss_names:
             title = f"{config.model_type} {loss_name}"
             try: # Files already calculated and exist
-                filename = f"vstime {loss_name} grid"
+                filename = f"run_data/vstime {loss_name} grid"
                 with open(filename, "rb") as f: histories = pickle.load(f)
             except: 
                 # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
