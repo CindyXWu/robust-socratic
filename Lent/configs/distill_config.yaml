@@ -40,7 +40,7 @@ early_stop_patience: 20
 log_to_wandb: true
 is_sweep: false
 sweep_num: 5
-save_model_as_artifact: false
+save_model_as_artifact: true
 save_model: false
 teacher_save_path: null
 wandb_project_name: ""

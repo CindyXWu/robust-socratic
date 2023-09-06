@@ -106,19 +106,24 @@ def main(config: DistillConfig) -> None:
         scheduler=scheduler,
         config=config,
         device=DEVICE)
-    try:
-        # Save teacher model and config as wandb artifacts:
-        if config.save_model_as_artifact:
-            cwd = get_original_cwd()
-            output_dir = HydraConfig.get().run.dir
-            if HydraConfig.get().job.num is not None:
-                output_dir.replace("outputs", "multirun")
-            model_artifact = wandb.Artifact("student", type="model", description="Trained student model state_dict")
-            model_artifact.add_file(f"{cwd}/{output_dir}/.hydra/config.yaml", name="distill_config.yaml")
-            wandb.log_artifact(model_artifact)
-    except: # The most lazy way of saying 'this block of code is generating errors sometimes but it doesn't really matter so I'm not going to fix it'
-        pass # I'm not sorry
     
+    try:
+        # Save student model as wandb artifact:
+        if config.save_model_as_artifact:
+            model_artifact = wandb.Artifact("model", type="model", description="The trained student model state_dict")
+            model_artifact.add_file(Path(".") / f"model.torch")
+            try:
+                cwd = get_original_cwd()
+                output_dir = HydraConfig.get().run.dir
+                if HydraConfig.get().job.num is not None:
+                    output_dir.replace("outputs", "multirun")
+                    model_artifact.add_file(f"{cwd}/{output_dir}/.hydra/config.yaml", name="distill_config.yaml")
+            except: # The most lazy way of saying 'this block of code is generating errors sometimes but it doesn't really matter so I'm not going to fix it'
+                pass # I'm not sorry
+            wandb.log_artifact(model_artifact, aliases=[config.wandb_run_name])
+    except:
+        pass
+
     # Needed to make sure each config file in multirun initialises separately - this requires the previous run to close
     wandb.finish()
 
