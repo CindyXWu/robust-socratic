@@ -29,6 +29,10 @@ dataloader:
   train_bs: 128
   test_bs: 128
   num_workers: 1
+wrn_config:
+blocks_per_stage: 2
+width_factor: 2
+
 
 epochs: null
 num_iters: 20000

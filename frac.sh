@@ -6,7 +6,7 @@ SCRIPT_PATH="Lent/run_distill.py"
 config_filename="distill_config"
 experiment="exhaustive_0" # Frac 0 - i.e. teacher trained on totally clean data
 experiment_s="frac_0"
-args="config_type=FRAC distill_loss_type=JACOBIAN dataset.box_cue_pattern=RANDOM experiment_s.experiment_config.m1_frac=90,95,96,97,98,99,100"
+args="config_type=FRAC distill_loss_type=JACOBIAN dataset.box_cue_pattern=RANDOM experiment_s.experiment_config.m1_frac=10,20,30,40,50,60,70,80"
 
 for i in {1..3}
 do
