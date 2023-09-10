@@ -155,6 +155,44 @@ def plot_counterfactual_heatmaps(
         ax.set_ylabel('Student Training Mechanism', fontsize=15)
         # ax.set_title(f'Counterfactual {key.replace("_", " ")} Test Accuracy - {loss} Loss')
         plt.savefig(f'images/heatmaps/{loss_name}_{box_pattern}/{key}.png', dpi=300, bbox_inches='tight')
+
+
+def plot_mean_variance_heatmaps(combined_history, exp_names, loss_name, box_pattern):
+    print(f"plotting vars in heatmap loss {loss_name} box {box_pattern}")
+    data_to_plot_mean = {}
+    data_to_plot_variance = {}
+    axes_labels = []
+    num_keys = len(exp_names)
+
+    for i, key in enumerate(exp_names):
+        data_to_plot_mean[key] = np.zeros((num_keys, num_keys))
+        data_to_plot_variance[key] = np.zeros((num_keys, num_keys))
+        axes_labels.append(exp_names[i])
+                           
+    for history in combined_history:
+        mechs = history['Group Name'].iloc[0]
+        row = exp_names.index(mechs['S'])
+        col = exp_names.index(mechs['T'])
+        for key in exp_names:
+            data_to_plot_mean[key][row, col] = history[f'{key} Mean'].loc[history[f'{key} Mean'].last_valid_index()]
+            data_to_plot_variance[key][row, col] = history[f'{key} Var'].loc[history[f'{key} Var'].last_valid_index()]
+
+    for key, data_mean in data_to_plot_mean.items():
+        fig, ax = plt.subplots()
+        heatmap = sns.heatmap(data_mean, cmap='mako', annot=True, fmt=".1f", cbar=True, ax=ax, vmax=100, vmin=0)
+
+        # Annotate each cell with the standard deviation value
+        for i in range(data_mean.shape[0]):
+            for j in range(data_mean.shape[1]):
+                variance = data_to_plot_variance[key][i, j]
+                std_dev = np.sqrt(variance)
+                ax.text(j + 0.6, i + 0.6, f"\n{std_dev:.2f}", va='top', ha='right', color='black', fontsize=6)  # Adjust font size and position as needed
+
+        ax.set_xticklabels(axes_labels, rotation='vertical', fontsize=15)
+        ax.set_yticklabels(axes_labels, rotation='horizontal', fontsize=15)
+        ax.set_xlabel('Teacher Training Mechanism', fontsize=15)
+        ax.set_ylabel('Student Training Mechanism', fontsize=15)
+        plt.savefig(f'images/heatmaps/{loss_name}_{box_pattern}/{key}.png', dpi=300, bbox_inches='tight')
             
 
 def make_plot(histories: List[pd.DataFrame], 
@@ -359,6 +397,44 @@ def wandb_plot(histories: List[pd.DataFrame], title: str, grid: bool = True) -> 
         make_new_plot(histories, mean_cols, title, 'acc')
 
 
+def plot_difference_heatmaps(differences: Dict[str, np.ndarray], loss_name: str, box_pattern: str):
+    for key, data in differences.items():
+        fig, ax = plt.subplots()
+        heatmap = sns.heatmap(data, cmap='mako', annot=True, fmt=".1f", cbar=True, ax=ax)
+        
+        ax.set_xticklabels(exp_names, rotation='vertical', fontsize=15)
+        ax.set_yticklabels(exp_names, rotation='horizontal', fontsize=15)
+        ax.set_xlabel('Teacher Training Mechanism', fontsize=15)
+        ax.set_ylabel('Student Training Mechanism', fontsize=15)
+        plt.savefig(f'images/difference_heatmaps/{loss_name}_{box_pattern}/{key}.png', dpi=300, bbox_inches='tight')
+
+
+def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.DataFrame]) -> Dict[str, np.ndarray]:
+    data_to_diff = {}
+    num_keys = len(exp_names)
+
+    # Initialize difference array with zeros
+    for key in exp_names:
+        data_to_diff[key] = np.zeros((num_keys, num_keys))
+    
+    # Create a dictionary for easier lookup based on Group Name for each history in compare_hist
+    compare_hist_dict = {tuple(hist['Group Name'].iloc[0].values()): hist for hist in compare_hist}
+
+    # Compute the differences
+    for b_hist in base_hist:
+        mechs = b_hist['Group Name'].iloc[0]
+        if tuple(mechs.values()) in compare_hist_dict:
+            c_hist = compare_hist_dict[tuple(mechs.values())]
+            row = exp_names.index(mechs['S'])
+            col = exp_names.index(mechs['T'])
+            for key in exp_names:
+                base_value = b_hist[f'{key} Mean'].loc[b_hist[f'{key} Mean'].last_valid_index()]
+                compare_value = c_hist[f'{key} Mean'].loc[c_hist[f'{key} Mean'].last_valid_index()]
+                data_to_diff[key][row, col] = compare_value - base_value
+
+    return data_to_diff
+
+
 if __name__ == "__main__":
     # Somewhat immutable things
     exp_names = [config.name for config in ConfigGroups.exhaustive]
@@ -377,7 +453,7 @@ if __name__ == "__main__":
     second_wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type}-{box_pattern}"
 
     # To be changed
-    mode = 0 # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot)
+    mode = 0 # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps
     groupby_metrics = ["experiment.name", "experiment_s.name"]
 
     if mode == 0:
@@ -388,7 +464,8 @@ if __name__ == "__main__":
             except:
                 # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
                 histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics)
-                plot_counterfactual_heatmaps(histories, exp_names, loss_name, box_pattern)
+            # plot_counterfactual_heatmaps(histories, exp_names, loss_name, box_pattern)
+            plot_mean_variance_heatmaps(histories, exp_names, loss_name, box_pattern)
             
     elif mode == 1:
         for t_exp_name in exp_names:
@@ -412,3 +489,21 @@ if __name__ == "__main__":
                 # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
                 histories = wandb_get_data(project_name=wandb_project_name, t_exp_name=None, loss_name=loss_name, model_name=model_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, grid=True)
             wandb_plot(histories, title, grid=True)
+
+    elif mode == 3:
+        box_pattern = "RANDOM"
+        file_names = [F"heatmap {loss_type.value} {box_pattern}" for loss_type in DistillLossType]
+        histories = {}
+
+        for file_name in file_names:
+            with open(f"run_data/{file_name}", "rb") as f:
+                histories[file_name.split()[1]] = pickle.load(f)
+
+        # 2. Calculate the differences between the specialized distillation losses and the base distillation
+        base_history = histories["BASE"]
+
+        jacobian_differences = compute_difference(base_history, histories["JACOBIAN"])
+        contrastive_differences = compute_difference(base_history, histories["CONTRASTIVE"])
+
+        plot_difference_heatmaps(jacobian_differences, "JACOBIAN", box_pattern)
+        plot_difference_heatmaps(contrastive_differences, "CONTRASTIVE", box_pattern)
