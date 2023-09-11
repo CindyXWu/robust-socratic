@@ -48,7 +48,7 @@ def get_approx_jacobian(
     x: torch.Tensor,
     batch_size: int,
     output_dim: int,
-    top_k_idx: int):
+    top_k_idx: int) -> torch.Tensor:
     """Compute Jacobian for the top-k most probable classes instead of just the most probable class.
     Args:
         output: [batch_size, output_dim=num_classes]
@@ -68,7 +68,11 @@ def get_approx_jacobian(
     return jacobian.view(batch_size, -1)
 
 
-def get_jacobian(output, x, batch_size, input_dim, output_dim):
+def get_jacobian(output: torch.Tensor, 
+                 x: torch.Tensor,
+                 batch_size: int,
+                 input_dim: int,
+                 output_dim:int) -> torch.Tensor:
     """Autograd method. Need to keep grads, so set create_graph to True."""
     assert output.requires_grad
     jacobian = torch.zeros(batch_size, output_dim, input_dim, device=x.device)
@@ -136,6 +140,7 @@ def jacobian_attention_loss(student, teacher, scores, targets, inputs, batch_siz
     jacobian_loss = torch.mean(jacobian_loss)   # Batchwise mean
     loss = (1 - alpha) * distill_loss + alpha * jacobian_loss
     return loss
+
 
 def get_grads(model, inputs, batch_size, layer):
     """Extract feature maps from model and call backward() to get input grad.
