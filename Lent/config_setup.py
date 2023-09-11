@@ -154,6 +154,7 @@ class MainConfig:
 
 @dataclass
 class DistillConfig(MainConfig):
+    student_model_type: ModelType = ModelType.RESNET18_ADAPTIVE_POOLING
     distill_loss_type: Optional[DistillLossType] = DistillLossType.BASE # Whether to add extra terms in base distillation
     base_distill_loss_type: Optional[LossType] = LossType.KL # Type of base distillation loss
     jacobian_loss_type: LossType = LossType.MSE

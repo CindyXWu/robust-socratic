@@ -41,25 +41,29 @@ def get_dataset_output_size(config: MainConfig) -> int:
     return dataset_output_sizes.get(config.dataset_type)
 
 
-def model_constructor(config: MainConfig) -> nn.Module:
+def model_constructor(config: MainConfig, is_student: bool) -> nn.Module:
     """Constructs a model based on a specified model type."""
-    if config.model_type == ModelType.MLP:
+    model_type = config.student_model_type if is_student else config.model_type
+    if model_type == ModelType.MLP:
+        mlp_config = config.student_mlp_config if is_student else config.mlp_config
         model = mlp_constructor(
             input_size=config.dataset.input_length,
-            hidden_sizes=config.mlp_config.hidden_sizes,
-            output_size=config.mlp_config.output_size,
-            bias=config.mlp_config.add_bias,
+            hidden_sizes=mlp_config.hidden_sizes,
+            output_size=mlp_config.output_size,
+            bias=mlp_config.add_bias,
         )
-    elif config.model_type == ModelType.RESNE20_WIDE:
+    elif model_type == ModelType.RESNE20_WIDE:
+        wrn_config = config.student_wrn_config if is_student else config.wrn_config
         model = wide_resnet_constructor(
-            blocks_per_stage=config.wrn_config.blocks_per_stage,
-            width_factor=config.wrn_config.width_factor,
+            blocks_per_stage=wrn_config.blocks_per_stage,
+            width_factor=wrn_config.width_factor,
             output_size=config.dataset.output_size,
         )
-    elif config.model_type == ModelType.RESNET18_ADAPTIVE_POOLING:
+    elif model_type == ModelType.RESNET18_ADAPTIVE_POOLING:
         model = CustomResNet18(config.dataset.output_size)
     else:
-        raise ValueError(f"Invalid model type: {config.model_type}")
+        raise ValueError(f"Invalid model type: {model_type}")
+
     return model
 
 

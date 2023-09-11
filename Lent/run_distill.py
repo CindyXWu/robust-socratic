@@ -88,8 +88,8 @@ def main(config: DistillConfig) -> None:
     config.epochs = config.num_iters//(len(train_loader))
     
     ## Models
-    student = model_constructor(config).to(DEVICE)
-    teacher = model_constructor(config).to(DEVICE)
+    student = model_constructor(config, is_student=True).to(DEVICE)
+    teacher = model_constructor(config, is_student=False).to(DEVICE)
     checkpoint = torch.load(config.teacher_save_path, map_location=DEVICE)
     teacher.load_state_dict(checkpoint['model_state_dict'])
     config.t_layer = config.s_layer = get_model_intermediate_layer(config)

@@ -1,4 +1,5 @@
 model_type: RN20W
+student_model_type: RN20W
 dataset_type: DOMINOES
 config_type: EXHAUSTIVE
 distill_loss_type: JACOBIAN
@@ -30,9 +31,11 @@ dataloader:
   test_bs: 128
   num_workers: 1
 wrn_config:
-blocks_per_stage: 2
-width_factor: 2
-
+    blocks_per_stage: 2
+    width_factor: 2
+student_wrn_config:
+    blocks_per_stage: 2
+    width_factor: 2
 
 epochs: null
 num_iters: 20000
