@@ -41,25 +41,29 @@ def get_dataset_output_size(config: MainConfig) -> int:
     return dataset_output_sizes.get(config.dataset_type)
 
 
-def model_constructor(config: MainConfig) -> nn.Module:
+def model_constructor(config: MainConfig, is_student: bool) -> nn.Module:
     """Constructs a model based on a specified model type."""
-    if config.model_type == ModelType.MLP:
+    model_type = config.student_model_type if is_student else config.model_type
+    if model_type == ModelType.MLP:
+        mlp_config = config.student_mlp_config if is_student else config.mlp_config
         model = mlp_constructor(
             input_size=config.dataset.input_length,
-            hidden_sizes=config.mlp_config.hidden_sizes,
-            output_size=config.mlp_config.output_size,
-            bias=config.mlp_config.add_bias,
+            hidden_sizes=mlp_config.hidden_sizes,
+            output_size=mlp_config.output_size,
+            bias=mlp_config.add_bias,
         )
-    elif config.model_type == ModelType.RESNE20_WIDE:
+    elif model_type in [ModelType.RESNET20_WIDE, ModelType.RESNET34_WIDE]:
+        wrn_config = config.student_wrn_config if is_student else config.wrn_config
         model = wide_resnet_constructor(
-            blocks_per_stage=config.wrn_config.blocks_per_stage,
-            width_factor=config.wrn_config.width_factor,
+            blocks_per_stage=wrn_config.blocks_per_stage,
+            width_factor=wrn_config.width_factor,
             output_size=config.dataset.output_size,
         )
-    elif config.model_type == ModelType.RESNET18_ADAPTIVE_POOLING:
+    elif model_type == ModelType.RESNET18_ADAPTIVE_POOLING:
         model = CustomResNet18(config.dataset.output_size)
     else:
-        raise ValueError(f"Invalid model type: {config.model_type}")
+        raise ValueError(f"Invalid model type: {model_type}")
+
     return model
 
 
@@ -68,7 +72,7 @@ def get_model_intermediate_layer(config: MainConfig) -> str:
     models = {
             ModelType.LENET5_3CHAN: {'feature_extractor.10': 'feature_extractor.10'},
             ModelType.RESNET18_ADAPTIVE_POOLING: {'layer4.1.bn2': 'bn_bn2'},
-            ModelType.RESNE20_WIDE: {"11.path2.5": "final_features"},
+            ModelType.RESNET20_WIDE: {"11.path2.5": "final_features"},
         }
     return models.get(config.model_type)
 
@@ -128,16 +132,23 @@ def create_dataloaders(config: MainConfig,
     return train_loader, test_loader
 
 
-def get_counterfactual_dataloaders(main_config: MainConfig, config_groupname: str) -> dict[str, DataLoader]:
+def get_counterfactual_dataloaders(config: MainConfig) -> dict[str, DataLoader]:
     """Get a dictionary of dataloaders for counterfactual evaluation. Key is string describing counterfactual experiment settings.
-    Args:
-        config_groupname: 
     """
+    if config.config_type == "TARGETED":
+        cf_groupname = "targeted_cf"
+    elif config.config_type == "EXHAUSTIVE":
+        cf_groupname = "exhaustive"
+    elif config.config_type == "FRAC":
+        cf_groupname = "frac_cf"
+    else:
+        raise ValueError("groupname in config YAML file incorrect")
+        
     dataloaders = {}
-    config_group = getattr(ConfigGroups, config_groupname)
+    config_group = getattr(ConfigGroups, cf_groupname)
     for idx, exp_config in enumerate(config_group):
         name, exp_config = exp_config.name, exp_config.experiment_config
-        _, dataloaders[name] = create_dataloaders(main_config, exp_config)
+        _, dataloaders[name] = create_dataloaders(config, exp_config)
     return dataloaders
 
 

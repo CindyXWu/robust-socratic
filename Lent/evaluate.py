@@ -1,13 +1,15 @@
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from collections import defaultdict
 from typing import Callable
 
 from losses.loss_common import *
+from config_setup import MainConfig, DistillLossType, DistillConfig
 
 
 @torch.no_grad()
-def evaluate(model: nn.Module, 
+def evaluate(model: nn.Module,
              dataloader: DataLoader, 
              batch_size: int, 
              num_eval_batches: int, 
@@ -22,6 +24,7 @@ def evaluate(model: nn.Module,
         scores = model(features)
         _, pred = torch.max(scores, 1)
         acc += torch.sum(torch.eq(pred, labels)).item()
+                                 
         if num_eval_batches != 0 and i >= num_eval_batches:
             break
         
@@ -69,3 +72,22 @@ def mixup_accuracy(metric_fn: Callable, logits, label, label_2, lam):
     Loss function should already have loss type and temperature set with functools partial.
     """
     return lam*metric_fn(logits, label) + (1-lam)*metric_fn(logits, label_2)
+
+
+@torch.no_grad()
+def counterfactual_evaluate_teacher(teacher: nn.Module,
+                                    cf_dataloaders: dict[str, DataLoader],
+                                    config: MainConfig,
+                                    device: torch.device) -> defaultdict[float]:
+    teacher.eval()
+    cf_accs = defaultdict(float)
+    
+    for name in cf_dataloaders:
+        cf_accs[f"Teacher {name}"] = evaluate(
+            model=teacher,
+            dataloader=cf_dataloaders[name],
+            batch_size=config.dataloader.test_bs,
+            num_eval_batches=config.num_eval_batches,
+            device=device)
+        
+    return cf_accs

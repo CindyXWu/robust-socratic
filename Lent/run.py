@@ -23,7 +23,7 @@ cs.store(name="config_base", node=MainConfig)
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # CHANGE THESE  
-config_filename = "wrn_config"
+config_filename = "main_config"
 sweep_filename = ""
     
 
@@ -74,7 +74,7 @@ def main(config: MainConfig) -> None:
     train_loader, test_loader = create_dataloaders(config=config)
 
     ## Model
-    teacher = model_constructor(config).to(DEVICE)
+    teacher = model_constructor(config, is_student=False).to(DEVICE)
     
     ## Optimizer
     config.epochs = config.num_iters//(len(train_loader))  
@@ -97,6 +97,7 @@ def main(config: MainConfig) -> None:
             if HydraConfig.get().job.num is not None:
                 output_dir.replace("outputs", "multirun")
             model_artifact = wandb.Artifact("teacher", type="model", description="Trained teacher model state_dict")
+            model_artifact.add_file(config.teacher_save_path)
             model_artifact.add_file(f"{cwd}/{output_dir}/.hydra/config.yaml", name="main_config.yaml")
             wandb.log_artifact(model_artifact)
     except: # The most lazy way of saying 'this block of code is generating errors sometimes but it doesn't really matter so I'm not going to fix it'
