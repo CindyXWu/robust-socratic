@@ -44,6 +44,7 @@ is_sweep: false
 sweep_num: 5
 save_model_as_artifact: true
 save_model: true
+log_teacher: true
 teacher_save_path: null
 wandb_project_name: " LR test"
 wandb_run_name: null

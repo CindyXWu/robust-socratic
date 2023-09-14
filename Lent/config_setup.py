@@ -149,6 +149,7 @@ class MainConfig:
     is_sweep: bool = False
     sweep_num: Optional[int] = 10
     save_model_as_artifact: bool = True
+    log_teacher: bool = True # Whether to eval and log teacher metrics for debugging
     wandb_project_name: Optional[str] = None
     wandb_run_name: Optional[str] = None # Initialise in main function
 

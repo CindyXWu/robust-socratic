@@ -111,7 +111,7 @@ def train_teacher(teacher: nn.Module,
                 test_acc_list.append(test_acc)
                 
                 # Counterfactual evaluations for teacher
-                cf_accs = counterfactual_evaluate_teacher(teacher, cf_dataloaders, config, device)
+                cf_accs = counterfactual_evaluate_teacher(teacher, cf_dataloaders, config, device) if config.log_teacher else {}
                 
                 ## Logging and metric printing
                 print(f'Project {config.wandb_project_name}, Epoch: {epoch}, Train accuracy: {train_acc}, Test accuracy: {test_acc}, Loss: {train_loss}, Log Test Loss: {np.log(test_loss)} LR {lr}')
@@ -126,12 +126,12 @@ def train_teacher(teacher: nn.Module,
                 if np.log(test_loss) < np.log(best_test_loss):  # Looking for a decrease in log loss
                     best_test_loss = loss
                     no_improve_count = 0
-                    if config.save_model:
-                        save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
                 else:
                     no_improve_count += 1
                 if no_improve_count >= config.early_stop_patience:
                     print("Early stopping due to no improvement in test log loss.")
+                    if config.save_model:
+                        save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
                     return
             
             it += 1
@@ -317,7 +317,7 @@ def train_distill(
                         batch_size=config.dataloader.test_bs,
                         num_eval_batches=config.num_eval_batches
                         )
-                teacher_cf_evals = counterfactual_evaluate_teacher(teacher, cf_dataloaders, config, device)
+                teacher_cf_evals = counterfactual_evaluate_teacher(teacher, cf_dataloaders, config, device) if config.log_teacher else {}
                 
                 ## Printing and logging
                 print(f"{config.run_description} Project: {config.wandb_run_name}, Iteration: {it}, Epoch: {epoch}, Loss: {train_loss}, Log Test Loss: {np.log(test_loss)}, LR: {lr}, Base Temperature: {config.dist_temp}, Jacobian Temperature: {config.jac_temp}, Contrastive Temperature: {config.contrast_temp}, Nonbase Loss Frac: {config.nonbase_loss_frac}, Error Count: {num_errors}")

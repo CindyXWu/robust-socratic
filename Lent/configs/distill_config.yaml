@@ -43,6 +43,7 @@ is_sweep: false
 sweep_num: 5
 save_model_as_artifact: true
 save_model: false
+log_teacher: true
 teacher_save_path: null
 wandb_project_name: " debug Mandelbrot learning A"
 wandb_run_name: null
