@@ -5,10 +5,10 @@ aug_type: NONE
 
 optimization:
   optimizer_type: SGD
-  base_lr: 0.001
+  base_lr: 0.005 # 0.001 for RN18
   weight_decay: 0.0
   momentum: 0.0
-  final_lr: 0.0001
+  final_lr: 0.001
   cosine_lr_schedule: true
   clip_grad: 1
   optimizer_kwargs: {}
@@ -33,7 +33,7 @@ wrn_config:
   width_factor: 2
 
 epochs: null
-num_iters: 20000
+num_iters: 200000 # Can afford to jack up number of training iterations when using early stopping
 eval_frequency: 100
 num_eval_batches: 50
 early_stop_patience: 20
@@ -45,5 +45,5 @@ sweep_num: 5
 save_model_as_artifact: true
 save_model: true
 teacher_save_path: null
-wandb_project_name: ""
+wandb_project_name: " LR test"
 wandb_run_name: null

@@ -12,8 +12,9 @@ from omegaconf import OmegaConf
 from create_sweep import load_config
 from train_utils import train_distill, get_previous_commit_hash
 from config_setup import DistillConfig, DistillLossType, ConfigType
-from constructors import model_constructor, get_model_intermediate_layer, optimizer_constructor, create_dataloaders, get_dataset_output_size, get_nonbase_loss_frac, change_frac_filename
+from constructors import model_constructor, get_model_intermediate_layer, optimizer_constructor, create_dataloaders, get_dataset_output_size, get_nonbase_loss_frac, change_frac_filename, get_counterfactual_dataloaders
 from teacher_check import load_model_and_get_accs
+from evaluate import counterfactual_evaluate_teacher
 
 warnings.filterwarnings("ignore")
 logging.getLogger("matplotlib").setLevel(logging.ERROR)
@@ -90,9 +91,25 @@ def main(config: DistillConfig) -> None:
     ## Models
     student = model_constructor(config, is_student=True).to(DEVICE)
     teacher = model_constructor(config, is_student=False).to(DEVICE)
+
+    first_layer_name = list(teacher.named_parameters())[0][0]
+    
     checkpoint = torch.load(config.teacher_save_path, map_location=DEVICE)
+    checkpoint_first_layer_params = checkpoint['model_state_dict'][first_layer_name]
+    print(f"Parameters of first layer '{first_layer_name}' from the checkpoint:\n", checkpoint_first_layer_params)
+    
     teacher.load_state_dict(checkpoint['model_state_dict'])
+    first_layer_params = list(teacher.named_parameters())[0][1]
+    print(f"Parameters of first layer '{first_layer_name}' (after loading checkpoint):\n", first_layer_params)
+    
+
     config.t_layer = config.s_layer = get_model_intermediate_layer(config)
+    
+    ## Test loaded teacher model for debugging
+    cf_dataloaders = get_counterfactual_dataloaders(config)
+    teacher_accs = counterfactual_evaluate_teacher(teacher, cf_dataloaders, config, device=DEVICE)
+    teacher_accs = {k+"Teacher Initial": v for k,v in teacher_accs.items()}
+    wandb.log(teacher_accs)
     
     ## Optimizer
     optimizer, scheduler = optimizer_constructor(config=config, model=student, train_loader=train_loader)
@@ -110,8 +127,8 @@ def main(config: DistillConfig) -> None:
     try:
         # Save student model as wandb artifact:
         if config.save_model_as_artifact:
-            model_artifact = wandb.Artifact("model", type="model", description="The trained student model state_dict")
-            model_artifact.add_file(Path(".") / f"model.torch")
+            model_artifact = wandb.Artifact("model", type="model", description="rained student model state_dict")
+            model_artifact.add_file(config.student_save_path)
             try:
                 cwd = get_original_cwd()
                 output_dir = HydraConfig.get().run.dir

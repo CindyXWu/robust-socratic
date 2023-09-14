@@ -52,7 +52,7 @@ def model_constructor(config: MainConfig, is_student: bool) -> nn.Module:
             output_size=mlp_config.output_size,
             bias=mlp_config.add_bias,
         )
-    elif model_type == ModelType.RESNE20_WIDE:
+    elif model_type in [ModelType.RESNET20_WIDE, ModelType.RESNET34_WIDE]:
         wrn_config = config.student_wrn_config if is_student else config.wrn_config
         model = wide_resnet_constructor(
             blocks_per_stage=wrn_config.blocks_per_stage,
@@ -72,7 +72,7 @@ def get_model_intermediate_layer(config: MainConfig) -> str:
     models = {
             ModelType.LENET5_3CHAN: {'feature_extractor.10': 'feature_extractor.10'},
             ModelType.RESNET18_ADAPTIVE_POOLING: {'layer4.1.bn2': 'bn_bn2'},
-            ModelType.RESNE20_WIDE: {"11.path2.5": "final_features"},
+            ModelType.RESNET20_WIDE: {"11.path2.5": "final_features"},
         }
     return models.get(config.model_type)
 
@@ -132,16 +132,23 @@ def create_dataloaders(config: MainConfig,
     return train_loader, test_loader
 
 
-def get_counterfactual_dataloaders(main_config: MainConfig, config_groupname: str) -> dict[str, DataLoader]:
+def get_counterfactual_dataloaders(config: MainConfig) -> dict[str, DataLoader]:
     """Get a dictionary of dataloaders for counterfactual evaluation. Key is string describing counterfactual experiment settings.
-    Args:
-        config_groupname: 
     """
+    if config.config_type == "TARGETED":
+        cf_groupname = "targeted_cf"
+    elif config.config_type == "EXHAUSTIVE":
+        cf_groupname = "exhaustive"
+    elif config.config_type == "FRAC":
+        cf_groupname = "frac_cf"
+    else:
+        raise ValueError("groupname in config YAML file incorrect")
+        
     dataloaders = {}
-    config_group = getattr(ConfigGroups, config_groupname)
+    config_group = getattr(ConfigGroups, cf_groupname)
     for idx, exp_config in enumerate(config_group):
         name, exp_config = exp_config.name, exp_config.experiment_config
-        _, dataloaders[name] = create_dataloaders(main_config, exp_config)
+        _, dataloaders[name] = create_dataloaders(config, exp_config)
     return dataloaders
 
 

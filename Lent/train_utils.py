@@ -26,7 +26,7 @@ from models.resnet_ap import CustomResNet18, CustomResNet50
 from config_setup import MainConfig, DistillLossType, DistillConfig
 from constructors import get_counterfactual_dataloaders
 from plotting_common import plot_PIL_batch
-from evaluate import evaluate, counterfactual_evaluate
+from evaluate import evaluate, counterfactual_evaluate, counterfactual_evaluate_teacher
 
 
 class LRScheduler(object):
@@ -78,31 +78,23 @@ def train_teacher(teacher: nn.Module,
     no_improve_count = 0
     best_test_loss = 0.0
     
-    print(config.config_type)
-    if config.config_type == "TARGETED":
-        cf_groupname = "targeted_cf"
-    elif config.config_type == "EXHAUSTIVE":
-        cf_groupname = "exhaustive"
-    elif config.config_type == "FRAC":
-        cf_groupname = "frac_cf"
-    cf_dataloaders = get_counterfactual_dataloaders(config, cf_groupname)
+    cf_dataloaders = get_counterfactual_dataloaders(config)
     
     for epoch in range(config.epochs):
         teacher.train()
 
         for inputs, labels in tqdm(train_loader, desc=f"Training iterations within epoch {epoch}"):
             labels = labels.to(device)
-            if aug:
+            if aug: # Augmentation
                 inputs, labels_2, lam = get_mixup_data(inputs, labels, augmentation_params)
                 labels_2 = labels_2.to(device)
             inputs = inputs.to(device)
-            inputs.requires_grad_()
+            inputs.requires_grad_() # For Jacobian etc.
             scores = teacher(inputs)
 
             optimizer.zero_grad()
             loss = ce_loss(scores, labels)
             loss.backward()
-                
             optimizer.step()
             scheduler.step()
             lr = scheduler.get_lr()
@@ -111,6 +103,7 @@ def train_teacher(teacher: nn.Module,
             check_grads(teacher)
                 
             if it % config.eval_frequency == 0:
+                ## Metric calculations
                 train_acc = evaluate(teacher, train_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
                 test_acc = evaluate(teacher, test_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
                 test_loss = get_teacher_test_loss(teacher, test_loader, config.num_eval_batches, device)
@@ -118,25 +111,18 @@ def train_teacher(teacher: nn.Module,
                 test_acc_list.append(test_acc)
                 
                 # Counterfactual evaluations for teacher
-                cf_accs = defaultdict(float)
-                for name in cf_dataloaders:
-                    cf_accs[name] = evaluate(
-                        model=teacher,
-                        dataloader=cf_dataloaders[name],
-                        batch_size=config.dataloader.test_bs,
-                        num_eval_batches=config.num_eval_batches,
-                        device=device)
+                cf_accs = counterfactual_evaluate_teacher(teacher, cf_dataloaders, config, device)
                 
+                ## Logging and metric printing
                 print(f'Project {config.wandb_project_name}, Epoch: {epoch}, Train accuracy: {train_acc}, Test accuracy: {test_acc}, Loss: {train_loss}, Log Test Loss: {np.log(test_loss)} LR {lr}')
-                
                 results_dict = {**cf_accs, **{
                     "Train Acc": train_acc, 
                     "Test Acc": test_acc, 
                     "Loss": train_loss, 
                     "LR": lr}}
-                
                 wandb.log(results_dict, step=it) # Can also optionally add step here
-               
+                
+                ## Early stopping
                 if np.log(test_loss) < np.log(best_test_loss):  # Looking for a decrease in log loss
                     best_test_loss = loss
                     no_improve_count = 0
@@ -186,7 +172,7 @@ def get_mixup_data(inputs: torch.Tensor, labels: torch.Tensor, augmentation_para
     random_labels = labels[shuffled_idx]
     
     return mixed_inputs, random_labels, lam
-
+    
 
 def train_distill(
     teacher: Module, 
@@ -222,14 +208,7 @@ def train_distill(
     assert batch_size == config.dataloader.train_bs
     input_dim = c*w*h
 
-    if config.config_type == "TARGETED":
-        cf_groupname = "targeted_cf"
-    elif config.config_type == "EXHAUSTIVE":
-        cf_groupname = "exhaustive"
-    elif config.config_type == "FRAC":
-        cf_groupname = "frac_cf"
-    
-    cf_dataloaders = get_counterfactual_dataloaders(config, cf_groupname)
+    cf_dataloaders = get_counterfactual_dataloaders(config)
     
     for epoch in range(config.epochs):
         for inputs, labels in tqdm(train_loader, desc=f"Training iterations within epoch {epoch}"):
@@ -239,7 +218,7 @@ def train_distill(
                 labels_2 = labels_2.to(device)
             inputs = inputs.to(device)
             inputs.requires_grad_()
-            
+  
             scores, targets = student(inputs), teacher(inputs)
             loss = base_distill_loss(
                         scores=scores, 
@@ -319,7 +298,9 @@ def train_distill(
                     wandb.log({name.split(":")[-1].strip().replace(' ', '_'): [wandb.Image(batch_image)]}, step=it)
                     
             if it % config.eval_frequency == 0:
+                ## Calculate metrics
                 train_acc = evaluate(student, train_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
+                teacher_train_acc = evaluate(teacher, train_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
                 test_acc, test_KL, test_top1 = counterfactual_evaluate(teacher, student, test_loader, batch_size=config.dataloader.test_bs, num_eval_batches=config.num_eval_batches, device=device)
                 train_acc_list.append(train_acc)
                 test_acc_list.append(test_acc)
@@ -336,26 +317,26 @@ def train_distill(
                         batch_size=config.dataloader.test_bs,
                         num_eval_batches=config.num_eval_batches
                         )
+                teacher_cf_evals = counterfactual_evaluate_teacher(teacher, cf_dataloaders, config, device)
+                
+                ## Printing and logging
                 print(f"{config.run_description} Project: {config.wandb_run_name}, Iteration: {it}, Epoch: {epoch}, Loss: {train_loss}, Log Test Loss: {np.log(test_loss)}, LR: {lr}, Base Temperature: {config.dist_temp}, Jacobian Temperature: {config.jac_temp}, Contrastive Temperature: {config.contrast_temp}, Nonbase Loss Frac: {config.nonbase_loss_frac}, Error Count: {num_errors}")
-
-                results_dict = {**cf_evals, **{
+                results_dict = {**cf_evals, **teacher_cf_evals, **{
                     "T-S KL": test_KL, 
                     "T-S Top 1 Fidelity": test_top1, 
                     "S Train": train_acc, 
                     "S Test": test_acc, 
-                    "S Loss": train_loss, 
-                    "S LR": lr, 
+                    "S Loss": train_loss,
+                    "T Train": teacher_train_acc,
+                    "LR": lr, 
                     "Jacobian Loss": jacobian_loss.detach().cpu().item() if jacobian_loss else None,
                     "Contrastive Loss": contrastive_loss.current_loss if contrastive_loss else None,
                 }}
-                
                 wandb.log(results_dict, step=it)
                 
-                # Get saliency map
+                ## Saliency map
                 single_image = inputs[0].detach().clone().unsqueeze(0).requires_grad_()
                 saliency_t, saliency_s = get_saliency_map(teacher, single_image), get_saliency_map(student, single_image)
-                
-                # Plot saliency map
                 s_prob = F.softmax(student(single_image), dim=1).squeeze().detach().cpu().numpy()
                 t_prob = F.softmax(teacher(single_image), dim=1).squeeze().detach().cpu().numpy()
                 
@@ -368,7 +349,6 @@ def train_distill(
                 axs[2].imshow(saliency_t)
                 axs[2].set_title("Teacher Saliency Map")
                 
-                # Display probabilities
                 s_prob_str = ["Student - " + f"Class {i}: {p:.4f}" for i, p in enumerate(s_prob)]
                 t_prob_str = ["Teacher - " + f"Class {i}: {p:.4f}" for i, p in enumerate(t_prob)]
                 all_probs_str = "\n".join(s_prob_str + [""] + t_prob_str)
@@ -376,7 +356,8 @@ def train_distill(
                 # plt.tight_layout()  # Adjust the layout so that plots do not overlap
 
                 wandb.log({f"Iteration {it}": [wandb.Image(fig)]}, step=it)
-
+                
+                ## Early stopping
                 if it > config.min_iters and config.use_early_stop: 
                     # Only consider early stopping beyond certain threshold, and if we set the model to train with early-stop
                     # Early stopping logic
@@ -395,7 +376,8 @@ def train_distill(
 
     if config.save_model:
         save_model(f"{config.teacher_save_path}", epoch, teacher, optimizer, train_loss, train_acc_list, test_acc_list, [train_acc, test_acc])
-    # Prevent memory leak in sweeps
+        
+    ## Prevent memory leak in sweeps
     torch.cuda.empty_cache()
     gc.collect()
     
