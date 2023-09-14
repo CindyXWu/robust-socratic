@@ -153,7 +153,7 @@ def plot_counterfactual_heatmaps(
         ax.set_yticklabels(axes_labels, rotation='horizontal', fontsize=15)
         ax.set_xlabel('Teacher Training Mechanism', fontsize=15)
         ax.set_ylabel('Student Training Mechanism', fontsize=15)
-        # ax.set_title(f'Counterfactual {key.replace("_", " ")} Test Accuracy - {loss} Loss')
+        ax.set_title(f'{key.replace("_", " ")} Acc {loss_name}')
         plt.savefig(f'images/heatmaps/{loss_name}_{box_pattern}/{key}.png', dpi=300, bbox_inches='tight')
 
 
@@ -406,6 +406,7 @@ def plot_difference_heatmaps(differences: Dict[str, np.ndarray], loss_name: str,
         ax.set_yticklabels(exp_names, rotation='horizontal', fontsize=15)
         ax.set_xlabel('Teacher Training Mechanism', fontsize=15)
         ax.set_ylabel('Student Training Mechanism', fontsize=15)
+        ax.set_title(f'{key.replace("_", " ")} {loss_name}-BASE ACC DIFF')
         plt.savefig(f'images/difference_heatmaps/{loss_name}_{box_pattern}/{key}.png', dpi=300, bbox_inches='tight')
 
 
@@ -452,8 +453,8 @@ if __name__ == "__main__":
     wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type}-{box_pattern}"
     second_wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type}-{box_pattern}"
 
-    # To be changed
-    mode = 0 # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps
+    # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps
+    mode = 3
     groupby_metrics = ["experiment.name", "experiment_s.name"]
 
     if mode == 0:
@@ -464,8 +465,8 @@ if __name__ == "__main__":
             except:
                 # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
                 histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics)
-            # plot_counterfactual_heatmaps(histories, exp_names, loss_name, box_pattern)
-            plot_mean_variance_heatmaps(histories, exp_names, loss_name, box_pattern)
+            plot_counterfactual_heatmaps(histories, exp_names, loss_name, box_pattern)
+            # plot_mean_variance_heatmaps(histories, exp_names, loss_name, box_pattern)
             
     elif mode == 1:
         for t_exp_name in exp_names:
@@ -491,7 +492,7 @@ if __name__ == "__main__":
             wandb_plot(histories, title, grid=True)
 
     elif mode == 3:
-        box_pattern = "RANDOM"
+        box_pattern = "MANDELBROT"
         file_names = [F"heatmap {loss_type.value} {box_pattern}" for loss_type in DistillLossType]
         histories = {}
 
