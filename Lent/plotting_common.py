@@ -150,7 +150,6 @@ def create_histories_list(
             
             # Check the number of data points before attempting to compute variance
             if len(combined) > 1:
-                print("Calculating variance")
                 var = combined.groupby(combined.index)[metric].var().fillna(0).rename(f'{metric} Var')
             else:
                 var = pd.Series(0, index=combined.index, name=f'{metric} Var')
@@ -172,8 +171,7 @@ def create_histories_list(
         else: raise ValueError("Mode must be 'exhaustive' or 'vstime'")
                 
         histories.append(combined)
-
-    print("history head", histories[0].head())
+        
     return histories
 
 

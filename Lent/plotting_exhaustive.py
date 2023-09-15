@@ -453,7 +453,6 @@ def aggregate_conditions(combined_history: list[pd.DataFrame]) -> Dict[str, np.n
 
     # Initialize matrices for means and variances
     aggregated_means = {'similarity': 0, 'student': 0, 'teacher': 0, 'neither': 0, 'other': 0}
-    added_to_same = []
     aggregated_vars = {'similarity': 0, 'student': 0, 'teacher': 0, 'neither': 0, 'other': 0}
 
     condition_counts = {'similarity': 0, 'student': 0, 'teacher': 0, 'neither': 0, 'other': 0}
@@ -465,7 +464,6 @@ def aggregate_conditions(combined_history: list[pd.DataFrame]) -> Dict[str, np.n
         for key in exp_names:
             if condition_for_similarity(student, teacher, key):
                 condition_name = 'similarity'
-                added_to_same.append(f"{student} {teacher} key {key}")
             elif condition_for_student(student, teacher, key):
                 condition_name = 'student'
             elif condition_for_teacher(student, teacher, key):
@@ -491,8 +489,6 @@ def aggregate_conditions(combined_history: list[pd.DataFrame]) -> Dict[str, np.n
     for condition in aggregated_means:
         aggregated_means[condition] /= condition_counts[condition]
         aggregated_vars[condition] /= condition_counts[condition]
-
-    print("Aggregated same list", added_to_same)
 
     return {
         'means': aggregated_means,
@@ -526,8 +522,7 @@ if __name__ == "__main__":
     # Somewhat immutable things
     exp_names = [config.name for config in ConfigGroups.exhaustive]
     label_group_names = ["IAB", "IA", "IB", "AB", "B", "A", "I"] # Actual order of names here
-    # loss_names = [loss_type.value for loss_type in DistillLossType]
-    loss_names = ["CONTRASTIVE"]
+    loss_names = [loss_type.value for loss_type in DistillLossType]
     
     # Configs - amazing part of using config YAML is I can load all settings in
     config_filename = "distill_config"
@@ -536,7 +531,7 @@ if __name__ == "__main__":
     config = recursive_namespace(config)
     box_pattern = config.dataset.box_cue_pattern
     model_name = config.model_type
-    wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type}-{box_pattern}"
+    wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type}-{box_pattern}-ALPHA"
 
     # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps, 4 for combined dist plots
     mode = 4
@@ -601,7 +596,7 @@ if __name__ == "__main__":
         plot_difference_heatmaps(contrastive_differences, "CONTRASTIVE", box_pattern)
     
     elif mode == 4:
-        box_pattern = "RANDOM"
+        box_pattern = "MANDELBROT"
         print("project name", wandb_project_name)
               
         for loss_name in loss_names:
