@@ -126,6 +126,10 @@ def visualise_features_2d(s_features: torch.Tensor,
 # Helper functions for graph plotting from WandB
 ## =========================================================================
 
+from collections import defaultdict
+from typing import Dict, List
+import pandas as pd
+
 def create_histories_list(
     grouped_runs: Dict[tuple, List],
     mode: str,
@@ -143,7 +147,14 @@ def create_histories_list(
         for metric, metric_values in metrics.items():
             combined = pd.concat(metric_values)
             mean = combined.groupby(combined.index)[metric].mean().rename(f'{metric} Mean')
-            var = combined.groupby(combined.index)[metric].var().rename(f'{metric} Var')
+            
+            # Check the number of data points before attempting to compute variance
+            if len(combined) > 1:
+                print("Calculating variance")
+                var = combined.groupby(combined.index)[metric].var().fillna(0).rename(f'{metric} Var')
+            else:
+                var = pd.Series(0, index=combined.index, name=f'{metric} Var')
+            
             means_and_vars_list.append(pd.concat([mean, var], axis=1))
 
         combined = pd.concat(means_and_vars_list, axis=1)
@@ -162,6 +173,7 @@ def create_histories_list(
                 
         histories.append(combined)
 
+    print("history head", histories[0].head())
     return histories
 
 
