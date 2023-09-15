@@ -436,6 +436,88 @@ def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.Data
     return data_to_diff
 
 
+def aggregate_conditions(combined_history: list[pd.DataFrame]) -> Dict[str, np.ndarray]:
+    """Get grouped data for violin plots of distribution shift experiments."""
+
+    def condition_for_similarity(s, t, key):
+        return (s == t and s == key)
+
+    def condition_for_student(s, t, key):
+        return all(k in s for k in key) and all(k not in t for k in key) and any(k in s and k in t for k in exp_names if k not in key)
+
+    def condition_for_teacher(s, t, key):
+        return all(k in t for k in key) and all(k not in s for k in key) and any(k in s and k in t for k in exp_names if k not in key)
+
+    def condition_for_neither(s, t):
+        return s != t
+
+    # Initialize matrices for means and variances
+    aggregated_means = {'similarity': 0, 'student': 0, 'teacher': 0, 'neither': 0, 'other': 0}
+    aggregated_vars = {'similarity': 0, 'student': 0, 'teacher': 0, 'neither': 0, 'other': 0}
+
+    condition_counts = {'similarity': 0, 'student': 0, 'teacher': 0, 'neither': 0, 'other': 0}
+
+    for history in combined_history:
+        student = history['Group Name'].iloc[0]['S']
+        teacher = history['Group Name'].iloc[0]['T']
+
+        for key in exp_names:
+            if condition_for_similarity(student, teacher, key):
+                condition_name = 'similarity'
+            elif condition_for_student(student, teacher, key):
+                condition_name = 'student'
+            elif condition_for_teacher(student, teacher, key):
+                condition_name = 'teacher'
+            elif condition_for_neither(student, teacher):
+                condition_name = 'neither'
+            else:
+                condition_name = 'other'
+                """Includes cases where the teacher and student are the same, but the key is not in either of them."""
+
+            try: 
+                aggregated_means[condition_name] += history[f'{key} Mean'].loc[history[f'{key} Mean'].last_valid_index()]
+            except: 
+                print("Error in mean for ", condition_name, " for ", key, " in ", student, " ", teacher)
+                print("history head", history.head())
+            try: 
+                aggregated_vars[condition_name] += history[f'{key} Var'].loc[history[f'{key} Var'].last_valid_index()]
+            except: 
+                print("Error in variance for ", condition_name, " for ", key, " in ", student, " ", teacher)
+                print("history head", history.head())
+            condition_counts[condition_name] += 1
+
+    for condition in aggregated_means:
+        aggregated_means[condition] /= condition_counts[condition]
+        aggregated_vars[condition] /= condition_counts[condition]
+
+    return {
+        'means': aggregated_means,
+        'variances': aggregated_vars
+    }
+
+
+def plot_aggregated_data(aggregated_data, loss_name, box_pattern):
+    conditions = list(aggregated_data['means'].keys())
+    
+    # Create a dataframe for seaborn
+    df_means = pd.DataFrame([aggregated_data['means']])
+    df_vars = pd.DataFrame([aggregated_data['variances']])
+
+    # Plotting means heatmap
+    plt.figure(figsize=(10, 6))
+    sns.heatmap(df_means, annot=True, fmt=".1f", cmap="mako", yticklabels=["Mean"])
+    plt.title("Aggregated Means")
+    plt.xticks(range(len(conditions)), conditions)
+    plt.savefig(f"images/aggregated_heatmaps/{loss_name}_{box_pattern}_means.png", dpi=300, bbox_inches="tight")
+
+    # Plotting variances heatmap
+    plt.figure(figsize=(10, 6))
+    sns.heatmap(df_vars, annot=True, fmt=".1f", cmap="mako", yticklabels=["Variance"])
+    plt.title("Aggregated Variances")
+    plt.xticks(range(len(conditions)), conditions)
+    plt.savefig(f"images/aggregated_heatmaps/{loss_name}_{box_pattern}_variances.png", dpi=300, bbox_inches="tight")
+
+
 if __name__ == "__main__":
     # Somewhat immutable things
     exp_names = [config.name for config in ConfigGroups.exhaustive]
@@ -449,12 +531,10 @@ if __name__ == "__main__":
     config = recursive_namespace(config)
     box_pattern = config.dataset.box_cue_pattern
     model_name = config.model_type
-    
-    wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type}-{box_pattern}"
-    second_wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type}-{box_pattern}"
+    wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type}-{box_pattern}-ALPHA"
 
-    # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps
-    mode = 3
+    # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps, 4 for combined dist plots
+    mode = 4
     groupby_metrics = ["experiment.name", "experiment_s.name"]
 
     if mode == 0:
@@ -465,30 +545,37 @@ if __name__ == "__main__":
             except:
                 # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
                 histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics)
+
             plot_counterfactual_heatmaps(histories, exp_names, loss_name, box_pattern)
             # plot_mean_variance_heatmaps(histories, exp_names, loss_name, box_pattern)
             
     elif mode == 1:
         for t_exp_name in exp_names:
             for loss_name in loss_names:
+
                 title = f"{config.model_type} {t_exp_name} {loss_name}"
+
                 try: # Files already calculated and exist
                     filename = f"run_data/vstime {t_exp_name} {loss_name}"
                     with open(filename, "rb") as f: histories = pickle.load(f)
                 except:
                     # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
                     histories = wandb_get_data(project_name=wandb_project_name, t_exp_name=t_exp_name, loss_name=loss_name, model_name=model_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, grid=False, plot_tmechs_together=False)
+
                 wandb_plot(histories, title, grid=False)
     
     elif mode == 2:
         for loss_name in loss_names:
+
             title = f"{config.model_type} {loss_name}"
+
             try: # Files already calculated and exist
                 filename = f"run_data/vstime {loss_name} grid"
                 with open(filename, "rb") as f: histories = pickle.load(f)
             except: 
                 # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
                 histories = wandb_get_data(project_name=wandb_project_name, t_exp_name=None, loss_name=loss_name, model_name=model_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, grid=True)
+
             wandb_plot(histories, title, grid=True)
 
     elif mode == 3:
@@ -500,11 +587,29 @@ if __name__ == "__main__":
             with open(f"run_data/{file_name}", "rb") as f:
                 histories[file_name.split()[1]] = pickle.load(f)
 
-        # 2. Calculate the differences between the specialized distillation losses and the base distillation
+        # Calculate differences between specialized distillation losses and base distillation
         base_history = histories["BASE"]
-
         jacobian_differences = compute_difference(base_history, histories["JACOBIAN"])
         contrastive_differences = compute_difference(base_history, histories["CONTRASTIVE"])
 
         plot_difference_heatmaps(jacobian_differences, "JACOBIAN", box_pattern)
         plot_difference_heatmaps(contrastive_differences, "CONTRASTIVE", box_pattern)
+    
+    elif mode == 4:
+        box_pattern = "MANDELBROT"
+        print("project name", wandb_project_name)
+              
+        for loss_name in loss_names:
+            try:
+                filename = f"run_data/heatmap {loss_name} {box_pattern}"
+                with open(filename, "rb") as f: histories = pickle.load(f)
+            except:
+                # IMPORTANT: teacher mechanism must go first in groupby_metrics list
+                histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics)
+
+            aggregated_data = aggregate_conditions(combined_history=histories)
+            df_means, df_vars = pd.DataFrame([aggregated_data['means']]), pd.DataFrame([aggregated_data['variances']])
+            df_means.to_csv(f"run_data/{loss_name}_{box_pattern}_aggregated_means.csv", index=False)
+            df_vars.to_csv(f"run_data/{loss_name}_{box_pattern}_aggregated_vars.csv", index=False)
+
+            plot_aggregated_data(aggregated_data, loss_name, box_pattern)
