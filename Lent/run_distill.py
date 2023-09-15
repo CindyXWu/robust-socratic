@@ -96,11 +96,11 @@ def main(config: DistillConfig) -> None:
     
     checkpoint = torch.load(config.teacher_save_path, map_location=DEVICE)
     checkpoint_first_layer_params = checkpoint['model_state_dict'][first_layer_name]
-    print(f"Parameters of first layer '{first_layer_name}' from the checkpoint:\n", checkpoint_first_layer_params)
+    # print(f"Parameters of first layer '{first_layer_name}' from the checkpoint:\n", checkpoint_first_layer_params)
     
     teacher.load_state_dict(checkpoint['model_state_dict'])
     first_layer_params = list(teacher.named_parameters())[0][1]
-    print(f"Parameters of first layer '{first_layer_name}' (after loading checkpoint):\n", first_layer_params)
+    # print(f"Parameters of first layer '{first_layer_name}' (after loading checkpoint):\n", first_layer_params)
     
 
     config.t_layer = config.s_layer = get_model_intermediate_layer(config)
