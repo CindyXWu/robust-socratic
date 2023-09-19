@@ -6,6 +6,7 @@ import yaml
 import pickle
 import logging
 import wandb
+from wandb.sdk.wandb_run import Run
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -14,7 +15,7 @@ import seaborn as sns
 from typing import List, Dict
 
 from config_setup import ConfigGroups, BoxPatternType, DistillLossType
-from plotting_common import drop_non_numeric_columns, clean_history, smooth_history, get_grouped_runs, custom_sort, recursive_namespace, create_histories_list, condition_for_neither, condition_for_similarity, condition_for_student, condition_for_teacher
+from plotting_common import drop_non_numeric_columns, clean_history, smooth_history, get_grouped_runs, custom_sort, recursive_namespace, create_histories_list, condition_for_neither, condition_for_similarity, condition_for_student, condition_for_teacher, get_nested_value, save_df_csv
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 image_dir = "images/"
@@ -59,12 +60,12 @@ def heatmap_get_data(project_name: str,
     assert(len(filtered_runs) > 0), "No runs found with the given settings"
     
     """Key of form: tuple of groupby metrics (in order it's passed in, in groupby_metrics)"""
-    grouped_runs: Dict = get_grouped_runs(filtered_runs, groupby_metrics)
+    grouped_runs: Dict[str, List[Run]] = get_grouped_runs(filtered_runs, groupby_metrics)
     
     # Compute means/var for all metrics for each group of runs
-    histories = create_histories_list(grouped_runs, mode='exhaustive')
+    histories: List[pd.DataFrame] = create_histories_list(grouped_runs, mode='exhaustive')
     
-    file_name = f"run_data/heatmap {loss_name} {box_pattern} {additional_naming}"
+    file_name = f"run_data/heatmap {loss_name} {box_pattern}{additional_naming}"
     with open(file_name, "wb") as f:
         pickle.dump(histories, f)
         
@@ -77,7 +78,6 @@ def aggregate_conditions(combined_history: list[pd.DataFrame], type: str) -> Dic
     # Initialize matrices for means and variances
     aggregated_means = {'similarity': 0, 'student': 0, 'teacher': 0, 'neither': 0, 'other': 0}
     aggregated_vars = {'similarity': 0, 'student': 0, 'teacher': 0, 'neither': 0, 'other': 0}
-
     condition_counts = {'similarity': 0, 'student': 0, 'teacher': 0, 'neither': 0, 'other': 0}
 
     for history in combined_history:
@@ -147,180 +147,43 @@ def plot_aggregated_data(aggregated_data: Dict[str, np.ndarray], loss_name: str,
     
 ## For violin plots ======================================================================================
 
-# def violinplot_get_data(project_name: str,
-#                         loss_name: str,
-#                         box_pattern: str,
-#                         groupby_metrics: List[str],
-#                         additional_naming: str) -> pd.DataFrame:
-#     runs = api.runs(project_name)
-        
-#     filtered_runs = []
-#     min_step = 300 # Filter partially logged/unfinished runs
-
-#     # Filter for loss and correct experiment name, and remove crashed/incomplete runs
-#     for run in runs:
-#         if run.config.get('distill_loss_type') == loss_name and run.config.get("experiment", {}).get("name") in label_group_names:
-#             history = run.history()
-#             if '_step' in history.columns and history['_step'].max() >= min_step:
-#                 history = drop_non_numeric_columns(history) # Remove artifacts
-#                 history = clean_history(history) # Remove NaNs
-#                 #history = smooth_history(history)
-#                 run.history  = history
-#                 filtered_runs.append(run)
-                
-#     # Check list of runs is not empty
-#     assert(len(filtered_runs) > 0), "No runs found with the given settings"
-    
-#     """Key of form: tuple of groupby metrics (in order it's passed in, in groupby_metrics)"""
-#     grouped_runs: Dict = get_grouped_runs(filtered_runs, groupby_metrics)
-#     combined_histories = [run.history for group in grouped_runs.values() for run in group]
-    
-#     # Compute means/var for all metrics for each group of runs
-#     df = prepare_data_for_violinplot(combined_histories)
-    
-#     file_name = f"run_data/aggregated violin {loss_name} {box_pattern} {additional_naming}"
-#     with open(file_name, "wb") as f:
-#         pickle.dump(df, f)
-        
-#     return df
-    
-
-# def aggregate_conditions_violin(combined_history: list[pd.DataFrame], type: str) -> pd.DataFrame:
-#     """Prepare data in a format suitable for seaborn's violinplot based on conditions."""
-
-#     all_data = []
-
-#     for history in combined_history:
-#         student = history['Group Name'].iloc[0]['S']
-#         teacher = history['Group Name'].iloc[0]['T']
-
-#         for key in exp_names:
-#             if condition_for_similarity(student, teacher, key):
-#                 condition_name = 'similarity'
-#             elif condition_for_student(student, teacher, key):
-#                 condition_name = 'student'
-#             elif condition_for_teacher(student, teacher, key):
-#                 condition_name = 'teacher'
-#             elif condition_for_neither(student, teacher):
-#                 condition_name = 'neither'
-#             else:
-#                 condition_name = 'other'
-
-#             if type == 'acc':
-#                 metric_name = f'{key} Mean'
-#             elif type == 'kl':
-#                 metric_name = f'{key} T-S KL Mean'
-#             elif type == 'top1':
-#                 metric_name = f'{key} T-S Top 1 Fidelity Mean'
-#             else:
-#                 raise ValueError("Unsupported type")
-
-#             temp_df = history[[metric_name]].copy()
-#             temp_df.rename(columns={metric_name: 'Value'}, inplace=True)
-#             temp_df['Metric'] = key
-#             temp_df['Condition'] = condition_name
-#             all_data.append(temp_df)
-
-#     final_df = pd.concat(all_data, axis=0)
-#     return final_df
-    
-
-# def plot_aggregated_data_violin(aggregated_data: Dict[str, np.ndarray], loss_name: str, box_pattern: str, type: str) -> None:
-#     """
-#     VIOLIN PLOT VERSION
-#     Plotting function for data produced by data retrieval function aggregate_conditions.
-#     """
-#     conditions = list(aggregated_data['means'].keys())
-    
-#     # Create a dataframe for seaborn in long format
-#     df_means = pd.DataFrame({
-#         'condition': conditions,
-#         'value': list(aggregated_data['means'].values()),
-#         'type': 'Mean'
-#     })
-#     df_vars = pd.DataFrame({
-#         'condition': conditions,
-#         'value': list(aggregated_data['variances'].values()),
-#         'type': 'Variance'
-#     })
-    
-#     # Concatenate both dataframes
-#     df = pd.concat([df_means, df_vars], axis=0)
-    
-#     # Plotting violin plot
-#     plt.figure(figsize=(12, 6))
-#     sns.violinplot(x="condition", y="value", hue="type", data=df, split=True, inner="quart")
-#     plt.title("Aggregated Data")
-#     plt.xticks(range(len(conditions)), conditions)
-#     plt.savefig(f"images/aggregated_violin/{loss_name}_{box_pattern}_{type}.png", dpi=300, bbox_inches="tight")
-
-
-# def prepare_data_for_violinplot(grouped_runs: Dict[tuple, List]) -> pd.DataFrame:
-#     """Prepare data in a format suitable for seaborn's violinplot."""
-#     all_data = []
-#     for key, runs in grouped_runs.items():
-#         for run in runs:
-#             history = run.history
-            
-#             for metric in history.columns:
-#                 temp_df = history[[metric]].copy()
-#                 temp_df.rename(columns={metric: 'Value'}, inplace=True)
-#                 temp_df['Metric'] = metric
-#                 temp_df['Group Name'] = f"T: {key[0]}, S: {key[1]}"
-#                 all_data.append(temp_df)
-    
-#     final_df = pd.concat(all_data, axis=0)
-#     return final_df
-
 def violinplot_get_data(project_name: str,
                         loss_name: str,
                         box_pattern: str,
                         groupby_metrics: List[str],
-                        additional_naming: str) -> pd.DataFrame:
+                        additional_naming: str) -> List[pd.DataFrame]:
     runs = api.runs(project_name)
 
     filtered_runs = []
+    filtered_histories = []
     min_step = 300  # Filter partially logged/unfinished runs
 
     # Filter for loss and correct experiment name, and remove crashed/incomplete runs
     for run in runs:
         if run.config.get('distill_loss_type') == loss_name and run.config.get("experiment", {}).get("name") in label_group_names:
             history = run.history()
+            key = tuple([get_nested_value(run.config, m) for m in groupby_metrics])
             if '_step' in history.columns and history['_step'].max() >= min_step:
                 history = drop_non_numeric_columns(history)  # Remove artifacts
                 history = clean_history(history)  # Remove NaNs
                 #history = smooth_history(history)
+                history['Group Name'] = {'T': key[0], 'S': key[1]}
                 run.history = history
                 filtered_runs.append(run)
-
-    # Check list of runs is not empty
     assert(len(filtered_runs) > 0), "No runs found with the given settings"
-
-    # Key of form: tuple of groupby metrics (in order it's passed in, in groupby_metrics)
-    grouped_runs: Dict = get_grouped_runs(filtered_runs, groupby_metrics)
-
-    combined_histories = []
-    for group, runs in grouped_runs.items():
-        for run in runs:
-            history = run.history
-            # Add Group Name column
-            history['Group Name'] = f"T: {group[0]}, S: {group[1]}"
-            combined_histories.append(history)
-            
-    # Compute means/var for all metrics for each group of runs and aggregate conditions
-    df = aggregate_conditions_violin(combined_histories, type="acc")  # You can change type based on need
 
     file_name = f"run_data/aggregated violin {loss_name} {box_pattern} {additional_naming}"
     with open(file_name, "wb") as f:
-        pickle.dump(df, f)
+        pickle.dump(filtered_runs, f)
 
-    return df
+    return filtered_histories
 
 
 def aggregate_conditions_violin(combined_history: List[pd.DataFrame], type: str) -> pd.DataFrame:
     all_data = []
 
     for history in combined_history:
+        print(history['Group Name'].iloc[0])
         student = history['Group Name'].iloc[0]['S']
         teacher = history['Group Name'].iloc[0]['T']
 
@@ -403,13 +266,16 @@ if __name__ == "__main__":
         for loss_name in loss_names:
             type = 'acc'
             print(f'calculating aggregated violin mode 5 for {wandb_project_name} {box_pattern} {loss_name} {type}')
-            filename = f"run_data/aggregated violin {loss_name} {box_pattern} {additional_naming}"
+            filename = f"run_data/aggregated violin {loss_name} {box_pattern}{additional_naming}"
             try:
                 with open(filename, "rb") as f:
-                    violin_df = pickle.load(f)
+                    violin_histories = pickle.load(f)
+                save_df_csv(violin_histories[0], 'filtered_hist')
             except:
                 # IMPORTANT: teacher mechanism must go first in groupby_metrics list
-                violin_df: pd.DataFrame = violinplot_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, additional_naming=additional_naming)
+                violin_histories: List[pd.DataFrame] = violinplot_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, additional_naming=additional_naming)
+                violin_df = aggregate_conditions_violin(violin_histories, type="acc")
+                
                 with open(filename, "wb") as f:
                     pickle.dump(violin_df, f)
             
