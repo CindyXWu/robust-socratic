@@ -134,7 +134,7 @@ def create_histories_list(
     grouped_runs: Dict[tuple, List],
     mode: str,
     **kwargs) -> List[pd.DataFrame]:
-
+    """Takes each metric and groups runs with the same ones, then calculates the mean and variance."""
     histories = []
     for key, runs in grouped_runs.items():
         metrics = defaultdict(list)
@@ -269,3 +269,19 @@ def recursive_namespace(data):
     if isinstance(data, dict):
         return SimpleNamespace(**{k: recursive_namespace(v) for k, v in data.items()})
     return data
+
+
+def condition_for_similarity(s, t, key):
+        return (s == t and s == key)
+
+
+def condition_for_student(s, t, key):
+    return all(k in s for k in key) and all(k not in t for k in key) and any(k in s and k in t for k in exp_names if k not in key)
+
+
+def condition_for_teacher(s, t, key):
+    return all(k in t for k in key) and all(k not in s for k in key) and any(k in s and k in t for k in exp_names if k not in key)
+
+
+def condition_for_neither(s, t):
+    return s != t
