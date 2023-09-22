@@ -6,6 +6,7 @@ import yaml
 import pickle
 import logging
 import wandb
+from tqdm import tqdm
 from wandb.sdk.wandb_run import Run
 
 import matplotlib.pyplot as plt
@@ -159,7 +160,7 @@ def violinplot_get_data(project_name: str,
     min_step = 300  # Filter partially logged/unfinished runs
 
     # Filter for loss and correct experiment name, and remove crashed/incomplete runs
-    for run in runs:
+    for run in tqdm(runs):
         if run.config.get('distill_loss_type') == loss_name and run.config.get("experiment", {}).get("name") in label_group_names:
             history = run.history()
             key = tuple([get_nested_value(run.config, m) for m in groupby_metrics])
@@ -167,14 +168,15 @@ def violinplot_get_data(project_name: str,
                 history = drop_non_numeric_columns(history)  # Remove artifacts
                 history = clean_history(history)  # Remove NaNs
                 #history = smooth_history(history)
-                history['Group Name'] = {'T': key[0], 'S': key[1]}
+                history['Group Name'] = history.apply(lambda row: {'T': key[0], 'S': key[1]}, axis=1)
                 run.history = history
                 filtered_runs.append(run)
+                filtered_histories.append(history)
     assert(len(filtered_runs) > 0), "No runs found with the given settings"
 
     file_name = f"run_data/aggregated violin {loss_name} {box_pattern} {additional_naming}"
     with open(file_name, "wb") as f:
-        pickle.dump(filtered_runs, f)
+        pickle.dump(filtered_histories, f)
 
     return filtered_histories
 
@@ -183,7 +185,6 @@ def aggregate_conditions_violin(combined_history: List[pd.DataFrame], type: str)
     all_data = []
 
     for history in combined_history:
-        print(history['Group Name'].iloc[0])
         student = history['Group Name'].iloc[0]['S']
         teacher = history['Group Name'].iloc[0]['T']
 
@@ -199,18 +200,17 @@ def aggregate_conditions_violin(combined_history: List[pd.DataFrame], type: str)
             else:
                 condition_name = 'other'
 
-            if type == 'acc':
-                metric_name = f'{key} Mean'
-            elif type == 'kl':
-                metric_name = f'{key} T-S KL Mean'
-            elif type == 'top1':
-                metric_name = f'{key} T-S Top 1 Fidelity Mean'
+            if type == 'ACC':
+                metric_name = f'{key}'
+            elif type == 'KL':
+                metric_name = f'{key} T-S KL'
+            elif type == 'TOP-1':
+                metric_name = f'{key} T-S Top 1 Fidelity'
             else:
                 raise ValueError("Unsupported type")
 
             temp_df = history[[metric_name]].copy()
             temp_df.rename(columns={metric_name: 'Value'}, inplace=True)
-            temp_df['Metric'] = key
             temp_df['Condition'] = condition_name
             all_data.append(temp_df)
 
@@ -218,10 +218,25 @@ def aggregate_conditions_violin(combined_history: List[pd.DataFrame], type: str)
     return final_df
 
 
-def plot_aggregated_data_violin(df: pd.DataFrame, loss_name: str, box_pattern: str, type: str) -> None:
-    plt.figure(figsize=(12, 6))
-    sns.violinplot(x="Metric", y="Value", hue="Condition", data=df, split=True, inner="quart")
-    plt.title("Aggregated Data")
+def plot_aggregated_data_violin(df: pd.DataFrame, loss_name: str, box_pattern: str, type: str, title: str, bw: float = 0.05) -> None:
+    # Define a fixed order for the conditions
+    condition_order = ['similarity', 'student', 'teacher', 'neither', 'other']
+    # Define a fixed color palette for the conditions
+    condition_palette = {
+        'similarity': 'blue',
+        'student': 'green',
+        'teacher': 'red',
+        'neither': 'purple',
+        'other': 'orange'
+    }
+    
+    plt.figure(figsize=(10, 6))
+    sns.violinplot(x="Condition", y="Value", data=df, orient='v', split=False, inner="quart", bw=bw, order=condition_order, palette=condition_palette)
+    
+    plt.title(title)
+    plt.ylabel("Counterfactual test accuracy")
+    plt.xlabel("Condition")
+    plt.tight_layout()
     plt.savefig(f"images/aggregated_violin/{loss_name}_{box_pattern}_{type}.png", dpi=300, bbox_inches="tight")
 
 
@@ -245,7 +260,7 @@ if __name__ == "__main__":
     if mode == 0:
         box_pattern = "MANDELBROT"
         for loss_name in loss_names:
-            type = 'acc'
+            type = 'ACC'
             print(f'calculating aggregated heatmap mode 4 for {wandb_project_name} {box_pattern} {loss_name} {type}')
             try:
                 filename = f"run_data/heatmap {loss_name} {box_pattern} {additional_naming}"
@@ -262,11 +277,14 @@ if __name__ == "__main__":
             plot_aggregated_data(aggregated_data, loss_name, box_pattern, type=type)
     
     elif mode == 1:
-        box_pattern = "MANDELBROT"
+        box_pattern = "RANDOM"
         for loss_name in loss_names:
-            type = 'acc'
-            print(f'calculating aggregated violin mode 5 for {wandb_project_name} {box_pattern} {loss_name} {type}')
+            type = 'TOP-1'
+            title = f"{type} {loss_name} {box_pattern}{additional_naming}"
             filename = f"run_data/aggregated violin {loss_name} {box_pattern}{additional_naming}"
+
+            print(f'calculating aggregated violin mode 1 for {wandb_project_name} {title}')
+
             try:
                 with open(filename, "rb") as f:
                     violin_histories = pickle.load(f)
@@ -274,10 +292,7 @@ if __name__ == "__main__":
             except:
                 # IMPORTANT: teacher mechanism must go first in groupby_metrics list
                 violin_histories: List[pd.DataFrame] = violinplot_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, additional_naming=additional_naming)
-                violin_df = aggregate_conditions_violin(violin_histories, type="acc")
-                
-                with open(filename, "wb") as f:
-                    pickle.dump(violin_df, f)
-            
+
+            violin_df = aggregate_conditions_violin(violin_histories, type=type)
             # Now, directly use violin_df for plotting since it's already in the right format
-            plot_aggregated_data_violin(violin_df, loss_name, box_pattern, type=type)
+            plot_aggregated_data_violin(violin_df, loss_name, box_pattern, type=type, title=title)

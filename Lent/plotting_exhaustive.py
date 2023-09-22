@@ -486,11 +486,11 @@ if __name__ == "__main__":
     model_name = 'RN18AP'
     dataset_type = 'DOMINOES'
     config_type = 'EXHAUSTIVE'
-    additional_naming = '' # For names appended to end of typical project naming convention
+    additional_naming = '' # For names appended to end of typical project naming convention (ALPHA, BETA etc)
     wandb_project_name = f"DISTILL-{model_name}-{dataset_type}-{config_type}-{box_pattern}{additional_naming}"
 
     # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps
-    mode = 0
+    mode = 1
     groupby_metrics = ["experiment.name", "experiment_s.name"]
 
     if mode == 0:
@@ -498,7 +498,7 @@ if __name__ == "__main__":
             type = 'acc'
             print(f'calculating heatmap mode 0 for {wandb_project_name} {loss_name} {type}')
             try:
-                filename = f"run_data/heatmap {loss_name} {box_pattern} {additional_naming}"
+                filename = f"run_data/heatmap {loss_name} {box_pattern}{additional_naming}"
                 with open(filename, "rb") as f: histories = pickle.load(f)
                 print('loaded existing data file')
             except:

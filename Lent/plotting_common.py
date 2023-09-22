@@ -17,6 +17,8 @@ from sklearn.manifold import TSNE
 from typing import List, Optional, Dict, Tuple
 from types import SimpleNamespace
 
+from config_setup import ConfigGroups
+
 warnings.filterwarnings("ignore")
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -138,6 +140,7 @@ def create_histories_list(
     histories = []
     
     for key, runs in grouped_runs.items():
+        print(f'creating history for {key}')
         metrics = defaultdict(list)
         for run in runs:
             history = run.history
@@ -160,13 +163,13 @@ def create_histories_list(
         combined = pd.concat(means_and_vars_list, axis=1)
 
         if mode == 'exhaustive': # For heatmaps
-            combined['Group Name'] = {'T': key[0], 'S': key[1]}
+            combined['Group Name'] = combined.apply(lambda row: {'T': key[0], 'S': key[1]}, axis=1)
         elif mode == 'vstime': # For vstime - must pass in extra info via kwargs
             grid = kwargs.get('grid')
             if grid is None:
                 raise ValueError("Whether to use grid must be provided")
             if grid:
-                combined['Group Name'] = {'T': key[0], 'S': key[1]}
+                combined['Group Name'] = combined.apply(lambda row: {'T': key[0], 'S': key[1]}, axis=1)
             else: # Student only in Group Name
                 combined['Group Name'] = key[1]
         else: raise ValueError("Mode must be 'exhaustive' or 'vstime'")
@@ -291,3 +294,6 @@ def condition_for_neither(s, t):
 def save_df_csv(df: pd.DataFrame, title: str, head: int = None):
     """head: If value is valid integer then save head."""
     df.to_csv(f"run_data/{title}.csv", index=False) if head is None else df.head(head).to_csv(f"run_data/{title}.csv", index=False)
+
+
+exp_names = [config.name for config in ConfigGroups.exhaustive]
