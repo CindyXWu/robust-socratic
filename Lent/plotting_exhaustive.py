@@ -14,7 +14,7 @@ import seaborn as sns
 from typing import List, Dict
 
 from config_setup import ConfigGroups, BoxPatternType, DistillLossType
-from plotting_common import drop_non_numeric_columns, clean_history, smooth_history, get_grouped_runs, custom_sort, recursive_namespace, create_histories_list
+from plotting_common import drop_non_numeric_columns, clean_history, smooth_history, get_grouped_runs, custom_sort, recursive_namespace, create_histories_list, condition_for_neither, condition_for_similarity, condition_for_student, condition_for_teacher
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 image_dir = "images/"
@@ -31,15 +31,15 @@ def heatmap_get_data(project_name: str,
                      loss_name: str,
                      box_pattern: str,
                      groupby_metrics: List[str],
-                     second_project_name: str = None) -> List[pd.DataFrame]:
+                     additional_naming: str) -> List[pd.DataFrame]:
     """Get data from wandb for experiment set, filter and group. 
-    
     Calculate mean/var of metrics and return a list of history dataframes with mean/var interleaved.
+    
+    Args:
+        config: DistillConfig object containing experiment settings.
+        additional_naming: Additional string to add to the end of the file name.
     """
     runs = api.runs(project_name)
-    if second_project_name: # Optional: combine runs from two projects
-        runs_2 = api.runs(second_project_name)
-        runs = runs + runs_2
         
     filtered_runs = []
     min_step = 300 # Filter partially logged/unfinished runs
@@ -64,7 +64,7 @@ def heatmap_get_data(project_name: str,
     # Compute means/var for all metrics for each group of runs
     histories = create_histories_list(grouped_runs, mode='exhaustive')
     
-    file_name = f"run_data/heatmap {loss_name} {box_pattern}"
+    file_name = f"run_data/heatmap {loss_name} {box_pattern} {additional_naming}"
     with open(file_name, "wb") as f:
         pickle.dump(histories, f)
         
@@ -125,10 +125,15 @@ def plot_counterfactual_heatmaps(
     combined_history: List[pd.DataFrame], 
     exp_names: str,
     loss_name: DistillLossType,
-    box_pattern: BoxPatternType) -> Dict[str, np.ndarray]:
+    box_pattern: BoxPatternType,
+    type: str = 'acc',
+    additional_naming: str = '') -> None:
     """
+    Plot heatmap of final KL-divergence, top-1 fidelity or accuracy for each of 49 student-teacher mechanism combinations.
+    
     Args:
         exp_names: ordered list of experiment names to plot.
+        type: string, 'acc', 'kl' or 'top1'
     """
     data_to_plot = {}
     axes_labels = []
@@ -143,7 +148,13 @@ def plot_counterfactual_heatmaps(
         row = exp_names.index(mechs['S'])
         col = exp_names.index(mechs['T'])
         for key in exp_names:
-            data_to_plot[key][row, col] = history[f'{key} Mean'].loc[history[f'{key} Mean'].last_valid_index()]
+            match type:
+                case 'acc':
+                    data_to_plot[key][row, col] = history[f'{key} Mean'].loc[history[f'{key} Mean'].last_valid_index()]
+                case 'kl':
+                    data_to_plot[key][row, col] = history[f'{key} T-S KL Mean'].loc[history[f'{key} T-S KL Mean'].last_valid_index()]
+                case 'top1':
+                    data_to_plot[key][row, col] = history[f'{key} T-S Top 1 Fidelity Mean'].loc[history[f'{key} T-S Top 1 Fidelity Mean'].last_valid_index()]
 
     for key, data in data_to_plot.items():
         fig, ax = plt.subplots()
@@ -153,11 +164,22 @@ def plot_counterfactual_heatmaps(
         ax.set_yticklabels(axes_labels, rotation='horizontal', fontsize=15)
         ax.set_xlabel('Teacher Training Mechanism', fontsize=15)
         ax.set_ylabel('Student Training Mechanism', fontsize=15)
-        ax.set_title(f'{key.replace("_", " ")} Acc {loss_name}')
-        plt.savefig(f'images/heatmaps/{loss_name}_{box_pattern}/{key}.png', dpi=300, bbox_inches='tight')
+        ax.set_title(f'{key.replace("_", " ")} {type} {loss_name}')
+        plt.savefig(f"images/heatmaps/{loss_name}_{box_pattern}/{type}_{key}_{additional_naming}.png", dpi=300, bbox_inches='tight')
 
 
-def plot_mean_variance_heatmaps(combined_history, exp_names, loss_name, box_pattern):
+def plot_mean_variance_heatmaps(combined_history: List[pd.DataFrame], 
+                                exp_names: str,
+                                loss_name: DistillLossType,
+                                box_pattern: BoxPatternType,
+                                type: str = 'acc') -> None:
+    """
+    Plot heatmap of final KL-divergence, top-1 fidelity or accuracy for each of 49 student-teacher mechanism combinations, and their variances.
+    
+    Args:
+        exp_names: ordered list of experiment names to plot.
+        type: string, 'acc', 'kl' or 'top1'
+    """
     print(f"plotting vars in heatmap loss {loss_name} box {box_pattern}")
     data_to_plot_mean = {}
     data_to_plot_variance = {}
@@ -174,8 +196,16 @@ def plot_mean_variance_heatmaps(combined_history, exp_names, loss_name, box_patt
         row = exp_names.index(mechs['S'])
         col = exp_names.index(mechs['T'])
         for key in exp_names:
-            data_to_plot_mean[key][row, col] = history[f'{key} Mean'].loc[history[f'{key} Mean'].last_valid_index()]
-            data_to_plot_variance[key][row, col] = history[f'{key} Var'].loc[history[f'{key} Var'].last_valid_index()]
+            match type:
+                case 'acc':
+                    data_to_plot_mean[key][row, col] = history[f'{key} Mean'].loc[history[f'{key} Mean'].last_valid_index()]
+                    data_to_plot_variance[key][row, col] = history[f'{key} Var'].loc[history[f'{key} Var'].last_valid_index()]
+                case 'kl':
+                    data_to_plot_mean[key][row, col] = history[f'{key} T-S KL Mean'].loc[history[f'{key} T-S KL Mean'].last_valid_index()]
+                    data_to_plot_variance[key][row, col] = history[f'{key} T-S KL Var'].loc[history[f'{key} T-S KL Var'].last_valid_index()]
+                case 'top1':
+                    data_to_plot_mean[key][row, col] = history[f'{key} T-S Top 1 Fidelity Mean'].loc[history[f'{key} T-S Top 1 Fidelity Mean'].last_valid_index()]
+                    data_to_plot_variance[key][row, col] = history[f'{key} T-S Top 1 Fidelity Var'].loc[history[f'{key} T-S Top 1 Fidelity Var'].last_valid_index()]
 
     for key, data_mean in data_to_plot_mean.items():
         fig, ax = plt.subplots()
@@ -192,7 +222,7 @@ def plot_mean_variance_heatmaps(combined_history, exp_names, loss_name, box_patt
         ax.set_yticklabels(axes_labels, rotation='horizontal', fontsize=15)
         ax.set_xlabel('Teacher Training Mechanism', fontsize=15)
         ax.set_ylabel('Student Training Mechanism', fontsize=15)
-        plt.savefig(f'images/heatmaps/{loss_name}_{box_pattern}/{key}.png', dpi=300, bbox_inches='tight')
+        plt.savefig(f'images/heatmaps/{loss_name}_{box_pattern}/{key}_{type}.png', dpi=300, bbox_inches='tight')
             
 
 def make_plot(histories: List[pd.DataFrame], 
@@ -201,6 +231,8 @@ def make_plot(histories: List[pd.DataFrame],
               mode: str) -> None:
     """
     For plots over time. Plots each teacher separately.
+    To be called by another function which lists the columns to be plotted - 
+    each of these is a subplot.
     
     Args:
         histories: List of dataframes containing historical information for each group of runs.
@@ -371,8 +403,13 @@ def make_new_plot(histories: List[pd.DataFrame],
     plt.savefig('images/exhaustivevstime/grid/'+title+'.png', dpi=300, bbox_inches='tight')
 
 
-def counterfactual_plot(histories: pd.DataFrame, exp_dict: Dict[str, List], title: str) -> None:
-    """For a given run, plot counterfactual test accuracy, KL and top-1 fidelity on different plots."""
+def counterfactual_plot(histories: list[pd.DataFrame], exp_dict: Dict[str, List], title: str) -> None:
+    """For a given run, plot counterfactual test accuracy, KL and top-1 fidelity on different plots.
+    
+    Args:
+        title: some generic title name to add to plots
+        exp_dict: dictionary of experiment names and the associated variable values.
+    """
     metric_names = list(exp_dict.keys())
     acc_mean_cols = [col for col in histories[0].columns if col.replace(' Mean', '') in metric_names]
     kl_mean_cols = [col for col in histories[0].columns if col.replace(' T-S KL Mean', '') in metric_names]
@@ -411,6 +448,9 @@ def plot_difference_heatmaps(differences: Dict[str, np.ndarray], loss_name: str,
 
 
 def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.DataFrame]) -> Dict[str, np.ndarray]:
+    """Difference between final attributes of different loss function to KL distillation loss.
+    Retrieves data for calling by plot_difference_heatmaps.
+    """
     data_to_diff = {}
     num_keys = len(exp_names)
 
@@ -436,125 +476,43 @@ def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.Data
     return data_to_diff
 
 
-def aggregate_conditions(combined_history: list[pd.DataFrame]) -> Dict[str, np.ndarray]:
-    """Get grouped data for violin plots of distribution shift experiments."""
-
-    def condition_for_similarity(s, t, key):
-        return (s == t and s == key)
-
-    def condition_for_student(s, t, key):
-        return all(k in s for k in key) and all(k not in t for k in key) and any(k in s and k in t for k in exp_names if k not in key)
-
-    def condition_for_teacher(s, t, key):
-        return all(k in t for k in key) and all(k not in s for k in key) and any(k in s and k in t for k in exp_names if k not in key)
-
-    def condition_for_neither(s, t):
-        return s != t
-
-    # Initialize matrices for means and variances
-    aggregated_means = {'similarity': 0, 'student': 0, 'teacher': 0, 'neither': 0, 'other': 0}
-    aggregated_vars = {'similarity': 0, 'student': 0, 'teacher': 0, 'neither': 0, 'other': 0}
-
-    condition_counts = {'similarity': 0, 'student': 0, 'teacher': 0, 'neither': 0, 'other': 0}
-
-    for history in combined_history:
-        student = history['Group Name'].iloc[0]['S']
-        teacher = history['Group Name'].iloc[0]['T']
-
-        for key in exp_names:
-            if condition_for_similarity(student, teacher, key):
-                condition_name = 'similarity'
-            elif condition_for_student(student, teacher, key):
-                condition_name = 'student'
-            elif condition_for_teacher(student, teacher, key):
-                condition_name = 'teacher'
-            elif condition_for_neither(student, teacher):
-                condition_name = 'neither'
-            else:
-                condition_name = 'other'
-                """Includes cases where the teacher and student are the same, but the key is not in either of them."""
-
-            try: 
-                aggregated_means[condition_name] += history[f'{key} Mean'].loc[history[f'{key} Mean'].last_valid_index()]
-            except: 
-                print("Error in mean for ", condition_name, " for ", key, " in ", student, " ", teacher)
-                print("history head", history.head())
-            try: 
-                aggregated_vars[condition_name] += history[f'{key} Var'].loc[history[f'{key} Var'].last_valid_index()]
-            except: 
-                print("Error in variance for ", condition_name, " for ", key, " in ", student, " ", teacher)
-                print("history head", history.head())
-            condition_counts[condition_name] += 1
-
-    for condition in aggregated_means:
-        aggregated_means[condition] /= condition_counts[condition]
-        aggregated_vars[condition] /= condition_counts[condition]
-
-    return {
-        'means': aggregated_means,
-        'variances': aggregated_vars
-    }
-
-
-def plot_aggregated_data(aggregated_data, loss_name, box_pattern):
-    conditions = list(aggregated_data['means'].keys())
-    
-    # Create a dataframe for seaborn
-    df_means = pd.DataFrame([aggregated_data['means']])
-    df_vars = pd.DataFrame([aggregated_data['variances']])
-
-    # Plotting means heatmap
-    plt.figure(figsize=(10, 6))
-    sns.heatmap(df_means, annot=True, fmt=".1f", cmap="mako", yticklabels=["Mean"])
-    plt.title("Aggregated Means")
-    plt.xticks(range(len(conditions)), conditions)
-    plt.savefig(f"images/aggregated_heatmaps/{loss_name}_{box_pattern}_means.png", dpi=300, bbox_inches="tight")
-
-    # Plotting variances heatmap
-    plt.figure(figsize=(10, 6))
-    sns.heatmap(df_vars, annot=True, fmt=".1f", cmap="mako", yticklabels=["Variance"])
-    plt.title("Aggregated Variances")
-    plt.xticks(range(len(conditions)), conditions)
-    plt.savefig(f"images/aggregated_heatmaps/{loss_name}_{box_pattern}_variances.png", dpi=300, bbox_inches="tight")
-
-
 if __name__ == "__main__":
     # Somewhat immutable things
     exp_names = [config.name for config in ConfigGroups.exhaustive]
     label_group_names = ["IAB", "IA", "IB", "AB", "B", "A", "I"] # Actual order of names here
     loss_names = [loss_type.value for loss_type in DistillLossType]
     
-    # Configs - amazing part of using config YAML is I can load all settings in
-    config_filename = "distill_config"
-    with open(f"configs/{config_filename}.yaml", 'r') as stream:
-        config = yaml.safe_load(stream)
-    config = recursive_namespace(config)
-    box_pattern = config.dataset.box_cue_pattern
-    model_name = config.model_type
-    wandb_project_name = f"DISTILL-{config.model_type}-{config.dataset_type}-{config.config_type}-{box_pattern}-ALPHA"
+    box_pattern = 'MANDELBROT'
+    model_name = 'RN18AP'
+    dataset_type = 'DOMINOES'
+    config_type = 'EXHAUSTIVE'
+    additional_naming = '' # For names appended to end of typical project naming convention
+    wandb_project_name = f"DISTILL-{model_name}-{dataset_type}-{config_type}-{box_pattern}{additional_naming}"
 
-    # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps, 4 for combined dist plots
-    mode = 4
+    # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps
+    mode = 0
     groupby_metrics = ["experiment.name", "experiment_s.name"]
 
     if mode == 0:
         for loss_name in loss_names:
+            type = 'acc'
+            print(f'calculating heatmap mode 0 for {wandb_project_name} {loss_name} {type}')
             try:
-                filename = f"run_data/heatmap {loss_name} {box_pattern}"
+                filename = f"run_data/heatmap {loss_name} {box_pattern} {additional_naming}"
                 with open(filename, "rb") as f: histories = pickle.load(f)
+                print('loaded existing data file')
             except:
+                print('calculating')
                 # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
-                histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics)
+                histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, additional_naming=additional_naming)
 
-            plot_counterfactual_heatmaps(histories, exp_names, loss_name, box_pattern)
+            plot_counterfactual_heatmaps(histories, exp_names, loss_name, box_pattern, type=type, additional_naming=additional_naming)
             # plot_mean_variance_heatmaps(histories, exp_names, loss_name, box_pattern)
             
     elif mode == 1:
         for t_exp_name in exp_names:
             for loss_name in loss_names:
-
-                title = f"{config.model_type} {t_exp_name} {loss_name}"
-
+                title = f"{model_name} {t_exp_name} {loss_name}"
                 try: # Files already calculated and exist
                     filename = f"run_data/vstime {t_exp_name} {loss_name}"
                     with open(filename, "rb") as f: histories = pickle.load(f)
@@ -567,7 +525,7 @@ if __name__ == "__main__":
     elif mode == 2:
         for loss_name in loss_names:
 
-            title = f"{config.model_type} {loss_name}"
+            title = f"{model_name} {loss_name}"
 
             try: # Files already calculated and exist
                 filename = f"run_data/vstime {loss_name} grid"
@@ -594,22 +552,3 @@ if __name__ == "__main__":
 
         plot_difference_heatmaps(jacobian_differences, "JACOBIAN", box_pattern)
         plot_difference_heatmaps(contrastive_differences, "CONTRASTIVE", box_pattern)
-    
-    elif mode == 4:
-        box_pattern = "MANDELBROT"
-        print("project name", wandb_project_name)
-              
-        for loss_name in loss_names:
-            try:
-                filename = f"run_data/heatmap {loss_name} {box_pattern}"
-                with open(filename, "rb") as f: histories = pickle.load(f)
-            except:
-                # IMPORTANT: teacher mechanism must go first in groupby_metrics list
-                histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics)
-
-            aggregated_data = aggregate_conditions(combined_history=histories)
-            df_means, df_vars = pd.DataFrame([aggregated_data['means']]), pd.DataFrame([aggregated_data['variances']])
-            df_means.to_csv(f"run_data/{loss_name}_{box_pattern}_aggregated_means.csv", index=False)
-            df_vars.to_csv(f"run_data/{loss_name}_{box_pattern}_aggregated_vars.csv", index=False)
-
-            plot_aggregated_data(aggregated_data, loss_name, box_pattern)

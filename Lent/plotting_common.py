@@ -134,8 +134,9 @@ def create_histories_list(
     grouped_runs: Dict[tuple, List],
     mode: str,
     **kwargs) -> List[pd.DataFrame]:
-
+    """Takes each metric and groups runs with the same ones, then calculates the mean and variance."""
     histories = []
+    
     for key, runs in grouped_runs.items():
         metrics = defaultdict(list)
         for run in runs:
@@ -159,15 +160,15 @@ def create_histories_list(
         combined = pd.concat(means_and_vars_list, axis=1)
 
         if mode == 'exhaustive': # For heatmaps
-            combined['Group Name'] = [{'T': key[0], 'S': key[1]}]*len(combined)
+            combined['Group Name'] = {'T': key[0], 'S': key[1]}
         elif mode == 'vstime': # For vstime - must pass in extra info via kwargs
             grid = kwargs.get('grid')
             if grid is None:
                 raise ValueError("Whether to use grid must be provided")
             if grid:
-                combined['Group Name'] = [{'T': key[0], 'S': key[1]}] * len(combined)
+                combined['Group Name'] = {'T': key[0], 'S': key[1]}
             else: # Student only in Group Name
-                combined['Group Name'] = [key[1]] * len(combined)
+                combined['Group Name'] = key[1]
         else: raise ValueError("Mode must be 'exhaustive' or 'vstime'")
                 
         histories.append(combined)
@@ -269,3 +270,24 @@ def recursive_namespace(data):
     if isinstance(data, dict):
         return SimpleNamespace(**{k: recursive_namespace(v) for k, v in data.items()})
     return data
+
+
+def condition_for_similarity(s, t, key):
+        return (s == t and s == key)
+
+
+def condition_for_student(s, t, key):
+    return all(k in s for k in key) and all(k not in t for k in key) and any(k in s and k in t for k in exp_names if k not in key)
+
+
+def condition_for_teacher(s, t, key):
+    return all(k in t for k in key) and all(k not in s for k in key) and any(k in s and k in t for k in exp_names if k not in key)
+
+
+def condition_for_neither(s, t):
+    return s != t
+
+
+def save_df_csv(df: pd.DataFrame, title: str, head: int = None):
+    """head: If value is valid integer then save head."""
+    df.to_csv(f"run_data/{title}.csv", index=False) if head is None else df.head(head).to_csv(f"run_data/{title}.csv", index=False)
