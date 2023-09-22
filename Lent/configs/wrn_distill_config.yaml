@@ -1,5 +1,5 @@
-model_type: RN34W
-student_model_type: RN20W
+model_type: RNW
+student_model_type: RNW
 dataset_type: DOMINOES
 config_type: EXHAUSTIVE
 distill_loss_type: BASE
@@ -31,7 +31,7 @@ dataloader:
   test_bs: 128
   num_workers: 1
 wrn_config:
-    blocks_per_stage: 2
+    blocks_per_stage: 8
     width_factor: 2
 student_wrn_config:
     blocks_per_stage: 2
@@ -53,7 +53,7 @@ log_teacher: true
 teacher_save_path: null
 wandb_project_name: ""
 wandb_run_name: null
-run_description: "Exhaustive Mandelbrot Jacobian"
+run_description: "WRN depth variation"
 
 use_early_stop: false
 base_distill_loss_type: KL

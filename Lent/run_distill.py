@@ -56,8 +56,8 @@ def main(config: DistillConfig) -> None:
         config.experiment_s.name = change_frac_filename(config, s_exp_idx, True)
     # From name field of config file
     t_exp_name, s_exp_name = config.experiment.name.split(":")[-1].strip(), config.experiment_s.name.split(":")[-1].strip()
-    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_teacher"
-    config.student_save_path = f"trained_students/{config.model_type}_{config.dataset_type}_{s_exp_prefix}_{s_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_student"
+    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.wrn_config.blocks_per_stage}_{config.wrn_config.width_factor}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_teacher" if config.model_type == "RNW" else f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_teacher"
+    config.student_save_path = f"trained_students/t{config.model_type}_{config.wrn_config.blocks_per_stage}_{config.wrn_config.width_factor}_s{config.student_model_type}_{config.student_wrn_config.blocks_per_stage}_{config.student_wrn_config.width_factor}_{config.dataset_type}_{s_exp_prefix}_{s_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_student" if config.student_model_type == "RNW" else f"{config.student_model_type}_{config.dataset_type}_{s_exp_prefix}_{s_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_student"
     
     ## Update config file before logging config values to wandb
     if config.nonbase_loss_frac is None and config.distill_loss_type != DistillLossType.BASE:

@@ -23,7 +23,7 @@ cs.store(name="config_base", node=MainConfig)
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # CHANGE THESE  
-config_filename = "main_config"
+config_filename = "wrn_config"
 sweep_filename = ""
     
 
@@ -46,7 +46,7 @@ def main(config: MainConfig) -> None:
     if config.config_type == ConfigType.FRAC:
          config.experiment.name = change_frac_filename(config, t_exp_idx)
     t_exp_name = config.experiment.name.split(":")[-1].strip()
-    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_teacher"
+    config.teacher_save_path = f"trained_teachers/{config.model_type}_{config.wrn_config.blocks_per_stage}_{config.wrn_config.width_factor}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_teacher" if config.model_type == "RNW" else f"trained_teachers/{config.model_type}_{config.dataset_type}_{t_exp_prefix}_{t_exp_name.replace(' ', '_')}_{config.dataset.box_cue_pattern}_teacher"
     
     ## WandB
     config.wandb_project_name = f"TEACHER-{config.model_type}-{config.dataset_type}-{config.config_type}-{config.dataset.box_cue_pattern}{config.wandb_project_name}"

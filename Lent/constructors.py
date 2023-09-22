@@ -52,7 +52,7 @@ def model_constructor(config: MainConfig, is_student: bool) -> nn.Module:
             output_size=mlp_config.output_size,
             bias=mlp_config.add_bias,
         )
-    elif model_type in [ModelType.RESNET20_WIDE, ModelType.RESNET34_WIDE]:
+    elif model_type == ModelType.RESNET_WIDE:
         wrn_config = config.student_wrn_config if is_student else config.wrn_config
         model = wide_resnet_constructor(
             blocks_per_stage=wrn_config.blocks_per_stage,
@@ -68,11 +68,13 @@ def model_constructor(config: MainConfig, is_student: bool) -> nn.Module:
 
 
 def get_model_intermediate_layer(config: MainConfig) -> str:
-    """For feature difference losses."""
+    """For feature difference losses.
+    TODO: edit ResNet wide to check for model width first
+    """
     models = {
             ModelType.LENET5_3CHAN: {'feature_extractor.10': 'feature_extractor.10'},
             ModelType.RESNET18_ADAPTIVE_POOLING: {'layer4.1.bn2': 'bn_bn2'},
-            ModelType.RESNET20_WIDE: {"11.path2.5": "final_features"},
+            ModelType.RESNET_WIDE: {"11.path2.5": "final_features"},
         }
     return models.get(config.model_type)
 

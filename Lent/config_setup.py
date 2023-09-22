@@ -9,8 +9,7 @@ from collections import namedtuple
 class ModelType(str, Enum):
     MLP = "MLP"
     RESNET18_ADAPTIVE_POOLING = "RN18AP"
-    RESNET20_WIDE = "RN20W"
-    RESNET34_WIDE = "RN34W"
+    RESNET_WIDE = "RNW"
     LENET5_3CHAN = "LENET5"
 
 

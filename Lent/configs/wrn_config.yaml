@@ -1,6 +1,6 @@
-model_type: RN20W
+model_type: RNW
 dataset_type: DOMINOES
-config_type: EXHAUSTIVE
+config_type: TARGETED
 aug_type: NONE
 
 optimization:
@@ -46,5 +46,5 @@ save_model_as_artifact: true
 save_model: true
 log_teacher: true
 teacher_save_path: null
-wandb_project_name: " LR test"
+wandb_project_name: ""
 wandb_run_name: null
