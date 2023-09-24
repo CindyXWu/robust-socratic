@@ -277,9 +277,9 @@ if __name__ == "__main__":
             plot_aggregated_data(aggregated_data, loss_name, box_pattern, type=type)
     
     elif mode == 1:
-        box_pattern = "RANDOM"
+        box_pattern = "MANDELBROT"
         for loss_name in loss_names:
-            type = 'TOP-1'
+            type = 'ACC'
             title = f"{type} {loss_name} {box_pattern}{additional_naming}"
             filename = f"run_data/aggregated violin {loss_name} {box_pattern}{additional_naming}"
 

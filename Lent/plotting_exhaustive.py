@@ -490,7 +490,7 @@ if __name__ == "__main__":
     wandb_project_name = f"DISTILL-{model_name}-{dataset_type}-{config_type}-{box_pattern}{additional_naming}"
 
     # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps
-    mode = 1
+    mode = 0
     groupby_metrics = ["experiment.name", "experiment_s.name"]
 
     if mode == 0:
