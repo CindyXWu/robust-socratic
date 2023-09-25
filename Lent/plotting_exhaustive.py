@@ -476,6 +476,110 @@ def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.Data
     return data_to_diff
 
 
+def plot_grid_heatmaps(exp_names: List[str],
+                       loss_names: List[str],
+                       box_pattern: BoxPatternType,
+                       wandb_project_name: str,
+                       groupby_metrics: List[str],
+                       additional_naming: str,
+                       exp_row_names: List[str],
+                       type: str = 'acc') -> None:
+    """
+    Plot a grid of heatmaps for each student-teacher mechanism combination, and their variances.
+    
+    Args:
+        exp_names: ordered list of experiment names to plot.
+        exp_row_names: ordered list of row names to label the y-axis.
+        type: string, 'acc', 'kl' or 'top1'
+    """
+    print(f"plotting vars in grid heatmap box {box_pattern}")
+    num_keys = len(exp_names)
+    row_height = 5
+    total_height = len(exp_row_names) * row_height
+    fig, axes = plt.subplots(nrows=len(exp_row_names), ncols=len(loss_names), figsize=(15, total_height), sharex=False, sharey=True)
+    fig.subplots_adjust(wspace=0, hspace=0)
+    
+    # Colourbar
+    cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
+    vmin = float('inf')
+    vmax = -float('inf')
+
+    for loss_index, loss_name in enumerate(loss_names):
+        print(f"processing loss {loss_name}")
+        
+        # Initialize nested dictionaries for this loss_name
+        data_to_plot_mean = {key: np.zeros((num_keys, num_keys)) for key in exp_names}
+        data_to_plot_variance = {key: np.zeros((num_keys, num_keys)) for key in exp_names}
+        
+        # Load the correct history
+        filename = f"run_data/heatmap {loss_name} {box_pattern}{additional_naming}"
+        try:
+            with open(filename, "rb") as f: 
+                histories = pickle.load(f)
+            print('loaded existing data file')
+        except:
+            print('calculating')
+            histories = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, additional_naming=additional_naming)
+
+        for history in histories:
+            mechs = history['Group Name'].iloc[0]
+            try:
+                row = exp_names.index(mechs['S'])
+                col = exp_names.index(mechs['T'])
+            except: # Mechs not in exp_names
+                pass
+            
+            for key in exp_names:
+                match type:
+                    case 'acc':
+                        data_to_plot_mean[key][row, col] = history[f'{key} Mean'].loc[history[f'{key} Mean'].last_valid_index()]
+                        data_to_plot_variance[key][row, col] = history[f'{key} Var'].loc[history[f'{key} Var'].last_valid_index()]
+                    case 'kl':
+                        data_to_plot_mean[key][row, col] = history[f'{key} T-S KL Mean'].loc[history[f'{key} T-S KL Mean'].last_valid_index()]
+                        data_to_plot_variance[key][row, col] = history[f'{key} T-S KL Var'].loc[history[f'{key} T-S KL Var'].last_valid_index()]
+                    case 'top1':
+                        data_to_plot_mean[key][row, col] = history[f'{key} T-S Top 1 Fidelity Mean'].loc[history[f'{key} T-S Top 1 Fidelity Mean'].last_valid_index()]
+                        data_to_plot_variance[key][row, col] = history[f'{key} T-S Top 1 Fidelity Var'].loc[history[f'{key} T-S Top 1 Fidelity Var'].last_valid_index()]
+
+        for key_index, key in enumerate(exp_row_names):
+            ax = axes[key_index][loss_index]
+            ax.set_aspect('equal')
+            vmin = min(vmin, np.min(data_to_plot_mean[key]))
+            vmax = max(vmax, np.max(data_to_plot_mean[key]))
+
+            heatmap = sns.heatmap(data_to_plot_mean[key], cmap='mako', annot=True, fmt=".1f", cbar=True, cbar_ax=cbar_ax, ax=ax, vmax=vmax, vmin=vmin)
+            cbar_ax.tick_params(labelsize=15)
+            
+            # Annotate each cell with the standard deviation value
+            for i in range(num_keys):
+                for j in range(num_keys):
+                    variance = data_to_plot_variance[key][i, j]
+                    std_dev = np.sqrt(variance)
+                    value = data_to_plot_mean[key][i, j]
+                    # Check the brightness of the cell to determine text color
+                    norm = plt.Normalize(vmin=vmin, vmax=vmax)
+                    rgb = mako_cmap(norm(value))[:3]
+                    brightness = sum(rgb) / 3.0
+                    text_color = "white" if brightness < 0.5 else "black"
+                    ax.text(j + 0.7, i + 0.85, f"{std_dev:.2f}", va='center', ha='center', color=text_color, fontsize=6)
+
+            # Set axis labels
+            if key_index == len(exp_row_names) - 1:
+                ax.set_xlabel(loss_name, fontsize=15)
+            if loss_index == 0:
+                ax.set_ylabel(f"CF {key}", fontsize=15)
+                
+            # ax.set_xticklabels(exp_names if key_index == len(exp_row_names) - 1 else [], rotation='vertical', fontsize=10)
+            ax.set_xticklabels(exp_names, rotation='vertical', fontsize=10)
+            # ax.set_yticklabels(exp_names if loss_index == 0 else [], rotation='horizontal', fontsize=10)
+            ax.set_yticklabels(exp_names, rotation='horizontal', fontsize=10)  # Always label yticks
+
+        fig.text(0.5, 0.01, 'Teacher Mechanism', ha='center', fontsize=20)
+        fig.text(0.01, 0.5, 'Student Mechanism', va='center', rotation='vertical', fontsize=20)
+        plt.tight_layout(rect=[0.02, 0.02, 0.9, 1])
+        plt.savefig(f'images/heatmaps/grid_{box_pattern}.png', dpi=300)
+
+
 if __name__ == "__main__":
     # Somewhat immutable things
     exp_names = [config.name for config in ConfigGroups.exhaustive]
@@ -489,8 +593,8 @@ if __name__ == "__main__":
     additional_naming = '' # For names appended to end of typical project naming convention (ALPHA, BETA etc)
     wandb_project_name = f"DISTILL-{model_name}-{dataset_type}-{config_type}-{box_pattern}{additional_naming}"
 
-    # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps
-    mode = 0
+    # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps, 4 for grid of heatmaps with variance
+    mode = 4
     groupby_metrics = ["experiment.name", "experiment_s.name"]
 
     if mode == 0:
@@ -506,8 +610,8 @@ if __name__ == "__main__":
                 # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
                 histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, additional_naming=additional_naming)
 
-            plot_counterfactual_heatmaps(histories, exp_names, loss_name, box_pattern, type=type, additional_naming=additional_naming)
-            # plot_mean_variance_heatmaps(histories, exp_names, loss_name, box_pattern)
+            # plot_counterfactual_heatmaps(histories, exp_names, loss_name, box_pattern, type=type, additional_naming=additional_naming)
+            plot_mean_variance_heatmaps(histories, exp_names, loss_name, box_pattern)
             
     elif mode == 1:
         for t_exp_name in exp_names:
@@ -540,7 +644,6 @@ if __name__ == "__main__":
         box_pattern = "MANDELBROT"
         file_names = [F"heatmap {loss_type.value} {box_pattern}" for loss_type in DistillLossType]
         histories = {}
-
         for file_name in file_names:
             with open(f"run_data/{file_name}", "rb") as f:
                 histories[file_name.split()[1]] = pickle.load(f)
@@ -552,3 +655,11 @@ if __name__ == "__main__":
 
         plot_difference_heatmaps(jacobian_differences, "JACOBIAN", box_pattern)
         plot_difference_heatmaps(contrastive_differences, "CONTRASTIVE", box_pattern)
+    
+    elif mode == 4:
+        box_pattern = "RANDOM"
+        # exp_row_names = ['AB', 'IB', 'IA', 'IAB']
+        exp_row_names = ['I', 'A', 'B']
+        mako_cmap = sns.color_palette("mako", as_cmap=True)  # Get the 'mako' colormap from Seaborn
+        plot_grid_heatmaps(exp_names, loss_names, box_pattern, wandb_project_name, groupby_metrics, additional_naming, exp_row_names)
+

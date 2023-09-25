@@ -276,7 +276,7 @@ def recursive_namespace(data):
 
 
 def condition_for_similarity(s, t, key):
-        return (s == t and s == key)
+        return s == t and all(k in s for k in key) or (all(k in s for k in key ) and all(k in t for k in key))
 
 
 def condition_for_student(s, t, key):
@@ -288,7 +288,7 @@ def condition_for_teacher(s, t, key):
 
 
 def condition_for_neither(s, t):
-    return s != t
+    return not any(char in t for char in s)
 
 
 def save_df_csv(df: pd.DataFrame, title: str, head: int = None):
