@@ -42,7 +42,7 @@ def heatmap_get_data(project_name: str,
     runs = api.runs(project_name)
         
     filtered_runs = []
-    min_step = 300 # Filter partially logged/unfinished runs
+    min_step = 5000 # Filter partially logged/unfinished runs
 
     # Filter for loss and correct experiment name, and remove crashed/incomplete runs
     for run in runs:
@@ -447,7 +447,7 @@ def plot_difference_heatmaps(differences: Dict[str, np.ndarray], loss_name: str,
         plt.savefig(f'images/difference_heatmaps/{loss_name}_{box_pattern}/{key}.png', dpi=300, bbox_inches='tight')
 
 
-def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.DataFrame]) -> Dict[str, np.ndarray]:
+def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.DataFrame], type: str = 'ACC') -> Dict[str, np.ndarray]:
     """Difference between final attributes of different loss function to KL distillation loss.
     Retrieves data for calling by plot_difference_heatmaps.
     """
@@ -461,6 +461,16 @@ def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.Data
     # Create a dictionary for easier lookup based on Group Name for each history in compare_hist
     compare_hist_dict = {tuple(hist['Group Name'].iloc[0].values()): hist for hist in compare_hist}
 
+    # Define a helper function to get the correct column name based on type
+    def get_column_name(key, metric):
+        match type:
+            case 'ACC':
+                return f'{key} {metric}'
+            case 'KL':
+                return f'{key} T-S KL {metric}'
+            case 'TOP1':
+                return f'{key} T-S Top 1 Fidelity {metric}'
+    
     # Compute the differences
     for b_hist in base_hist:
         mechs = b_hist['Group Name'].iloc[0]
@@ -469,11 +479,12 @@ def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.Data
             row = exp_names.index(mechs['S'])
             col = exp_names.index(mechs['T'])
             for key in exp_names:
-                base_value = b_hist[f'{key} Mean'].loc[b_hist[f'{key} Mean'].last_valid_index()]
-                compare_value = c_hist[f'{key} Mean'].loc[c_hist[f'{key} Mean'].last_valid_index()]
+                base_value = b_hist[get_column_name(key, 'Mean')].loc[b_hist[get_column_name(key, 'Mean')].last_valid_index()]
+                compare_value = c_hist[get_column_name(key, 'Mean')].loc[c_hist[get_column_name(key, 'Mean')].last_valid_index()]
                 data_to_diff[key][row, col] = compare_value - base_value
 
     return data_to_diff
+
 
 
 def plot_grid_heatmaps(exp_names: List[str],
@@ -483,7 +494,8 @@ def plot_grid_heatmaps(exp_names: List[str],
                        groupby_metrics: List[str],
                        additional_naming: str,
                        exp_row_names: List[str],
-                       type: str = 'acc') -> None:
+                       idx: int,
+                       type: str = 'ACC') -> None:
     """
     Plot a grid of heatmaps for each student-teacher mechanism combination, and their variances.
     
@@ -531,13 +543,13 @@ def plot_grid_heatmaps(exp_names: List[str],
             
             for key in exp_names:
                 match type:
-                    case 'acc':
+                    case 'ACC':
                         data_to_plot_mean[key][row, col] = history[f'{key} Mean'].loc[history[f'{key} Mean'].last_valid_index()]
                         data_to_plot_variance[key][row, col] = history[f'{key} Var'].loc[history[f'{key} Var'].last_valid_index()]
-                    case 'kl':
+                    case 'KL':
                         data_to_plot_mean[key][row, col] = history[f'{key} T-S KL Mean'].loc[history[f'{key} T-S KL Mean'].last_valid_index()]
                         data_to_plot_variance[key][row, col] = history[f'{key} T-S KL Var'].loc[history[f'{key} T-S KL Var'].last_valid_index()]
-                    case 'top1':
+                    case 'TOP1':
                         data_to_plot_mean[key][row, col] = history[f'{key} T-S Top 1 Fidelity Mean'].loc[history[f'{key} T-S Top 1 Fidelity Mean'].last_valid_index()]
                         data_to_plot_variance[key][row, col] = history[f'{key} T-S Top 1 Fidelity Var'].loc[history[f'{key} T-S Top 1 Fidelity Var'].last_valid_index()]
 
@@ -577,7 +589,134 @@ def plot_grid_heatmaps(exp_names: List[str],
         fig.text(0.5, 0.01, 'Teacher Mechanism', ha='center', fontsize=20)
         fig.text(0.01, 0.5, 'Student Mechanism', va='center', rotation='vertical', fontsize=20)
         plt.tight_layout(rect=[0.02, 0.02, 0.9, 1])
-        plt.savefig(f'images/heatmaps/grid_{box_pattern}.png', dpi=300)
+        plt.savefig(f'images/heatmaps/grid_{box_pattern}__{type}_{idx}.png', dpi=300)
+
+
+def plot_grid_difference_heatmaps(exp_names: List[str],
+                                  box_pattern: BoxPatternType,
+                                  exp_row_names: List[str],
+                                  idx: int,
+                                  type: str = 'ACC') -> None:
+    loss_names = ["Jacobian", "Contrastive"]
+    mako_cmap = sns.color_palette('mako', as_cmap=True)
+
+    # Load data from files
+    file_names = [F"heatmap {loss_type.value} {box_pattern}" for loss_type in DistillLossType]
+    histories = {}
+    for file_name in file_names:
+        with open(f"run_data/{file_name}", "rb") as f:
+            histories[file_name.split()[1]] = pickle.load(f)
+
+    # Calculate differences between specialized distillation losses and base distillation
+    base_history = histories["BASE"]
+    jacobian_differences = compute_difference(base_history, histories["JACOBIAN"], type)
+    contrastive_differences = compute_difference(base_history, histories["CONTRASTIVE"], type)
+
+    differences_dict = {
+        "Base": convert_hist_to_dict(base_history, type),  # Absolute values for base distillation
+        "Jacobian": jacobian_differences,
+        "Contrastive": contrastive_differences
+    }
+
+    num_keys = len(exp_names)
+    row_height = 5
+    total_height = len(exp_row_names) * row_height
+    # Remember to add 1 for columns since base plotted by default
+    fig, axes = plt.subplots(nrows=len(exp_row_names), ncols=len(loss_names)+1, figsize=(15, total_height), sharex=False, sharey=True)
+    fig.subplots_adjust(wspace=0, hspace=0)
+    
+    # Colourbar
+    cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
+    vmin = float('inf')
+    vmax = -float('inf')
+
+    def plot_heatmap_for_loss(ax, loss_name, differences_dict, key, exp_names, vmin, vmax, mako_cmap):
+        ax.set_aspect('equal')
+        differences = differences_dict[loss_name]
+        vmin = min(vmin, np.min(differences[key]))
+        vmax = max(vmax, np.max(differences[key]))
+        
+        heatmap = sns.heatmap(differences[key], cmap='mako', annot=True, fmt=".1f", cbar=True, cbar_ax=cbar_ax, ax=ax, vmax=vmax, vmin=vmin)
+        cbar_ax.tick_params(labelsize=15)
+
+        # Extract variance for the current key and loss type
+        variance_key = key + " Var"
+        if variance_key in histories:
+            variance_data = histories[variance_key]
+            
+            # Annotate each cell with the standard deviation value
+            for i in range(num_keys):
+                for j in range(num_keys):
+                    variance = variance_data[i, j]
+                    std_dev = np.sqrt(variance)
+                    value = differences[key][i, j]
+                    
+                    # Check the brightness of the cell to determine text color
+                    norm = plt.Normalize(vmin=vmin, vmax=vmax)
+                    rgb = mako_cmap(norm(value))[:3]
+                    brightness = sum(rgb) / 3.0
+                    text_color = "white" if brightness < 0.5 else "black"
+                    ax.text(j + 0.7, i + 0.85, f"{std_dev:.2f}", va='center', ha='center', color=text_color, fontsize=6)
+        
+        # Set axis labels
+        ax.set_xlabel(loss_name, fontsize=15)
+        if loss_name == 'Base':
+            ax.set_ylabel(f"CF {key}", fontsize=15)
+        ax.set_xticklabels(exp_names, rotation='vertical', fontsize=10)
+        ax.set_yticklabels(exp_names, rotation='horizontal', fontsize=10)  # Always label yticks
+
+    for key_index, key in enumerate(exp_row_names):
+        ax = axes[key_index][0]
+        plot_heatmap_for_loss(ax, "Base", differences_dict, key, exp_names, vmin, vmax, mako_cmap)  # This function needs to be defined
+
+    for loss_index, loss_name in enumerate(loss_names):
+        print(f"processing loss {loss_name}")
+        
+        for key_index, key in enumerate(exp_row_names):
+            ax = axes[key_index][loss_index + 1]
+            plot_heatmap_for_loss(ax, loss_name, differences_dict, key, exp_names, vmin, vmax, mako_cmap)
+
+        fig.text(0.5, 0.01, 'Teacher Mechanism', ha='center', fontsize=20)
+        fig.text(0.01, 0.5, 'Student Mechanism', va='center', rotation='vertical', fontsize=20)
+        plt.tight_layout(rect=[0.02, 0.02, 0.9, 1])
+        plt.savefig(f'images/difference_heatmaps/grid_{box_pattern}_{type}_{idx}.png', dpi=300)
+
+
+def convert_hist_to_dict(hist: List[pd.DataFrame], type: str = 'ACC') -> Dict[str, np.ndarray]:
+    """Converts a list of DataFrames (histories) to a dictionary format."""
+    data_dict = {}
+    num_keys = len(exp_names)
+
+    # Initialize the dictionary with zeros
+    for key in exp_names:
+        data_dict[key] = np.zeros((num_keys, num_keys))
+    
+    # Create a dictionary for easier lookup based on Group Name for each history in hist
+    hist_dict = {tuple(data['Group Name'].iloc[0].values()): data for data in hist}
+
+    # Define a helper function to get the correct column name based on type
+    def get_column_name(key, metric):
+        match type:
+            case 'ACC':
+                return f'{key} {metric}'
+            case 'KL':
+                return f'{key} T-S KL {metric}'
+            case 'TOP1':
+                return f'{key} T-S Top 1 Fidelity {metric}'
+
+    # Populate the dictionary
+    for h_data in hist:
+        mechs = h_data['Group Name'].iloc[0]
+        if tuple(mechs.values()) in hist_dict:
+            current_data = hist_dict[tuple(mechs.values())]
+            row = exp_names.index(mechs['S'])
+            col = exp_names.index(mechs['T'])
+            for key in exp_names:
+                value = current_data[get_column_name(key, 'Mean')].loc[current_data[get_column_name(key, 'Mean')].last_valid_index()]
+                data_dict[key][row, col] = value
+
+    return data_dict
+
 
 
 if __name__ == "__main__":
@@ -593,8 +732,8 @@ if __name__ == "__main__":
     additional_naming = '' # For names appended to end of typical project naming convention (ALPHA, BETA etc)
     wandb_project_name = f"DISTILL-{model_name}-{dataset_type}-{config_type}-{box_pattern}{additional_naming}"
 
-    # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps, 4 for grid of heatmaps with variance
-    mode = 4
+    # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps, 4 for grid of heatmaps with variance, 5 for diff grid heatmaps with variance
+    mode = 5
     groupby_metrics = ["experiment.name", "experiment_s.name"]
 
     if mode == 0:
@@ -657,9 +796,19 @@ if __name__ == "__main__":
         plot_difference_heatmaps(contrastive_differences, "CONTRASTIVE", box_pattern)
     
     elif mode == 4:
+        type = 'ACC'
         box_pattern = "RANDOM"
-        # exp_row_names = ['AB', 'IB', 'IA', 'IAB']
-        exp_row_names = ['I', 'A', 'B']
-        mako_cmap = sns.color_palette("mako", as_cmap=True)  # Get the 'mako' colormap from Seaborn
-        plot_grid_heatmaps(exp_names, loss_names, box_pattern, wandb_project_name, groupby_metrics, additional_naming, exp_row_names)
+        exp_row_names_list = [['I', 'A', 'B'], ['AB', 'IB', 'IA', 'IAB']]
+        for i, exp_row_names in enumerate(exp_row_names_list):
+            mako_cmap = sns.color_palette("mako", as_cmap=True)  # Get the 'mako' colormap from Seaborn
+            plot_grid_heatmaps(exp_names, loss_names, box_pattern, wandb_project_name, groupby_metrics, additional_naming, exp_row_names, (i+1), type)
+    
+    elif mode == 5:
+        types = ["ACC", "KL", "TOP1"]
+        box_pattern = "RANDOM"
+        exp_row_names_list = [['I', 'A', 'B'], ['AB', 'IB', 'IA', 'IAB']]
+        for i, exp_row_names in enumerate(exp_row_names_list):
+            for type in types:
+                plot_grid_difference_heatmaps(exp_names, box_pattern, exp_row_names, (i+1), type)
+
 
