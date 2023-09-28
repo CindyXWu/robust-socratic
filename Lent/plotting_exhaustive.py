@@ -447,6 +447,10 @@ def plot_difference_heatmaps(differences: Dict[str, np.ndarray], loss_name: str,
         plt.savefig(f'images/difference_heatmaps/{loss_name}_{box_pattern}/{key}.png', dpi=300, bbox_inches='tight')
 
 
+from typing import List, Dict
+import pandas as pd
+import numpy as np
+
 def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.DataFrame], type: str = 'ACC') -> Dict[str, np.ndarray]:
     """Difference between final attributes of different loss function to KL distillation loss.
     Retrieves data for calling by plot_difference_heatmaps.
@@ -454,9 +458,10 @@ def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.Data
     data_to_diff = {}
     num_keys = len(exp_names)
 
-    # Initialize difference array with zeros
+    # Initialize difference array with zeros and another key for variance with suffix ' Var'
     for key in exp_names:
         data_to_diff[key] = np.zeros((num_keys, num_keys))
+        data_to_diff[key + ' Var'] = np.zeros((num_keys, num_keys))
     
     # Create a dictionary for easier lookup based on Group Name for each history in compare_hist
     compare_hist_dict = {tuple(hist['Group Name'].iloc[0].values()): hist for hist in compare_hist}
@@ -471,7 +476,7 @@ def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.Data
             case 'TOP1':
                 return f'{key} T-S Top 1 Fidelity {metric}'
     
-    # Compute the differences
+    # Compute the differences and variances
     for b_hist in base_hist:
         mechs = b_hist['Group Name'].iloc[0]
         if tuple(mechs.values()) in compare_hist_dict:
@@ -482,9 +487,11 @@ def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.Data
                 base_value = b_hist[get_column_name(key, 'Mean')].loc[b_hist[get_column_name(key, 'Mean')].last_valid_index()]
                 compare_value = c_hist[get_column_name(key, 'Mean')].loc[c_hist[get_column_name(key, 'Mean')].last_valid_index()]
                 data_to_diff[key][row, col] = compare_value - base_value
+                
+                compare_variance_value = c_hist[f"{key} Var"].loc[c_hist[f"{key} Var"].last_valid_index()]
+                data_to_diff[key + ' Var'][row, col] = compare_variance_value
 
     return data_to_diff
-
 
 
 def plot_grid_heatmaps(exp_names: List[str],
@@ -638,28 +645,25 @@ def plot_grid_difference_heatmaps(exp_names: List[str],
         
         heatmap = sns.heatmap(differences[key], cmap='mako', annot=True, fmt=".1f", cbar=True, cbar_ax=cbar_ax, ax=ax, vmax=vmax, vmin=vmin)
         cbar_ax.tick_params(labelsize=15)
-
-        # Extract variance for the current key and loss type
-        variance_key = key + " Var"
-        if variance_key in histories:
-            variance_data = histories[variance_key]
-            
-            # Annotate each cell with the standard deviation value
-            for i in range(num_keys):
-                for j in range(num_keys):
-                    variance = variance_data[i, j]
-                    std_dev = np.sqrt(variance)
-                    value = differences[key][i, j]
-                    
-                    # Check the brightness of the cell to determine text color
-                    norm = plt.Normalize(vmin=vmin, vmax=vmax)
-                    rgb = mako_cmap(norm(value))[:3]
-                    brightness = sum(rgb) / 3.0
-                    text_color = "white" if brightness < 0.5 else "black"
-                    ax.text(j + 0.7, i + 0.85, f"{std_dev:.2f}", va='center', ha='center', color=text_color, fontsize=6)
+        
+        # Annotate each cell with the standard deviation value
+        variance_data = differences[key + " Var"]
+        for i in range(num_keys):
+            for j in range(num_keys):
+                variance = variance_data[i, j]
+                std_dev = np.sqrt(variance)
+                value = differences[key][i, j]
+                
+                # Check the brightness of the cell to determine text color
+                norm = plt.Normalize(vmin=vmin, vmax=vmax)
+                rgb = mako_cmap(norm(value))[:3]
+                brightness = sum(rgb) / 3.0
+                text_color = "white" if brightness < 0.5 else "black"
+                ax.text(j + 0.7, i + 0.85, f"{std_dev:.2f}", va='center', ha='center', color=text_color, fontsize=6)
         
         # Set axis labels
-        ax.set_xlabel(loss_name, fontsize=15)
+        if key_index == len(exp_row_names) - 1:
+            ax.set_xlabel(loss_name, fontsize=15)
         if loss_name == 'Base':
             ax.set_ylabel(f"CF {key}", fontsize=15)
         ax.set_xticklabels(exp_names, rotation='vertical', fontsize=10)
@@ -687,9 +691,10 @@ def convert_hist_to_dict(hist: List[pd.DataFrame], type: str = 'ACC') -> Dict[st
     data_dict = {}
     num_keys = len(exp_names)
 
-    # Initialize the dictionary with zeros
+    # Initialize the dictionary with zeros and another key for variance with suffix ' Var'
     for key in exp_names:
         data_dict[key] = np.zeros((num_keys, num_keys))
+        data_dict[key + ' Var'] = np.zeros((num_keys, num_keys))
     
     # Create a dictionary for easier lookup based on Group Name for each history in hist
     hist_dict = {tuple(data['Group Name'].iloc[0].values()): data for data in hist}
@@ -714,9 +719,11 @@ def convert_hist_to_dict(hist: List[pd.DataFrame], type: str = 'ACC') -> Dict[st
             for key in exp_names:
                 value = current_data[get_column_name(key, 'Mean')].loc[current_data[get_column_name(key, 'Mean')].last_valid_index()]
                 data_dict[key][row, col] = value
+                
+                variance_value = current_data[f"{key} Var"].loc[current_data[f"{key} Var"].last_valid_index()]
+                data_dict[key + ' Var'][row, col] = variance_value
 
     return data_dict
-
 
 
 if __name__ == "__main__":
@@ -805,7 +812,7 @@ if __name__ == "__main__":
     
     elif mode == 5:
         types = ["ACC", "KL", "TOP1"]
-        box_pattern = "RANDOM"
+        box_pattern = "MANDELBROT"
         exp_row_names_list = [['I', 'A', 'B'], ['AB', 'IB', 'IA', 'IAB']]
         for i, exp_row_names in enumerate(exp_row_names_list):
             for type in types:
