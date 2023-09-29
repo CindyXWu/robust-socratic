@@ -158,12 +158,14 @@ def violinplot_get_data(project_name: str,
 
     filtered_runs = []
     filtered_histories = []
-    min_step = 300  # Filter partially logged/unfinished runs
+    min_step = 1300  # Filter partially logged/unfinished runs
 
     # Filter for loss and correct experiment name, and remove crashed/incomplete runs
     for run in tqdm(runs):
-        if run.config.get('distill_loss_type') == loss_name and run.config.get("experiment", {}).get("name") in label_group_names:
-            history = run.history()
+        history = run.history()
+        if ('_step' in history and history['_step'].max() > min_step and 
+            run.config.get('distill_loss_type') == loss_name and 
+            run.config.get("experiment", {}).get("name") in label_group_names):
             key = tuple([get_nested_value(run.config, m) for m in groupby_metrics])
             if '_step' in history.columns and history['_step'].max() >= min_step:
                 history = drop_non_numeric_columns(history)  # Remove artifacts

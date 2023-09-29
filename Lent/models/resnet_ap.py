@@ -3,6 +3,7 @@ import torch
 import torchvision.models as models
 from torch_intermediate_layer_getter import IntermediateLayerGetter as MidGet
 
+from common import get_submodules
 
 class CustomResNet18(models.ResNet):
     """This model accepts images of any size using adaptive average pooling."""
@@ -83,6 +84,10 @@ def show_model(model):
     for idx, module in enumerate(model.children()):
         print(f"Layer {idx}: {module}")
 
+
+if __name__ == "__main__":
+    resnet = CustomResNet18(10)
+    get_submodules(resnet)
 
 # class ResNet18_CIFAR(models.ResNet):
 #     """10 layers in total.

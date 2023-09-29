@@ -42,7 +42,7 @@ def heatmap_get_data(project_name: str,
     runs = api.runs(project_name)
         
     filtered_runs = []
-    min_step = 5000 # Filter partially logged/unfinished runs
+    min_step = 1200 # Filter partially logged/unfinished runs
 
     # Filter for loss and correct experiment name, and remove crashed/incomplete runs
     for run in runs:
@@ -537,7 +537,6 @@ def plot_grid_heatmaps(exp_names: List[str],
                 histories = pickle.load(f)
             print('loaded existing data file')
         except:
-            print('calculating')
             histories = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, additional_naming=additional_naming)
 
         for history in histories:
@@ -740,7 +739,7 @@ if __name__ == "__main__":
     wandb_project_name = f"DISTILL-{model_name}-{dataset_type}-{config_type}-{box_pattern}{additional_naming}"
 
     # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps, 4 for grid of heatmaps with variance, 5 for diff grid heatmaps with variance
-    mode = 5
+    mode = 4
     groupby_metrics = ["experiment.name", "experiment_s.name"]
 
     if mode == 0:
@@ -752,7 +751,6 @@ if __name__ == "__main__":
                 with open(filename, "rb") as f: histories = pickle.load(f)
                 print('loaded existing data file')
             except:
-                print('calculating')
                 # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
                 histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, additional_naming=additional_naming)
 
@@ -774,9 +772,7 @@ if __name__ == "__main__":
     
     elif mode == 2:
         for loss_name in loss_names:
-
             title = f"{model_name} {loss_name}"
-
             try: # Files already calculated and exist
                 filename = f"run_data/vstime {loss_name} grid"
                 with open(filename, "rb") as f: histories = pickle.load(f)
@@ -803,12 +799,13 @@ if __name__ == "__main__":
         plot_difference_heatmaps(contrastive_differences, "CONTRASTIVE", box_pattern)
     
     elif mode == 4:
-        type = 'ACC'
-        box_pattern = "RANDOM"
+        types = ["ACC", "KL", "TOP1"]
+        box_pattern = "MANDELBROT"
+        mako_cmap = sns.color_palette("mako", as_cmap=True)  # Get the 'mako' colormap from Seaborn
         exp_row_names_list = [['I', 'A', 'B'], ['AB', 'IB', 'IA', 'IAB']]
         for i, exp_row_names in enumerate(exp_row_names_list):
-            mako_cmap = sns.color_palette("mako", as_cmap=True)  # Get the 'mako' colormap from Seaborn
-            plot_grid_heatmaps(exp_names, loss_names, box_pattern, wandb_project_name, groupby_metrics, additional_naming, exp_row_names, (i+1), type)
+            for type in types:
+                plot_grid_heatmaps(exp_names, loss_names, box_pattern, wandb_project_name, groupby_metrics, additional_naming, exp_row_names, (i+1), type)
     
     elif mode == 5:
         types = ["ACC", "KL", "TOP1"]
