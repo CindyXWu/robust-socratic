@@ -447,10 +447,6 @@ def plot_difference_heatmaps(differences: Dict[str, np.ndarray], loss_name: str,
         plt.savefig(f'images/difference_heatmaps/{loss_name}_{box_pattern}/{key}.png', dpi=300, bbox_inches='tight')
 
 
-from typing import List, Dict
-import pandas as pd
-import numpy as np
-
 def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.DataFrame], type: str = 'ACC') -> Dict[str, np.ndarray]:
     """Difference between final attributes of different loss function to KL distillation loss.
     Retrieves data for calling by plot_difference_heatmaps.
@@ -484,11 +480,11 @@ def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.Data
             row = exp_names.index(mechs['S'])
             col = exp_names.index(mechs['T'])
             for key in exp_names:
-                base_value = b_hist[get_column_name(key, 'Mean')].loc[b_hist[get_column_name(key, 'Mean')].last_valid_index()]
-                compare_value = c_hist[get_column_name(key, 'Mean')].loc[c_hist[get_column_name(key, 'Mean')].last_valid_index()]
+                base_value = b_hist[get_column_name(key, 'Mean')].tail(5).mean()
+                compare_value = c_hist[get_column_name(key, 'Mean')].tail(5).mean()
                 data_to_diff[key][row, col] = compare_value - base_value
                 
-                compare_variance_value = c_hist[f"{key} Var"].loc[c_hist[f"{key} Var"].last_valid_index()]
+                compare_variance_value = c_hist[f"{key} Var"].tail(5).mean()
                 data_to_diff[key + ' Var'][row, col] = compare_variance_value
 
     return data_to_diff
@@ -716,10 +712,10 @@ def convert_hist_to_dict(hist: List[pd.DataFrame], type: str = 'ACC') -> Dict[st
             row = exp_names.index(mechs['S'])
             col = exp_names.index(mechs['T'])
             for key in exp_names:
-                value = current_data[get_column_name(key, 'Mean')].loc[current_data[get_column_name(key, 'Mean')].last_valid_index()]
+                value = current_data[get_column_name(key, 'Mean')].tail(5).mean()
                 data_dict[key][row, col] = value
                 
-                variance_value = current_data[f"{key} Var"].loc[current_data[f"{key} Var"].last_valid_index()]
+                variance_value = current_data[f"{key} Var"].tail(5).mean()
                 data_dict[key + ' Var'][row, col] = variance_value
 
     return data_dict

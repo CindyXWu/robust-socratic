@@ -45,12 +45,15 @@ def heatmap_get_data(project_name: str,
     runs = api.runs(project_name)
         
     filtered_runs = []
-    min_step = 300 # Filter partially logged/unfinished runs
+    min_step = 1200 # Filter partially logged/unfinished runs
 
     # Filter for loss and correct experiment name, and remove crashed/incomplete runs
     for run in runs:
         if run.config.get('distill_loss_type') == loss_name and run.config.get("experiment", {}).get("name") in label_group_names:
-            history = run.history()
+            try:
+                history = run.history()
+            except:
+                history = run.history
             if '_step' in history.columns and history['_step'].max() >= min_step:
                 history = drop_non_numeric_columns(history) # Remove artifacts
                 history = clean_history(history) # Remove NaNs
@@ -162,7 +165,10 @@ def violinplot_get_data(project_name: str,
 
     # Filter for loss and correct experiment name, and remove crashed/incomplete runs
     for run in tqdm(runs):
-        history = run.history()
+        try:
+            history = run.history()
+        except:
+            history = run.history
         if ('_step' in history and history['_step'].max() > min_step and 
             run.config.get('distill_loss_type') == loss_name and 
             run.config.get("experiment", {}).get("name") in label_group_names):
@@ -225,39 +231,50 @@ def aggregate_conditions_violin(combined_history: List[pd.DataFrame], type: str)
     return final_df, condition_mapping
 
 
-def plot_aggregated_data_violin(df: pd.DataFrame, loss_name: str, box_pattern: str, type: str, title: str, bw: float = 0.05) -> None:
-    # Define a fixed order for the conditions
-    condition_order = ['similarity', 'student', 'teacher', 'neither', 'other']
-    # Define a fixed color palette for the conditions
-    condition_palette = {
-        'similarity': 'blue',
-        'student': 'green',
-        'teacher': 'red',
-        'neither': 'purple',
-        'other': 'orange'
-    }
-    
-    plt.figure(figsize=(10, 6))
-    sns.violinplot(x="Condition", y="Value", data=df, orient='v', split=False, inner="quart", bw=bw, order=condition_order, palette=condition_palette)
-    
-    plt.title(title)
-    plt.ylabel("Counterfactual test accuracy")
-    plt.xlabel("Condition")
-    plt.tight_layout()
-    plt.savefig(f"images/aggregated_violin/{loss_name}_{box_pattern}_{type}.png", dpi=300, bbox_inches="tight")
+# def plot_aggregated_data_scatter(df: pd.DataFrame, loss_name: str, box_pattern: str, type: str, title: str) -> None:
+#     # Define a fixed order for the conditions
+#     condition_order = ['similarity', 'student', 'teacher', 'neither', 'other']
+
+#     # Set style and context suitable for an academic paper
+#     sns.set_style("whitegrid")
+#     sns.set_context("paper")
+
+#     # Create the plot with the 'colorblind' palette
+#     plt.figure(figsize=(8, 5))
+#     ax = sns.stripplot(x="Condition", y="Value", hue="Key", data=df, order=condition_order,
+#                        jitter=True, dodge=True, palette="Paired", marker="o", edgecolor="gray")
+
+#     plt.ylabel("Counterfactual test accuracy", fontsize=12)
+#     plt.xlabel("Condition", fontsize=12)
+#     # plt.title(title, fontsize=14)
+#     handles, labels = ax.get_legend_handles_labels()
+#     ax.legend(handles=handles[1:], labels=labels[1:], title="Key", bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+#     sns.despine()
+#     plt.tight_layout()
+#     plt.savefig(f"images/aggregated_scatter/{loss_name}_{box_pattern}_{type}.png", dpi=300, bbox_inches="tight")
 
 
 def plot_aggregated_data_scatter(df: pd.DataFrame, loss_name: str, box_pattern: str, type: str, title: str) -> None:
     # Define a fixed order for the conditions
     condition_order = ['similarity', 'student', 'teacher', 'neither', 'other']
-    
-    plt.figure(figsize=(10, 6))
-    sns.stripplot(x="Condition", y="Value", hue="Key", data=df, order=condition_order, jitter=True, dodge=True)
-    
-    plt.title(title)
-    plt.ylabel("Counterfactual test accuracy")
-    plt.xlabel("Condition")
-    plt.legend(title="Key")
+
+    # Set style and context suitable for an academic paper
+    sns.set_style("whitegrid")
+    sns.set_context("paper", font_scale=2.5)  # Increase the font scale
+
+    # Increase the figure size
+    plt.figure(figsize=(12, 7.5))
+    ax = sns.stripplot(x="Condition", y="Value", hue="Key", data=df, order=condition_order,
+                       jitter=True, dodge=True, palette="Paired", marker="o", edgecolor="gray", size=10)
+
+    plt.ylabel("Student test accuracy", fontsize=24)
+    plt.xlabel("Teacher-student mech condition", fontsize=24)
+    # plt.title(title, fontsize=18)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles=handles[1:], labels=labels[1:], title="Test mech", bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., fontsize=18)
+
+    sns.despine()
     plt.tight_layout()
     plt.savefig(f"images/aggregated_scatter/{loss_name}_{box_pattern}_{type}.png", dpi=300, bbox_inches="tight")
 
