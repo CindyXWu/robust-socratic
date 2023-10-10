@@ -38,6 +38,9 @@ def heatmap_get_data(project_name: str,
     Args:
         config: DistillConfig object containing experiment settings.
         additional_naming: Additional string to add to the end of the file name.
+        
+    Returns:
+        List[pd.DataFrame]: The dataframes for the teacher runs.
     """
     runs = api.runs(project_name)
         
@@ -54,7 +57,7 @@ def heatmap_get_data(project_name: str,
                 #history = smooth_history(history)
                 run.history  = history
                 filtered_runs.append(run)
-                
+              
     # Check list of runs is not empty
     assert(len(filtered_runs) > 0), "No runs found with the given settings"
     
@@ -722,12 +725,13 @@ def convert_hist_to_dict(hist: List[pd.DataFrame], type: str = 'ACC') -> Dict[st
 
 
 if __name__ == "__main__":
-    # Somewhat immutable things
+    """Somewhat immutable variables"""
     exp_names = [config.name for config in ConfigGroups.exhaustive]
     label_group_names = ["IAB", "IA", "IB", "AB", "B", "A", "I"] # Actual order of names here
     loss_names = [loss_type.value for loss_type in DistillLossType]
     
-    box_pattern = 'MANDELBROT'
+    """Mutable"""
+    box_pattern = 'RANDOM'
     model_name = 'RN18AP'
     dataset_type = 'DOMINOES'
     config_type = 'EXHAUSTIVE'
@@ -735,7 +739,7 @@ if __name__ == "__main__":
     wandb_project_name = f"DISTILL-{model_name}-{dataset_type}-{config_type}-{box_pattern}{additional_naming}"
 
     # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps, 4 for grid of heatmaps with variance, 5 for diff grid heatmaps with variance
-    mode = 4
+    mode = 5
     groupby_metrics = ["experiment.name", "experiment_s.name"]
 
     if mode == 0:
@@ -805,7 +809,7 @@ if __name__ == "__main__":
     
     elif mode == 5:
         types = ["ACC", "KL", "TOP1"]
-        box_pattern = "MANDELBROT"
+        box_pattern = "RANDOM"
         exp_row_names_list = [['I', 'A', 'B'], ['AB', 'IB', 'IA', 'IAB']]
         for i, exp_row_names in enumerate(exp_row_names_list):
             for type in types:

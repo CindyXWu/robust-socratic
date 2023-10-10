@@ -25,6 +25,7 @@ class BoxPatternType(str, Enum):
     RANDOM = "RANDOM"
     MANDELBROT = "MANDELBROT"
     
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 def get_box_mask(
     mask: torch.Tensor,
@@ -295,7 +296,7 @@ def get_transform(tform_type='nocue'):
     if(tform_type == 'nocue'):
         train_transform = T.Compose([
             T.ToTensor(),
-            T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+            # T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ])
 
     elif(tform_type == 'dominoes'):
@@ -373,7 +374,7 @@ def get_box_dataloader(
     image_frac=1.0, box_frac=1.0, mnist_frac=1.0,
     randomize_img=False, randomize_box=False, randomize_mnist=False,
     box_cue_size: int = 4,
-    box_pattern: BoxPatternType = "MANDELBROT") -> DataLoader:
+    box_pattern: BoxPatternType = "RANDOM") -> DataLoader:
     """
     Return dataloaders for dominoes and box datasets. Main function to be called by other modules.
     
@@ -444,33 +445,7 @@ def get_box_dataloader(
     return dataloader
 
 
-# def show_images_grid(imgs_, class_labels, num_images):
-#     """This version was for augmented label plots. Not currently in use."""
-#     ncols = int(np.ceil(num_images**0.5))
-#     nrows = int(np.ceil(num_images / ncols))
-#     _, axes = plt.subplots(nrows, ncols, figsize=(nrows * 3, ncols * 3))
-#     axes = axes.flatten()
-
-#     for ax_i, ax in enumerate(axes):
-#         if ax_i < num_images:
-#             img = imgs_[ax_i]
-#             if img.ndim == 3 and img.shape[0] == 3:
-#                 img = einops.rearrange(img, 'c h w -> h w c')
-#             ax.imshow(img, cmap='Greys_r', interpolation='nearest')
-            
-#             # Get non-zero indices
-#             non_zero_indices = np.where(class_labels[ax_i])[0]
-#             label = ", ".join(map(str, non_zero_indices))
-#             ax.set_title(f'Non-zero indices: {label}', fontsize=10)
-#             ax.set_xticks([])
-#             ax.set_yticks([])
-#         else:
-#             ax.axis('off')
-#     plt.tight_layout()
-#     plt.show()
-
-
-def show_images_grid(imgs_, class_labels, num_images):
+def show_images_grid(imgs_, class_labels, num_images, title: str) -> None:
     """Now modified to show both [c h w] and [h w c] images."""
     ncols = int(np.ceil(num_images**0.5))
     nrows = int(np.ceil(num_images / ncols))
@@ -483,61 +458,95 @@ def show_images_grid(imgs_, class_labels, num_images):
             if img.ndim == 3 and img.shape[0] == 3:
                 img = einops.rearrange(img, 'c h w -> h w c')
             ax.imshow(img, cmap='Greys_r', interpolation='nearest')
-            ax.set_title(f'Class: {class_labels[ax_i]}')  # Display the class label as title
+            # ax.set_title(f'Class: {class_labels[ax_i]}')  # Display the class label as title
             ax.set_xticks([])
             ax.set_yticks([])
         else:
             ax.axis('off')
     print("showing plot")
+    plt.savefig(f"{title}_{class_labels[ax_i]}.png")
     plt.show()
 
-        
+
+def show_single_image(img, class_label, title: str) -> None:
+    """Displays a single image (can handle batch dimension of 1)."""
+    # Squeeze out batch dimension if present
+    if len(img.shape) == 4 and img.shape[0] == 1:
+        img = img.squeeze(0)
+    
+    if img.ndim == 3 and img.shape[0] == 3:
+        img = einops.rearrange(img, 'c h w -> h w c')
+    
+    plt.imshow(img, cmap='Greys_r', interpolation='nearest')
+    # plt.title(f'Class: {class_label}')  # Display the class label as title
+    plt.axis('off')
+    print("showing plot")
+    plt.savefig(f"{title}_{class_label}.png", bbox_inches='tight', pad_inches=0)
+
+
+def denormalize(img, tform_type='nocue'):
+    """Undo normalization for an image tensor."""
+    if tform_type == 'nocue':
+        return (img - 0.5) / 0.5
+    elif tform_type == 'dominoes':
+        return img
+    
+
 if __name__ == "__main__":
-    batch_size = 20
-    train_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, cue_type='domcues', box_frac=1.0, mnist_frac=1.0, image_frac=0, randomize_box=False, randomize_mnist=True, randomize_img=False, box_cue_size=4)
-    for i, (x, y) in enumerate(train_loader):
-        show_images_grid(x, y, num_images=batch_size)
-        break
+    batch_size = 1
+    title = "dominoes_cifar"
+    target_classes = [3,5]
     
+    # Test load type removes shuffling
+    train_loader = get_box_dataloader(load_type='test', base_dataset='Dominoes', batch_size=batch_size, cue_type='dominoes', box_frac=0, mnist_frac=0, image_frac=1, randomize_box=False, randomize_mnist=False, randomize_img=False, box_cue_size=4, box_pattern="RANDOM")
+    for target_class in target_classes:
+        for i, (x, y) in enumerate(train_loader):
+            if y.item() == target_class:  # Check if current label matches target class
+                if batch_size == 1:
+                    show_single_image(x, y, title=title)
+                else:
+                    show_images_grid(x, y, num_images=batch_size, title=title)
+                break
+
     
-# Not currently in use
-class domDataset(Dataset):
-    """Dominoes CIFAR10 (complex) + FashionMNIST (simple) stacked vertically."""
-    def __init__(self, 
-                 dataset: Union[CIFAR10, CIFAR100],
-                 dataset_simple: Type[FashionMNIST], 
-                 image_frac: float = 1.0,
-                 cue_frac: float = 1.0,
-                 randomize_img=False,
-                 randomize_cue: bool = False):
-        self.dataset = dataset
-        self.classes = dataset.classes
-        self.dataset_simple = dataset_simple
-        self.n_classes = len(dataset.classes)
-        self.targets = np.array(dataset.targets)
+# # Not currently in use
+# class domDataset(Dataset):
+#     """Dominoes CIFAR10 (complex) + FashionMNIST (simple) stacked vertically."""
+#     def __init__(self, 
+#                  dataset: Union[CIFAR10, CIFAR100],
+#                  dataset_simple: Type[FashionMNIST], 
+#                  image_frac: float = 1.0,
+#                  cue_frac: float = 1.0,
+#                  randomize_img=False,
+#                  randomize_cue: bool = False):
+#         self.dataset = dataset
+#         self.classes = dataset.classes
+#         self.dataset_simple = dataset_simple
+#         self.n_classes = len(dataset.classes)
+#         self.targets = np.array(dataset.targets)
 
-        self.cue_frac, self.randomize_cue, self.randomize_img = cue_frac, randomize_cue, randomize_img
-        self.cue_ids = get_cue_ids(labels=self.targets, n_classes=self.n_classes, cue_frac=cue_frac)
+#         self.cue_frac, self.randomize_cue, self.randomize_img = cue_frac, randomize_cue, randomize_img
+#         self.cue_ids = get_cue_ids(labels=self.targets, n_classes=self.n_classes, cue_frac=cue_frac)
 
-        self.association_ids: Dict = get_dominoes_associations(targets_c10=self.targets, targets_fmnist=np.array(dataset_simple.targets))
+#         self.association_ids: Dict = get_dominoes_associations(targets_c10=self.targets, targets_fmnist=np.array(dataset_simple.targets))
 
-    def __len__(self):
-        return len(self.dataset)
+#     def __len__(self):
+#         return len(self.dataset)
 
-    def __getitem__(self, item):
-        image, label = self.dataset[item]
-        associated_id = self.association_ids[label][item]
-        image = self.dataset[np.random.randint(0, len(self.dataset))][0] if self.randomize_img else image
+#     def __getitem__(self, item):
+#         image, label = self.dataset[item]
+#         associated_id = self.association_ids[label][item]
+#         image = self.dataset[np.random.randint(0, len(self.dataset))][0] if self.randomize_img else image
 
-        if self.cue_frac > 0:
-            put_cue_attribute = (np.random.uniform() < self.cue_frac) if self.cue_ids is None else self.cue_ids[label][item]
-        else:
-            put_cue_attribute = False
+#         if self.cue_frac > 0:
+#             put_cue_attribute = (np.random.uniform() < self.cue_frac) if self.cue_ids is None else self.cue_ids[label][item]
+#         else:
+#             put_cue_attribute = False
 
-        if put_cue_attribute:
-            image_fmnist = self.dataset_simple[np.random.randint(0, len(self.dataset))][0] if self.randomize_cue else self.dataset_simple[associated_id][0]
-        else:
-            image_fmnist = torch.zeros_like(image)
-        image = torch.cat((image_fmnist, image), dim=1)        
+#         if put_cue_attribute:
+#             image_fmnist = self.dataset_simple[np.random.randint(0, len(self.dataset))][0] if self.randomize_cue else self.dataset_simple[associated_id][0]
+#         else:
+#             image_fmnist = torch.zeros_like(image)
+#         image = torch.cat((image_fmnist, image), dim=1)        
 
-        return image, label
+#         return image, label

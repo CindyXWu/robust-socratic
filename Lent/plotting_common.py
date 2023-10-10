@@ -128,9 +128,6 @@ def visualise_features_2d(s_features: torch.Tensor,
 # Helper functions for graph plotting from WandB
 ## =========================================================================
 
-from collections import defaultdict
-from typing import Dict, List
-import pandas as pd
 
 def create_histories_list(
     grouped_runs: Dict[tuple, List],
@@ -146,7 +143,7 @@ def create_histories_list(
             history = run.history
             for metric in history.columns:
                 metrics[metric].append(history[[metric]])
-
+        
         means_and_vars_list = []
         for metric, metric_values in metrics.items():
             combined = pd.concat(metric_values)

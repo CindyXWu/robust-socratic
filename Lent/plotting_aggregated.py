@@ -161,7 +161,7 @@ def violinplot_get_data(project_name: str,
 
     filtered_runs = []
     filtered_histories = []
-    min_step = 1300  # Filter partially logged/unfinished runs
+    min_step = 1200  # Filter partially logged/unfinished runs
 
     # Filter for loss and correct experiment name, and remove crashed/incomplete runs
     for run in tqdm(runs):
@@ -189,15 +189,13 @@ def violinplot_get_data(project_name: str,
 
     return filtered_histories
 
-
 def aggregate_conditions_violin(combined_history: List[pd.DataFrame], type: str) -> pd.DataFrame:
     all_data = []
     condition_mapping = {'similarity': [], 'student': [], 'teacher': [], 'neither': [], 'other': []}
-
     for history in tqdm(combined_history):
         student = history['Group Name'].iloc[0]['S']
         teacher = history['Group Name'].iloc[0]['T']
-
+        print(history.head())
         for key in exp_names:
             if condition_for_similarity(student, teacher, key):
                 condition_name = 'similarity'
@@ -219,43 +217,27 @@ def aggregate_conditions_violin(combined_history: List[pd.DataFrame], type: str)
             else:
                 raise ValueError("Unsupported type")
 
-            temp_df = history[[metric_name]].copy()
-            temp_df.rename(columns={metric_name: 'Value'}, inplace=True)
-            temp_df['Condition'] = condition_name
-            temp_df['Key'] = key
-            all_data.append(temp_df)
+            value = history[metric_name].iloc[-1]
+            
+            data_dict = {
+                'Value': value,
+                'Condition': condition_name,
+                'Key': key,
+                'Teacher': teacher,
+                'Student': student
+            }
+            all_data.append(data_dict)
 
+            # assert value < 50, f"WARNING: {metric_name} for {teacher} {student} on {key} is {value}"
             condition_mapping[condition_name].append(f"{teacher} {student}")
 
-    final_df = pd.concat(all_data, axis=0)
+    final_df = pd.DataFrame(all_data)
+    save_df_csv(final_df, title=f'final_{type}_df')
     return final_df, condition_mapping
 
 
-# def plot_aggregated_data_scatter(df: pd.DataFrame, loss_name: str, box_pattern: str, type: str, title: str) -> None:
-#     # Define a fixed order for the conditions
-#     condition_order = ['similarity', 'student', 'teacher', 'neither', 'other']
 
-#     # Set style and context suitable for an academic paper
-#     sns.set_style("whitegrid")
-#     sns.set_context("paper")
-
-#     # Create the plot with the 'colorblind' palette
-#     plt.figure(figsize=(8, 5))
-#     ax = sns.stripplot(x="Condition", y="Value", hue="Key", data=df, order=condition_order,
-#                        jitter=True, dodge=True, palette="Paired", marker="o", edgecolor="gray")
-
-#     plt.ylabel("Counterfactual test accuracy", fontsize=12)
-#     plt.xlabel("Condition", fontsize=12)
-#     # plt.title(title, fontsize=14)
-#     handles, labels = ax.get_legend_handles_labels()
-#     ax.legend(handles=handles[1:], labels=labels[1:], title="Key", bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-
-#     sns.despine()
-#     plt.tight_layout()
-#     plt.savefig(f"images/aggregated_scatter/{loss_name}_{box_pattern}_{type}.png", dpi=300, bbox_inches="tight")
-
-
-def plot_aggregated_data_scatter(df: pd.DataFrame, loss_name: str, box_pattern: str, type: str, title: str) -> None:
+def plot_aggregated_data_scatter(df: pd.DataFrame, loss_name: str, box_pattern: str, type: str, title: str, make_legend: bool) -> None:
     # Define a fixed order for the conditions
     condition_order = ['similarity', 'student', 'teacher', 'neither', 'other']
 
@@ -267,13 +249,18 @@ def plot_aggregated_data_scatter(df: pd.DataFrame, loss_name: str, box_pattern: 
     plt.figure(figsize=(12, 7.5))
     ax = sns.stripplot(x="Condition", y="Value", hue="Key", data=df, order=condition_order,
                        jitter=True, dodge=True, palette="Paired", marker="o", edgecolor="gray", size=10)
-
-    plt.ylabel("Student test accuracy", fontsize=24)
-    plt.xlabel("Teacher-student mech condition", fontsize=24)
-    # plt.title(title, fontsize=18)
-    handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles=handles[1:], labels=labels[1:], title="Test mech", bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., fontsize=18)
-
+    y_axes_names = {"ACC": "Student Test Accuracy", "KL": "Teacher-Student KL Divergence", "TOP-1": "Teacher-Student Top-1 Fidelity"}
+    plt.ylabel(y_axes_names[type], fontsize=24, labelpad=15)
+    plt.xlabel("Teacher/Distillation/Test Mechanisms Condition", fontsize=24, labelpad=30)
+    if not make_legend:
+        ax.legend_.remove()
+    if make_legend:
+        handles, labels = ax.get_legend_handles_labels()
+        leg = ax.legend(handles=handles, labels=labels, title="Test Mech", bbox_to_anchor=(0.2, 0.95), loc=2, borderaxespad=0., fontsize=17, title_fontsize=24, frameon=False)
+        for legobj in leg.legendHandles:
+            legobj.set_sizes([200])
+            legobj.set_edgecolor('black')
+            legobj.set_facecolor(legobj.get_facecolor())
     sns.despine()
     plt.tight_layout()
     plt.savefig(f"images/aggregated_scatter/{loss_name}_{box_pattern}_{type}.png", dpi=300, bbox_inches="tight")
@@ -338,12 +325,12 @@ if __name__ == "__main__":
     
     elif mode == 2:
         box_pattern = "RANDOM"
+        type = 'KL'
         for loss_name in loss_names:
-            type = 'ACC'
+            make_legend = True if loss_name == 'CONTRASTIVE' else False
             title = f"{type} {loss_name} {box_pattern}{additional_naming}"
             wandb_project_name = f"DISTILL-{model_name}-{dataset_type}-{config_type}-{box_pattern}{additional_naming}"
             filename = f"run_data/aggregated violin {loss_name} {box_pattern}{additional_naming}"
-
             print(f'calculating aggregated scatter mode 2 for {wandb_project_name} {title}')
 
             try:
@@ -356,6 +343,6 @@ if __name__ == "__main__":
 
             violin_df, condition_map = aggregate_conditions_violin(violin_histories, type=type)
             # Now, directly use violin_df for plotting since it's already in the right format
-            plot_aggregated_data_scatter(violin_df, loss_name, box_pattern, type=type, title=title)
+            plot_aggregated_data_scatter(violin_df, loss_name, box_pattern, type=type, title=title, make_legend=make_legend)
 
             print(pd.DataFrame(dict([(k, pd.Series(v)) for k, v in condition_map.items()])) )
