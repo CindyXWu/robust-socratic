@@ -16,7 +16,24 @@ import seaborn as sns
 from typing import List, Dict
 
 from config_setup import ConfigGroups, BoxPatternType, DistillLossType
-from plotting_common import drop_non_numeric_columns, clean_history, smooth_history, get_grouped_runs, custom_sort, recursive_namespace, create_histories_list, condition_for_neither, condition_for_similarity, condition_for_student, condition_for_teacher, get_nested_value, save_df_csv
+from plotting_common import (
+    drop_non_numeric_columns, 
+    clean_history, 
+    smooth_history, 
+    get_grouped_runs, 
+    custom_sort, 
+    recursive_namespace, 
+    create_histories_list, 
+    condition_neither, 
+    condition_similarity, 
+    condition_student,
+    condition_teacher,
+    condition_key_equals_t,
+    condition_key_equals_s,
+    condition_overlap_not_in_key,
+    get_nested_value,
+    save_df_csv
+)
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 image_dir = "images/"
@@ -90,13 +107,13 @@ def aggregate_conditions(combined_history: list[pd.DataFrame], type: str) -> Dic
         teacher = history['Group Name'].iloc[0]['T']
 
         for key in exp_names:
-            if condition_for_similarity(student, teacher, key):
+            if condition_similarity(student, teacher, key):
                 condition_name = 'similarity'
-            elif condition_for_student(student, teacher, key):
+            elif condition_student(student, teacher, key):
                 condition_name = 'student'
-            elif condition_for_teacher(student, teacher, key):
+            elif condition_teacher(student, teacher, key):
                 condition_name = 'teacher'
-            elif condition_for_neither(student, teacher):
+            elif condition_neither(student, teacher):
                 condition_name = 'neither'
             else:
                 condition_name = 'other'
@@ -149,8 +166,10 @@ def plot_aggregated_data(aggregated_data: Dict[str, np.ndarray], loss_name: str,
     plt.title("Aggregated Variances")
     plt.xticks(range(len(conditions)), conditions)
     plt.savefig(f"images/aggregated_heatmaps/{loss_name}_{box_pattern}_{type}_variances.png", dpi=300, bbox_inches="tight")
-    
-## For violin plots ======================================================================================
+
+
+## For violin plots ===========================================================================
+
 
 def violinplot_get_data(project_name: str,
                         loss_name: str,
@@ -161,7 +180,7 @@ def violinplot_get_data(project_name: str,
 
     filtered_runs = []
     filtered_histories = []
-    min_step = 1200  # Filter partially logged/unfinished runs
+    min_step = 1200
 
     # Filter for loss and correct experiment name, and remove crashed/incomplete runs
     for run in tqdm(runs):
@@ -189,24 +208,37 @@ def violinplot_get_data(project_name: str,
 
     return filtered_histories
 
-def aggregate_conditions_violin(combined_history: List[pd.DataFrame], type: str) -> pd.DataFrame:
+
+def aggregate_conditions_violin(combined_history: List[pd.DataFrame], type: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Take list of history dataframes. Go through every single history and group into a particular condition. 
+    Append final value of metric given by type to column named 'value'.
+    Append the teacher and student mechanisms to list of teacher-student pairs in condition dictionary. Create a new dataframe from this and return as condition map.
+    Create a dataframe with the columns 'Value', 'Condition', 'Key', 'Teacher', 'Student', then concat (since they all have same cols).
+    """
     all_data = []
-    condition_mapping = {'similarity': [], 'student': [], 'teacher': [], 'neither': [], 'other': []}
+    condition_map = {'Similarity': [], 'Student': [], 'Teacher': [], 'Student TP': [], 'Teacher SP':[], 'Overlap': [], 'Neither': [], 'Other': []}
+
     for history in tqdm(combined_history):
         student = history['Group Name'].iloc[0]['S']
         teacher = history['Group Name'].iloc[0]['T']
-        print(history.head())
+
         for key in exp_names:
-            if condition_for_similarity(student, teacher, key):
-                condition_name = 'similarity'
-            elif condition_for_student(student, teacher, key):
-                condition_name = 'student'
-            elif condition_for_teacher(student, teacher, key):
-                condition_name = 'teacher'
-            elif condition_for_neither(student, teacher):
-                condition_name = 'neither'
+            if condition_similarity(student, teacher, key):
+                condition_name = 'Similarity'
+            elif condition_student(student, teacher, key):
+                condition_name = 'Student'
+            elif condition_teacher(student, teacher, key):
+                condition_name = 'Teacher'
+            elif condition_key_equals_s(student, teacher, key):
+                condition_name = 'Student TP'
+            elif condition_key_equals_t(student, teacher, key):
+                condition_name = 'Teacher SP'
+            elif condition_overlap_not_in_key(student, teacher, key):
+                condition_name = 'Overlap'
+            elif condition_neither(student, teacher):
+                condition_name = 'Neither'
             else:
-                condition_name = 'other'
+                condition_name = 'Other'
 
             if type == 'ACC':
                 metric_name = f'{key}'
@@ -228,42 +260,57 @@ def aggregate_conditions_violin(combined_history: List[pd.DataFrame], type: str)
             }
             all_data.append(data_dict)
 
-            # assert value < 50, f"WARNING: {metric_name} for {teacher} {student} on {key} is {value}"
-            condition_mapping[condition_name].append(f"{teacher} {student}")
+            condition_map[condition_name].append(f"{teacher} {student} {key}")
 
+    df_condition_map = pd.DataFrame(dict([(k, pd.Series(v)) for k, v in condition_map.items()]))
     final_df = pd.DataFrame(all_data)
     save_df_csv(final_df, title=f'final_{type}_df')
-    return final_df, condition_mapping
+    save_df_csv(df_condition_map, title=f'condition_mapping_{type}_df')
+
+    return final_df, condition_map
 
 
-
-def plot_aggregated_data_scatter(df: pd.DataFrame, loss_name: str, box_pattern: str, type: str, title: str, make_legend: bool) -> None:
+def plot_aggregated_data_scatter(all_data: dict[str, pd.DataFrame], box_pattern: str, type: str) -> None:     
+    """Plot strip scatter plots for all loss functions in a single row."""
     # Define a fixed order for the conditions
-    condition_order = ['similarity', 'student', 'teacher', 'neither', 'other']
+    condition_order = ['Similarity', 'Student', 'Teacher', 'Student TP', 'Teacher SP', 'Overlap', 'Neither', 'Other']
 
-    # Set style and context suitable for an academic paper
-    sns.set_style("whitegrid")
-    sns.set_context("paper", font_scale=2.5)  # Increase the font scale
+    sns.set_style("white")
+    sns.set_context("paper", font_scale=1.2)
 
-    # Increase the figure size
-    plt.figure(figsize=(12, 7.5))
-    ax = sns.stripplot(x="Condition", y="Value", hue="Key", data=df, order=condition_order,
-                       jitter=True, dodge=True, palette="Paired", marker="o", edgecolor="gray", size=10)
-    y_axes_names = {"ACC": "Student Test Accuracy", "KL": "Teacher-Student KL Divergence", "TOP-1": "Teacher-Student Top-1 Fidelity"}
-    plt.ylabel(y_axes_names[type], fontsize=24, labelpad=15)
-    plt.xlabel("Teacher/Distillation/Test Mechanisms Condition", fontsize=24, labelpad=30)
-    if not make_legend:
-        ax.legend_.remove()
-    if make_legend:
+    num_plots = len(all_data)
+    fig, axes = plt.subplots(1, num_plots, figsize=(7 * num_plots, 6), sharey=True)
+
+    if num_plots == 1:
+        axes = [axes]
+
+    y_axes_names = {"ACC": "Student Test Accuracy", "KL": "KL Divergence", "TOP-1": "Top-1 Fidelity"}
+
+    all_handles, all_labels = set(), []  # To store unique handles and labels
+
+    for idx, (loss_name, df) in enumerate(all_data.items()):
+        ax = axes[idx]
+        sns.stripplot(x="Condition", y="Value", hue="Key", data=df, order=condition_order, jitter=False, dodge=True, palette="Paired", marker="o", edgecolor="gray", size=6, ax=ax)
+
+        # Update axis labels and titles
+        if idx == 0: ax.set_ylabel(y_axes_names[type], fontsize=15, labelpad=15)
+        ax.set_xlabel("Dataset Mechanisms Condition", fontsize=15, labelpad=15)
+        ax.set_title(f"{loss_name.capitalize()} Loss", fontsize=18)
+
+        # Collect handles and labels from each subplot
         handles, labels = ax.get_legend_handles_labels()
-        leg = ax.legend(handles=handles, labels=labels, title="Test Mech", bbox_to_anchor=(0.2, 0.95), loc=2, borderaxespad=0., fontsize=17, title_fontsize=24, frameon=False)
-        for legobj in leg.legendHandles:
-            legobj.set_sizes([200])
-            legobj.set_edgecolor('black')
-            legobj.set_facecolor(legobj.get_facecolor())
-    sns.despine()
+        for handle, label in zip(handles, labels):
+            if label not in all_labels:  # Avoid duplicates
+                all_handles.add(handle)
+                all_labels.append(label)
+
+        ax.legend_.remove()
+
+    fig.legend(all_handles, all_labels, loc='upper center', ncol=len(all_labels), bbox_to_anchor=(0.5, -0.01), fontsize=15, title="Test Mechanism")
+
     plt.tight_layout()
-    plt.savefig(f"images/aggregated_scatter/{loss_name}_{box_pattern}_{type}.png", dpi=300, bbox_inches="tight")
+    plt.savefig(f"images/aggregated_scatter/{box_pattern}_{type}.pdf", dpi=300, bbox_inches="tight")
+
 
 
 if __name__ == "__main__":
@@ -308,7 +355,6 @@ if __name__ == "__main__":
             type = 'ACC'
             title = f"{type} {loss_name} {box_pattern}{additional_naming}"
             filename = f"run_data/aggregated violin {loss_name} {box_pattern}{additional_naming}"
-
             print(f'calculating aggregated violin mode 1 for {wandb_project_name} {title}')
 
             try:
@@ -325,7 +371,9 @@ if __name__ == "__main__":
     
     elif mode == 2:
         box_pattern = "RANDOM"
-        type = 'KL'
+        type = 'ACC'
+        data_to_plot = {}
+
         for loss_name in loss_names:
             make_legend = True if loss_name == 'CONTRASTIVE' else False
             title = f"{type} {loss_name} {box_pattern}{additional_naming}"
@@ -337,12 +385,13 @@ if __name__ == "__main__":
                 with open(filename, "rb") as f:
                     violin_histories = pickle.load(f)
                 save_df_csv(violin_histories[0], 'scatterplot histories after opening saved raw data')
-            except:
-                # IMPORTANT: teacher mechanism must go first in groupby_metrics list
+            except: # IMPORTANT: teacher mechanism must go first in groupby_metrics list
                 violin_histories: List[pd.DataFrame] = violinplot_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, additional_naming=additional_naming)
 
             violin_df, condition_map = aggregate_conditions_violin(violin_histories, type=type)
-            # Now, directly use violin_df for plotting since it's already in the right format
-            plot_aggregated_data_scatter(violin_df, loss_name, box_pattern, type=type, title=title, make_legend=make_legend)
 
-            print(pd.DataFrame(dict([(k, pd.Series(v)) for k, v in condition_map.items()])) )
+            data_to_plot[loss_name] = violin_df
+
+            # plot_aggregated_data_scatter(violin_df, loss_name, box_pattern, type=type, make_legend=make_legend)
+        
+        plot_aggregated_data_scatter(data_to_plot, box_pattern, type=type)

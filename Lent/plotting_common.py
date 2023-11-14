@@ -272,20 +272,39 @@ def recursive_namespace(data):
     return data
 
 
-def condition_for_similarity(s, t, key):
-        return s == t and all(k in s for k in key) or (all(k in s for k in key ) and all(k in t for k in key))
+def condition_similarity(s, t, key):
+    """Key overlaps completely with s and t."""
+    return s == t and all(k in s for k in key) or (all(k in s for k in key ) and all(k in t for k in key))
 
 
-def condition_for_student(s, t, key):
+def condition_student(s, t, key):
+    """Check if fully in s, and not at all in t. s, t share at least one key subset."""
     return all(k in s for k in key) and all(k not in t for k in key) and any(k in s and k in t for k in exp_names if k not in key)
 
 
-def condition_for_teacher(s, t, key):
+def condition_teacher(s, t, key):
+    """Check if fully in t, and not at all in s. s, t share at least one key subset."""
     return all(k in t for k in key) and all(k not in s for k in key) and any(k in s and k in t for k in exp_names if k not in key)
 
 
-def condition_for_neither(s, t):
+def condition_neither(s, t):
+    """T shares no mechanisms with S, regardless of test mechanism."""
     return not any(char in t for char in s)
+
+
+def condition_key_equals_t(s, t, key):
+    """Check if t is equal to key, with student having some overlap with key."""
+    return t == key and any(k in s for k in key)
+
+
+def condition_key_equals_s(s, t, key):
+    """Check if s is equal to key, with teacher having some overlap with key."""
+    return s == key and any(k in t for k in key)
+
+
+def condition_overlap_not_in_key(s, t, key):
+    """Check if t and s have overlap, none of which is contained in key."""
+    return any(k in s and k in t for k in set(s + t) if k not in key)
 
 
 def save_df_csv(df: pd.DataFrame, title: str, head: int = None):

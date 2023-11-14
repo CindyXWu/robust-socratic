@@ -228,7 +228,6 @@ class domCueDataset(Dataset):
         loc = np.random.randint(0, 10) if self.randomize_box else (label % 10)
         box_size = mask.shape[1] // self.box_cue_size # Adjustable box cue size
         
-        # Box patterns
         if self.box_pattern == BoxPatternType.MANDELBROT: # Pattern also depends on class, as well as position
             box_colors: List[np.ndarray] = generate_mandelbrot_images(num_images=self.n_classes, size=box_size)
             box_color = torch.from_numpy(box_colors[label % 10]).float()
