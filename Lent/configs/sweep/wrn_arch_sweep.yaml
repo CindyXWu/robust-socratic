@@ -9,6 +9,3 @@ parameters:
     values: [1, 2, 3, 5, 10]
   wrn_config.blocks_per_stage:
     values: [1, 2, 3, 5, 10]
-# early_terminate: 
-#   type: hyperband
-#   min_iter: 5
