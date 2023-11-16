@@ -112,6 +112,45 @@ class OptimizerConfig:
     optimizer_kwargs: Optional[dict[str, Any]] = field(default_factory=dict)
 
 
+class RLCTSamplerType(str, Enum):
+    SGLD = "SGLD"
+    SGNHT = "SGNHT"
+
+
+@dataclass
+class SGNHT_Kwargs:
+    lr: float
+    diffusion_factor: float
+    bounding_box_size: float
+
+
+@dataclass
+class SGLD_Kwargs:
+    lr: float
+    noise_level: float
+    weight_decay: float
+    elasticity: float
+    temperature: str
+
+
+@dataclass
+class RLCTConfig:
+    sampling_method: RLCTSamplerType
+    sigma: float
+    num_chains: int
+    num_burnin_steps: int
+    num_steps_bw_draws: int
+    num_samples: int
+    batch_size: int
+    cores: int
+    seed: Optional[int] = None # Technically union of int and list of ints, but worry about later
+    pbar: Optional[bool] = True
+    verbose: Optional[bool] = True
+    return_weights: Optional[bool] = True
+    sgld_kwargs: Optional[SGLD_Kwargs] = None
+    sgnht_kwargs: Optional[SGNHT_Kwargs] = None
+
+
 @dataclass
 class MainConfig:
     """Does not include which config group to load experiment from. This is specified from command line via Hydra multirun."""
@@ -151,6 +190,9 @@ class MainConfig:
     log_teacher: bool = True # Whether to eval and log teacher metrics for debugging
     wandb_project_name: Optional[str] = None
     wandb_run_name: Optional[str] = None # Initialise in main function
+
+    # RLCT
+    rlct_config: Optional[RLCTConfig] = None
 
 
 @dataclass

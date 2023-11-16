@@ -1,8 +1,6 @@
-from collections import defaultdict
 import pandas as pd
 import numpy as np
 import os
-import yaml
 import pickle
 import logging
 import wandb
@@ -14,7 +12,7 @@ import seaborn as sns
 from typing import List, Dict
 
 from config_setup import ConfigGroups, BoxPatternType, DistillLossType
-from plotting_common import drop_non_numeric_columns, clean_history, smooth_history, get_grouped_runs, custom_sort, recursive_namespace, create_histories_list, condition_for_neither, condition_for_similarity, condition_for_student, condition_for_teacher
+from plotting_common import drop_non_numeric_columns, clean_history, smooth_history, get_grouped_runs, custom_sort, create_histories_list
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 image_dir = "images/"
@@ -23,15 +21,14 @@ if not os.path.exists(image_dir):
 
 api = wandb.Api(overrides=None, timeout=None, api_key =None)
 
-# sns.set_style("whitegrid")
-# sns.set_palette("pastel")
 
-
-def heatmap_get_data(project_name: str,
-                     loss_name: str,
-                     box_pattern: str,
-                     groupby_metrics: List[str],
-                     additional_naming: str) -> List[pd.DataFrame]:
+def heatmap_get_data(
+    project_name: str,
+    loss_name: str,
+    box_pattern: str,
+    groupby_metrics: List[str],
+    additional_naming: str
+) -> List[pd.DataFrame]:
     """Get data from wandb for experiment set, filter and group. 
     Calculate mean/var of metrics and return a list of history dataframes with mean/var interleaved.
     
@@ -65,7 +62,7 @@ def heatmap_get_data(project_name: str,
     grouped_runs: Dict = get_grouped_runs(filtered_runs, groupby_metrics)
     
     # Compute means/var for all metrics for each group of runs
-    histories = create_histories_list(grouped_runs, mode='exhaustive')
+    histories: list[pd.DataFrame] = create_histories_list(grouped_runs, mode='exhaustive')
     
     file_name = f"run_data/heatmap {loss_name} {box_pattern} {additional_naming}"
     with open(file_name, "wb") as f:
@@ -74,22 +71,24 @@ def heatmap_get_data(project_name: str,
     return histories
 
     
-def wandb_get_data(project_name: str,
-                   t_exp_name: str,
-                   loss_name: str,
-                   model_name: str,
-                   box_pattern: str,
-                   groupby_metrics: List[str],
-                   grid: bool = True,
-                   min_step: int = 300) -> List[pd.DataFrame]:
+def wandb_get_data(
+    project_name: str,
+    t_exp_name: str,
+    loss_name: str,
+    model_name: str,
+    box_pattern: str,
+    groupby_metrics: List[str],
+    grid: bool = True,
+    min_step: int = 300
+) -> List[pd.DataFrame]:
     """Get data from wandb for experiment set, filter and group. 
     For plotting over training time.
     
     Args:
-        config: DistillConfig object containing experiment settings.
         groupby_metrics: List of metrics to group runs by (e.g. ["teacher mechanism", "student mechanism"]).
         plot_tmechs_together: Whether to plot teacher mechanisms together or separately. If plotted together, then each run also needs to be labelled with its teacher experiment type.
-        min_step: Filters partially logged/unfinished runs
+        grid: If we want to plot all teachers on the same grid, then turn off filtering by teacher mechanism.
+        min_step: Cutoff step for filtering unfinished runs.
     """
     runs = api.runs(project_name) 
     filtered_runs = []
@@ -99,23 +98,19 @@ def wandb_get_data(project_name: str,
         # If grid is True, then ignore the run_exp filter.
         if grid or (not grid and run.config.get("experiment", {}).get("name") == t_exp_name):
             if run.config.get('model_type') == model_name and run.config.get('distill_loss_type') == loss_name:
-                try:
-                    history = run.history()
-                except:
-                    history = run.history
+                try: history = run.history()
+                except: history = run.history
                 if '_step' in history.columns and history['_step'].max() >= min_step:
-                    filtered_runs.append(run)
                     history = drop_non_numeric_columns(history) # Remove artifacts
                     history = clean_history(history) # Remove NaNs
-                    # history = smooth_history(history)
                     run.history = smooth_history(history) # Smooth bumpy plots
                     filtered_runs.append(run)
                 
     assert(len(filtered_runs) > 0), f"No runs found: {t_exp_name} {loss_name}"
     
     # Group filtered runs: key is tuple of values of metrics specified in groupby_metrics (e.g. "teacher mechanism"). Values = list of runs satisfying these metric values.
-    grouped_runs: Dict = get_grouped_runs(filtered_runs, groupby_metrics)
-    histories = create_histories_list(grouped_runs, mode='vstime', grid=grid)
+    grouped_runs: Dict[tuple[str], list] = get_grouped_runs(filtered_runs, groupby_metrics)
+    histories: list[pd.DataFrame] = create_histories_list(grouped_runs, mode='vstime', grid=grid)
     
     file_name = f"run_data/vstime {loss_name} {box_pattern} grid" if grid else f"vstime {t_exp_name} {loss_name}"
     with open(file_name, "wb") as f:
@@ -171,11 +166,13 @@ def plot_counterfactual_heatmaps(
         plt.savefig(f"images/heatmaps/{loss_name}_{box_pattern}/{type}_{key}_{additional_naming}.png", dpi=300, bbox_inches='tight')
 
 
-def plot_mean_variance_heatmaps(combined_history: List[pd.DataFrame], 
-                                exp_names: str,
-                                loss_name: DistillLossType,
-                                box_pattern: BoxPatternType,
-                                type: str = 'acc') -> None:
+def plot_mean_variance_heatmaps(
+    combined_history: List[pd.DataFrame], 
+    exp_names: str,
+    loss_name: DistillLossType,
+    box_pattern: BoxPatternType,
+    type: str = 'acc'
+) -> None:
     """
     Plot heatmap of final KL-divergence, top-1 fidelity or accuracy for each of 49 student-teacher mechanism combinations, and their variances.
     
@@ -219,7 +216,7 @@ def plot_mean_variance_heatmaps(combined_history: List[pd.DataFrame],
             for j in range(data_mean.shape[1]):
                 variance = data_to_plot_variance[key][i, j]
                 std_dev = np.sqrt(variance)
-                ax.text(j + 0.6, i + 0.6, f"\n{std_dev:.2f}", va='top', ha='right', color='black', fontsize=6)  # Adjust font size and position as needed
+                ax.text(j + 0.6, i + 0.6, f"\n{std_dev:.2f}", va='top', ha='right', color='black', fontsize=6)
 
         ax.set_xticklabels(axes_labels, rotation='vertical', fontsize=15)
         ax.set_yticklabels(axes_labels, rotation='horizontal', fontsize=15)
@@ -228,10 +225,12 @@ def plot_mean_variance_heatmaps(combined_history: List[pd.DataFrame],
         plt.savefig(f'images/heatmaps/{loss_name}_{box_pattern}/{key}_{type}.png', dpi=300, bbox_inches='tight')
             
 
-def make_plot(histories: List[pd.DataFrame], 
-              cols: List[str], 
-              title: str, 
-              mode: str) -> None:
+def make_plot(
+    histories: List[pd.DataFrame], 
+    cols: List[str], 
+    title: str, 
+    mode: str
+) -> None:
     """
     For plots over time. Plots each teacher separately.
     To be called by another function which lists the columns to be plotted - 
@@ -244,8 +243,6 @@ def make_plot(histories: List[pd.DataFrame],
     """
     sns.set(style='whitegrid', context='paper', font_scale=1)
     num_groups = len(set([history['Group Name'].iloc[0] for history in histories]))
-
-    # Determine rows and columns for subplots
     n_metrics = len(cols)
     n_cols = min(2, len(cols))
     n_rows = np.ceil(n_metrics / n_cols).astype(int)
@@ -280,24 +277,31 @@ def make_plot(histories: List[pd.DataFrame],
             group_name = history['Group Name'].iloc[0]
             
             if mean_col in history.columns and var_col in history.columns:
-                line = axs[i].plot(history.index, 
-                                   history[mean_col], 
-                                   linewidth=3, 
-                                   label=group_name, 
-                                   color=color_dict[group_name], 
-                                   linestyle=line_styles[line_num%len(line_styles)])
-                axs[i].fill_between(history.index, 
-                                    history[mean_col] - history[var_col].apply(np.sqrt),
-                                    history[mean_col] + history[var_col].apply(np.sqrt),
-                                    alpha=0.2)
+                line = axs[i].plot(
+                    history.index, 
+                    history[mean_col], 
+                    linewidth=3, 
+                    label=group_name, 
+                    color=color_dict[group_name], 
+                    linestyle=line_styles[line_num%len(line_styles)]
+                    )
+                axs[i].fill_between(
+                    history.index, 
+                    history[mean_col] - history[var_col].apply(np.sqrt),
+                    history[mean_col] + history[var_col].apply(np.sqrt),
+                    alpha=0.2
+                    )
                 # The key to matching the legend to lines is to check order of dominoes_exp_dict.keys() - these don't correspond to plotting order
                 print("Group name: ", group_name, "Line num: ", line_num, "label_group_names: ", label_group_names[line_num])
                 if i == 0:  # Only add legend handles once per group (correspond to first subplot)
-                    legend_handles.append(mpl.lines.Line2D([0], [0], 
-                                                           color=color_dict[group_name], 
-                                                           linestyle=line_styles[line_num%len(line_styles)], 
-                                                           label=label_group_names[line_num],
-                                                           linewidth=2))
+                    legend_handles.append(
+                        mpl.lines.Line2D([0], [0], 
+                            color=color_dict[group_name], 
+                            linestyle=line_styles[line_num%len(line_styles)], 
+                            label=label_group_names[line_num],
+                            linewidth=2
+                        )
+                    )
         axs[i].set_title(mean_col.replace(' Mean', '').replace('_', ' '), fontsize=18)
         axs[i].tick_params(axis='both', which='major', labelsize=15)
         axs[i].tick_params(axis='both', which='minor', labelsize=12)
@@ -318,10 +322,12 @@ def make_plot(histories: List[pd.DataFrame],
     plt.savefig('images/exhaustivevstime/'+title+'.png', dpi=300, bbox_inches='tight')
     
 
-def make_new_plot(histories: List[pd.DataFrame], 
-                  cols: List[str], 
-                  title: str, 
-                  mode: str) -> None:
+def make_new_plot(
+    histories: List[pd.DataFrame], 
+    cols: List[str], 
+    title: str, 
+    mode: str
+) -> None:
     """
     For plots over time. Plots all teachers and all students on a 7x7 grid.
     
@@ -330,7 +336,6 @@ def make_new_plot(histories: List[pd.DataFrame],
         cols: List of column names to plot.
         mode: Plotting accuracy, KL or top-1.
     """
-    
     fig, axs = plt.subplots(7, 7, figsize=(7.8, 10.5), gridspec_kw={'wspace': 0, 'hspace': 0})
     colors = mpl.cm.get_cmap('viridis', len(cols) + 1)
     line_styles = ['-', '--', '-.', ':']
@@ -352,16 +357,20 @@ def make_new_plot(histories: List[pd.DataFrame],
                 var_col = mean_col.replace(' Mean', ' Var')
                 
                 if mean_col in history.columns and var_col in history.columns:
-                    ax.plot(history.index, 
-                            history[mean_col], 
-                            linewidth=1,
-                            label=mean_col.replace(' Mean', '').replace('_', ' '), 
-                            color=colors(idx), 
-                            linestyle=line_styles[idx % len(line_styles)])
-                    ax.fill_between(history.index, 
-                                    history[mean_col] - history[var_col].apply(np.sqrt),
-                                    history[mean_col] + history[var_col].apply(np.sqrt),
-                                    color=colors(idx), alpha=0.2)
+                    ax.plot(
+                        history.index, 
+                        history[mean_col], 
+                        linewidth=1,
+                        label=mean_col.replace(' Mean', '').replace('_', ' '), 
+                        color=colors(idx), 
+                        linestyle=line_styles[idx % len(line_styles)]
+                    )
+                    ax.fill_between(
+                        history.index, 
+                        history[mean_col] - history[var_col].apply(np.sqrt),
+                        history[mean_col] + history[var_col].apply(np.sqrt),
+                        color=colors(idx), alpha=0.2
+                    )
 
             ax.set_ylim(adjusted_ylim)
 
@@ -378,10 +387,8 @@ def make_new_plot(histories: List[pd.DataFrame],
                 ax.set_xticklabels([])
                 ax.set_xticks([])
                         
-            # Label lines within each subplot
             labelLines(ax.get_lines(), align=False, fontsize=6)
 
-    # Add common labels and titles
     fig.text(0.5, -0.01, 'Teacher Mechanism', ha='center', va='center', fontsize=13)
     fig.text(-0.01, 0.5, 'Student Mechanism', ha='center', va='center', rotation='vertical', fontsize=13)
     
@@ -397,19 +404,19 @@ def make_new_plot(histories: List[pd.DataFrame],
     fig.legend(handles, labels, loc='lower center', ncol=len(cols), bbox_to_anchor=(0.5, -0.07))
     
     plt.tight_layout()
-    # Find all text objects in the figure
-    text_objects = [obj for obj in plt.gcf().findobj() if isinstance(obj, plt.Text)]
-
-    # # Extract the content and position of each text object
-    # text_contents = [(text_obj.get_text(), text_obj.get_position()) for text_obj in text_objects]
-    # print(text_contents)
     plt.savefig('images/exhaustivevstime/grid/'+title+'.png', dpi=300, bbox_inches='tight')
 
 
-def counterfactual_plot(histories: list[pd.DataFrame], exp_dict: Dict[str, List], title: str) -> None:
+def counterfactual_plot(
+    histories: list[pd.DataFrame], 
+    exp_dict: Dict[str, List], 
+    title: str
+) -> None:
     """For a given run, plot counterfactual test accuracy, KL and top-1 fidelity on different plots.
     
     Args:
+        histories: list of edited run histories with an additional 'Group Name' column 
+            - tells how data from this history should be used in plotting.
         title: some generic title name to add to plots
         exp_dict: dictionary of experiment names and the associated variable values.
     """
@@ -426,7 +433,11 @@ def counterfactual_plot(histories: list[pd.DataFrame], exp_dict: Dict[str, List]
     make_plot(histories, top1_mean_cols, "Counterfactual T-S Top 1 Fidelity"+title)
 
 
-def wandb_plot(histories: List[pd.DataFrame], title: str, grid: bool = True) -> None:
+def wandb_plot(
+    histories: List[pd.DataFrame], 
+    title: str, 
+    grid: bool = True
+) -> None:
     """Extract unique column group names and plot them on separate plots - for plotting over training time."""
     mean_cols = [col for col in histories[0].columns if col.replace(' Mean', '') in exp_names]
     mean_cols.sort(key=lambda col: custom_sort(col, 'acc', exp_names))
@@ -437,7 +448,18 @@ def wandb_plot(histories: List[pd.DataFrame], title: str, grid: bool = True) -> 
         make_new_plot(histories, mean_cols, title, 'acc')
 
 
-def plot_difference_heatmaps(differences: Dict[str, np.ndarray], loss_name: str, box_pattern: str):
+def plot_difference_heatmaps(
+    differences: Dict[str, np.ndarray], 
+    loss_name: str, 
+    box_pattern: str
+) -> None:
+    """Specifically used to plot heatmaps that are the difference of data with respect to base distillation.
+    
+    Args:
+        differences: keys are the test mechanism and values are the heatmap data.
+        loss_name: one of the three 'BASE', 'JACOBIAN', 'CONTRASTIVE'.
+        box_pattern: one of 'RANDOM', 'MANDELBROT'.
+    """
     for key, data in differences.items():
         fig, ax = plt.subplots()
         heatmap = sns.heatmap(data, cmap='mako', annot=True, fmt=".1f", cbar=True, ax=ax)
@@ -450,7 +472,11 @@ def plot_difference_heatmaps(differences: Dict[str, np.ndarray], loss_name: str,
         plt.savefig(f'images/difference_heatmaps/{loss_name}_{box_pattern}/{key}.png', dpi=300, bbox_inches='tight')
 
 
-def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.DataFrame], type: str = 'ACC') -> Dict[str, np.ndarray]:
+def compute_difference(
+    base_hist: List[pd.DataFrame], 
+    compare_hist: List[pd.DataFrame], 
+    type: str = 'ACC'
+) -> Dict[str, np.ndarray]:
     """Difference between final attributes of different loss function to KL distillation loss.
     Retrieves data for calling by plot_difference_heatmaps.
     """
@@ -493,15 +519,17 @@ def compute_difference(base_hist: List[pd.DataFrame], compare_hist: List[pd.Data
     return data_to_diff
 
 
-def plot_grid_heatmaps(exp_names: List[str],
-                       loss_names: List[str],
-                       box_pattern: BoxPatternType,
-                       wandb_project_name: str,
-                       groupby_metrics: List[str],
-                       additional_naming: str,
-                       exp_row_names: List[str],
-                       idx: int,
-                       type: str = 'ACC') -> None:
+def plot_grid_heatmaps(
+    exp_names: List[str],
+    loss_names: List[str],
+    box_pattern: BoxPatternType,
+    wandb_project_name: str,
+    groupby_metrics: List[str],
+    additional_naming: str,
+    exp_row_names: List[str],
+    idx: int,
+    type: str = 'ACC'
+) -> None:
     """
     Plot a grid of heatmaps for each student-teacher mechanism combination, and their variances.
     
@@ -584,7 +612,7 @@ def plot_grid_heatmaps(exp_names: List[str],
             if key_index == len(exp_row_names) - 1:
                 ax.set_xlabel(loss_name, fontsize=15)
             if loss_index == 0:
-                ax.set_ylabel(f"CF {key}", fontsize=15)
+                ax.set_ylabel(f"Test Mechanism {key}", fontsize=15)
                 
             # ax.set_xticklabels(exp_names if key_index == len(exp_row_names) - 1 else [], rotation='vertical', fontsize=10)
             ax.set_xticklabels(exp_names, rotation='vertical', fontsize=10)
@@ -597,11 +625,31 @@ def plot_grid_heatmaps(exp_names: List[str],
         plt.savefig(f'images/heatmaps/grid_{box_pattern}__{type}_{idx}.png', dpi=300)
 
 
-def plot_grid_difference_heatmaps(exp_names: List[str],
-                                  box_pattern: BoxPatternType,
-                                  exp_row_names: List[str],
-                                  idx: int,
-                                  type: str = 'ACC') -> None:
+def calculate_global_min_max(differences_dict: dict):
+    """
+    Helper function for normalising grid heatmap values for colourbar.
+    
+    vmin, vmax clamped +-2 standard deviations.
+    """
+    all_values = []
+    for differences in differences_dict.values():
+        for key in differences:
+            if isinstance(differences[key], np.ndarray):  # Check if it's an array (ignore variance data)
+                all_values.extend(differences[key].flatten())
+    mean = np.mean(all_values)
+    std_dev = np.std(all_values)
+    vmin = mean - 2 * std_dev
+    vmax = mean + 2 * std_dev
+    return vmin, vmax
+
+
+def plot_grid_difference_heatmaps(
+    exp_names: List[str],
+    box_pattern: BoxPatternType,
+    exp_row_names: List[str],
+    idx: int,
+    type: str = 'ACC'
+) -> None:
     loss_names = ["Jacobian", "Contrastive"]
     mako_cmap = sns.color_palette('mako', as_cmap=True)
 
@@ -629,23 +677,19 @@ def plot_grid_difference_heatmaps(exp_names: List[str],
     # Remember to add 1 for columns since base plotted by default
     fig, axes = plt.subplots(nrows=len(exp_row_names), ncols=len(loss_names)+1, figsize=(15, total_height), sharex=False, sharey=True)
     fig.subplots_adjust(wspace=0, hspace=0)
-    
-    # Colourbar
-    cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
-    vmin = float('inf')
-    vmax = -float('inf')
+
+    # Normalisation for colourbar
+    vmin, vmax = calculate_global_min_max(differences_dict)
 
     def plot_heatmap_for_loss(ax, loss_name, differences_dict, key, exp_names, vmin, vmax, mako_cmap):
         ax.set_aspect('equal')
         differences = differences_dict[loss_name]
-        vmin = min(vmin, np.min(differences[key]))
-        vmax = max(vmax, np.max(differences[key]))
         
-        heatmap = sns.heatmap(differences[key], cmap='mako', annot=True, fmt=".1f", cbar=True, cbar_ax=cbar_ax, ax=ax, vmax=vmax, vmin=vmin)
-        cbar_ax.tick_params(labelsize=15)
+        heatmap = sns.heatmap(differences[key], cmap=mako_cmap, annot=True, fmt=".1f", cbar=False, ax=ax, vmax=vmax, vmin=vmin)
         
         # Annotate each cell with the standard deviation value
         variance_data = differences[key + " Var"]
+        num_keys = len(exp_names)
         for i in range(num_keys):
             for j in range(num_keys):
                 variance = variance_data[i, j]
@@ -659,17 +703,14 @@ def plot_grid_difference_heatmaps(exp_names: List[str],
                 text_color = "white" if brightness < 0.5 else "black"
                 ax.text(j + 0.7, i + 0.85, f"{std_dev:.2f}", va='center', ha='center', color=text_color, fontsize=6)
         
-        # Set axis labels
-        if key_index == len(exp_row_names) - 1:
-            ax.set_xlabel(loss_name, fontsize=15)
-        if loss_name == 'Base':
-            ax.set_ylabel(f"CF {key}", fontsize=15)
+        if key_index == len(exp_row_names) - 1: ax.set_xlabel(loss_name, fontsize=15)
+        if loss_name == 'Base': ax.set_ylabel(f"Test Mechanism {key}", fontsize=15)
         ax.set_xticklabels(exp_names, rotation='vertical', fontsize=10)
-        ax.set_yticklabels(exp_names, rotation='horizontal', fontsize=10)  # Always label yticks
+        ax.set_yticklabels(exp_names, rotation='horizontal', fontsize=10)
 
     for key_index, key in enumerate(exp_row_names):
         ax = axes[key_index][0]
-        plot_heatmap_for_loss(ax, "Base", differences_dict, key, exp_names, vmin, vmax, mako_cmap)  # This function needs to be defined
+        plot_heatmap_for_loss(ax, "Base", differences_dict, key, exp_names, vmin, vmax, mako_cmap)
 
     for loss_index, loss_name in enumerate(loss_names):
         print(f"processing loss {loss_name}")
@@ -678,10 +719,17 @@ def plot_grid_difference_heatmaps(exp_names: List[str],
             ax = axes[key_index][loss_index + 1]
             plot_heatmap_for_loss(ax, loss_name, differences_dict, key, exp_names, vmin, vmax, mako_cmap)
 
-        fig.text(0.5, 0.01, 'Teacher Mechanism', ha='center', fontsize=20)
-        fig.text(0.01, 0.5, 'Student Mechanism', va='center', rotation='vertical', fontsize=20)
-        plt.tight_layout(rect=[0.02, 0.02, 0.9, 1])
-        plt.savefig(f'images/difference_heatmaps/grid_{box_pattern}_{type}_{idx}.png', dpi=300)
+    # Colourbar
+    cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
+    norm = plt.Normalize(vmin=vmin, vmax=vmax)
+    sm = plt.cm.ScalarMappable(cmap=mako_cmap, norm=norm)
+    sm.set_array([])  # Set an empty array to link the ScalarMappable with the norm
+    fig.colorbar(sm, cax=cbar_ax)
+
+    fig.supxlabel('Teacher Mechanism', fontsize=20)
+    fig.supylabel('Student Mechanism', fontsize=20)
+    plt.tight_layout(rect=[0.02, 0.02, 0.9, 1])
+    plt.savefig(f'images/difference_heatmaps/grid_{box_pattern}_{type}_{idx}.png', dpi=300)
 
 
 def convert_hist_to_dict(hist: List[pd.DataFrame], type: str = 'ACC') -> Dict[str, np.ndarray]:
@@ -697,7 +745,7 @@ def convert_hist_to_dict(hist: List[pd.DataFrame], type: str = 'ACC') -> Dict[st
     # Create a dictionary for easier lookup based on Group Name for each history in hist
     hist_dict = {tuple(data['Group Name'].iloc[0].values()): data for data in hist}
 
-    # Define a helper function to get the correct column name based on type
+    # Helper function to get correct column name based on type
     def get_column_name(key, metric):
         match type:
             case 'ACC':
@@ -707,7 +755,7 @@ def convert_hist_to_dict(hist: List[pd.DataFrame], type: str = 'ACC') -> Dict[st
             case 'TOP1':
                 return f'{key} T-S Top 1 Fidelity {metric}'
 
-    # Populate the dictionary
+    # Populate dictionary
     for h_data in hist:
         mechs = h_data['Group Name'].iloc[0]
         if tuple(mechs.values()) in hist_dict:
@@ -722,6 +770,97 @@ def convert_hist_to_dict(hist: List[pd.DataFrame], type: str = 'ACC') -> Dict[st
                 data_dict[key + ' Var'][row, col] = variance_value
 
     return data_dict
+
+
+def plot_teachers(
+    histories: List[pd.DataFrame], 
+    cols: List[str], 
+    title: str,
+    map_dict: dict[str, str],
+) -> None:
+    """
+    For plots over time. Plots each teacher separately.
+    To be called by another function which lists the columns to be plotted - 
+    each of these is a subplot.
+    
+    Args:
+        histories: List of dataframes containing historical information for each group of runs.
+        cols: List of column names to plot.
+        mode: Plotting accuracy, KL or top-1.
+        map_dict: Used to change naming convention from Weights and Biases data.
+    """
+    sns.set(style='whitegrid', context='paper', font_scale=1)
+    num_groups = 7
+    n_metrics = len(cols)
+    n_cols = min(3, n_metrics)
+    n_rows = np.ceil(n_metrics / n_cols).astype(int)
+    plot_width, plot_height = 11, 3.5*n_rows
+
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(plot_width, plot_height), sharey=True)
+    axs = axs.flatten() # Flatten the axs array so that we can iterate over it with a single loop
+    if n_metrics < n_rows * n_cols: # Remove unused subplots
+        for i in range(n_metrics, n_rows * n_cols):
+            fig.delaxes(axs[i])
+
+    colors = mpl.cm.get_cmap('viridis', num_groups+1) # +1 as we ditch yellow
+    color_dict = {}
+    for i, history in enumerate(histories):
+        group_name = history['Group Name'].iloc[0]
+        color = colors(i)
+        if color[0] > 0.8 and color[1] > 0.8 and color[2] < 0.2:  # Check if i exceeds the maximum index of colors
+            continue
+        if group_name not in color_dict:
+            color_dict[group_name] = colors(i)  # Use the next color in the colormap
+
+    for ax in axs:
+        ax.set_prop_cycle(color=[color_dict[group_name] for group_name in color_dict])
+        for spine in ax.spines.values(): # Solid border
+            spine.set_visible(True)
+            spine.set_linewidth(1)
+            spine.set_edgecolor('black')
+    legend_handles = []
+
+    for i, mean_col in enumerate(cols): # Iterate over subplots
+        ax = axs[i]
+        xvals = []  # List to store x-coordinates for labels
+        for line_num, history in enumerate(histories): # Iterate over lines
+            group_name = history['Group Name'].iloc[0]
+            if mean_col in history.columns:
+                index_position = history[mean_col].last_valid_index()
+                x_position = np.random.uniform(0.1 * index_position, index_position)
+                xvals.append(x_position)
+                line = ax.plot(
+                        history.index, 
+                        history[mean_col], 
+                        linewidth=3, 
+                        label=map_dict[group_name], 
+                        color=color_dict[group_name], 
+                    )
+                # The key to matching the legend to lines is to check order of dominoes_exp_dict.keys() - these don't correspond to plotting order
+                print(f"Group name: {group_name} Line num {line_num} Label group names {label_group_names[line_num]}")
+                if i == 0:  # Only add legend handles once per group (correspond to first subplot)
+                    legend_handles.append(
+                        mpl.lines.Line2D(
+                            [0], 
+                            [0], 
+                            color=color_dict[group_name], 
+                            label=label_group_names[line_num],
+                            linewidth=2
+                        )
+                    )
+        ax.set_title(f"Test Mechanism {map_dict[mean_col]}", fontsize=18)
+        ax.tick_params(axis='both', which='major', labelsize=15)
+        ax.tick_params(axis='both', which='minor', labelsize=12)
+        ax.set_ylim(-5, 105)
+        labelLines(ax.get_lines(), fontsize=13, align=False, xvals=xvals)
+
+    lines, labels = axs[0].get_legend_handles_labels()
+    fig.supxlabel("Training Evaluation Step", fontsize=15)
+    fig.supylabel('Test Accuracy', fontsize=15)
+    leg = fig.legend(handles=legend_handles, loc='upper center', bbox_to_anchor=(0.5, 1.08), fontsize=15, title="Teacher Mechanism", handlelength=1, ncol=len(labels), title_fontsize=15)
+    for legobj in leg.legendHandles: legobj.set_linewidth(3.0)
+    plt.tight_layout()
+    plt.savefig('images/exhaustivevstime/'+title+'.png', dpi=500, bbox_inches='tight')
 
 
 if __name__ == "__main__":
@@ -740,7 +879,7 @@ if __name__ == "__main__":
 
     # 0 for heatmap, 1 for plots, 2 for grid plots (all teachers on one plot), 3 for diff heatmaps, 4 for grid of heatmaps with variance, 5 for diff grid heatmaps with variance
     mode = 5
-    groupby_metrics = ["experiment.name", "experiment_s.name"]
+    groupby_metrics = ["experiment.name", "experiment_s.name"] # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
 
     if mode == 0:
         for loss_name in loss_names:
@@ -751,7 +890,6 @@ if __name__ == "__main__":
                 with open(filename, "rb") as f: histories = pickle.load(f)
                 print('loaded existing data file')
             except:
-                # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
                 histories: List[pd.DataFrame] = heatmap_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, additional_naming=additional_naming)
 
             # plot_counterfactual_heatmaps(histories, exp_names, loss_name, box_pattern, type=type, additional_naming=additional_naming)
@@ -765,7 +903,6 @@ if __name__ == "__main__":
                     filename = f"run_data/vstime {t_exp_name} {loss_name}"
                     with open(filename, "rb") as f: histories = pickle.load(f)
                 except:
-                    # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
                     histories = wandb_get_data(project_name=wandb_project_name, t_exp_name=t_exp_name, loss_name=loss_name, model_name=model_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, grid=False, plot_tmechs_together=False)
 
                 wandb_plot(histories, title, grid=False)
@@ -777,7 +914,6 @@ if __name__ == "__main__":
                 filename = f"run_data/vstime {loss_name} grid"
                 with open(filename, "rb") as f: histories = pickle.load(f)
             except: 
-                # IMPORTANT: teacher mechanism must go first in the groupby_metrics list
                 histories = wandb_get_data(project_name=wandb_project_name, t_exp_name=None, loss_name=loss_name, model_name=model_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, grid=True)
 
             wandb_plot(histories, title, grid=True)
@@ -814,5 +950,23 @@ if __name__ == "__main__":
         for i, exp_row_names in enumerate(exp_row_names_list):
             for type in types:
                 plot_grid_difference_heatmaps(exp_names, box_pattern, exp_row_names, (i+1), type)
+    
+    elif mode == 6:
+        """Teachers."""
+        if box_pattern == "RANDOM":
+            teacher_name_mapping_wandb = {"C": "I", "B": "A", "M": "B", "CB": "IA", "MB": "AB", "CM": "IB", "CMB": "IAB"}
+            wandb_project_name = f"{model_name} {dataset_type} {config_type}"
+        elif box_pattern == "MANDELBROT":
+            teacher_name_mapping_wandb = {"I": "I", "A": "A", "B": "B", "IA": "IA", "AB": "AB", "IB": "IB", "IAB": "IAB"}
+            wandb_project_name = f"{model_name} {dataset_type} {config_type} {box_pattern}"
+        cols = list(teacher_name_mapping_wandb.keys())
+        runs = api.runs(wandb_project_name)
+        histories = []
+        for run in runs:
+            history = run.history()
+            history['Group Name'] = run.config.get("experiment", {}).get("name")
+            histories.append(history)
+        
+        plot_teachers(histories, cols=cols, title=f"teacher_{box_pattern}", map_dict=teacher_name_mapping_wandb)
 
 

@@ -49,3 +49,29 @@ teacher_save_path: null
 wandb_project_name: ""
 wandb_run_name: null
 
+# RLCT stuff
+rlct_config:
+  sampling_method: "SGLD"
+  sigma: 0.25
+  sgld_kwargs:
+    lr: 5e-7
+    noise_level: 1.0
+    weight_decay: 3e-7
+    elasticity: 1.0
+    temperature: "adaptive"
+  sgnht_kwargs:
+    lr: 5e-7
+    diffusion_factor: 0.01
+    bounding_box_size: 0.5
+  num_chains: 10
+  num_burnin_steps: 0 
+  num_steps_bw_draws: 1
+  num_samples: 10000 # Default could also be length of dataset
+  batch_size: 1024
+  cores: 1
+  seed:
+    # Default: None. Can be an int or a list of ints.
+    # Example: 1234 or [1234, 5678]
+  pbar: true  # Progress bar
+  verbose: true
+  return_weights: true

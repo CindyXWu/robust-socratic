@@ -57,7 +57,11 @@ def plot_PIL_batch(dataloader: DataLoader, num_images: int) -> None:
     return fig
 
     
-def show_images_grid(imgs_, class_labels, num_images):
+def show_images_grid(
+    imgs: list, 
+    class_labels: torch.Tensor, 
+    num_images: int
+) -> None:
     """Now modified to show both [c h w] and [h w c] images."""
     ncols = int(np.ceil(num_images**0.5))
     nrows = int(np.ceil(num_images / ncols))
@@ -66,7 +70,7 @@ def show_images_grid(imgs_, class_labels, num_images):
 
     for ax_i, ax in enumerate(axes):
         if ax_i < num_images:
-            img = imgs_[ax_i]
+            img = imgs[ax_i]
             if img.ndim == 3 and img.shape[0] == 3:
                 img = einops.rearrange(img, 'c h w -> h w c')
             ax.imshow(img, cmap='Greys_r', interpolation='nearest')
@@ -75,7 +79,6 @@ def show_images_grid(imgs_, class_labels, num_images):
             ax.set_yticks([])
         else:
             ax.axis('off')
-    print("showing plot")
     plt.show()
 
 
@@ -86,9 +89,12 @@ def plot_images(dataloader: DataLoader, num_images: int, title: Optional[str] = 
         break
 
 
-def visualise_features_3d(s_features: torch.Tensor, 
-                          t_features: torch.Tensor, 
-                          title: Optional[str] = None):
+def visualise_features_3d(
+    s_features: torch.Tensor, 
+    t_features: torch.Tensor, 
+    title: Optional[str] = None
+) -> None:
+    """3D t-SNE."""
     tsne = TSNE(n_components=3, perplexity=30, learning_rate=200, n_iter=1000, random_state=42)
     s = tsne.fit_transform(s_features.detach().numpy())
     t = tsne.fit_transform(t_features.detach().numpy())
@@ -105,9 +111,11 @@ def visualise_features_3d(s_features: torch.Tensor,
         plt.show()
 
 
-def visualise_features_2d(s_features: torch.Tensor, 
-                          t_features: torch.Tensor, 
-                          title=None):
+def visualise_features_2d(
+    s_features: torch.Tensor, 
+    t_features: torch.Tensor, 
+    title=None
+) -> None:
     """Student and teacher features shape [num_samples, feature_dim]."""
     tsne = TSNE(n_components=2, perplexity=30, learning_rate=200, n_iter=1000, random_state=42)
     s = tsne.fit_transform(s_features.detach().numpy())
@@ -132,15 +140,18 @@ def visualise_features_2d(s_features: torch.Tensor,
 def create_histories_list(
     grouped_runs: Dict[tuple, List],
     mode: str,
-    **kwargs) -> List[pd.DataFrame]:
-    """Takes each metric and groups runs with the same ones, then calculates the mean and variance."""
+    **kwargs
+) -> List[pd.DataFrame]:
+    """Takes each metric and groups runs with the same ones. 
+    
+    Calculates the mean and variance for each metric and adds these as separate columns, returning new combined history."""
     histories = []
     
     for key, runs in grouped_runs.items():
         print(f'creating history for {key}')
         metrics = defaultdict(list)
         for run in runs:
-            history = run.history
+            history = run.history()
             for metric in history.columns:
                 metrics[metric].append(history[[metric]])
         
@@ -149,8 +160,7 @@ def create_histories_list(
             combined = pd.concat(metric_values)
             mean = combined.groupby(combined.index)[metric].mean().rename(f'{metric} Mean')
             
-            # Check the number of data points before attempting to compute variance
-            if len(combined) > 1:
+            if len(combined) > 1:   # Check number of data points before attempting to compute variance
                 var = combined.groupby(combined.index)[metric].var().fillna(0).rename(f'{metric} Var')
             else:
                 var = pd.Series(0, index=combined.index, name=f'{metric} Var')
@@ -163,20 +173,18 @@ def create_histories_list(
             combined['Group Name'] = combined.apply(lambda row: {'T': key[0], 'S': key[1]}, axis=1)
         elif mode == 'vstime': # For vstime - must pass in extra info via kwargs
             grid = kwargs.get('grid')
-            if grid is None:
-                raise ValueError("Whether to use grid must be provided")
-            if grid:
-                combined['Group Name'] = combined.apply(lambda row: {'T': key[0], 'S': key[1]}, axis=1)
-            else: # Student only in Group Name
-                combined['Group Name'] = key[1]
-        else: raise ValueError("Mode must be 'exhaustive' or 'vstime'")
+            if grid is None: raise ValueError("Whether to use grid must be provided")
+            if grid: combined['Group Name'] = combined.apply(lambda row: {'T': key[0], 'S': key[1]}, axis=1)
+            else: combined['Group Name'] = key[1] # Student only in Group Name
+        else: 
+            raise ValueError("Mode must be 'exhaustive' or 'vstime'")
                 
         histories.append(combined)
         
     return histories
 
 
-def drop_non_numeric_columns(df):
+def drop_non_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Drop columns that cannot be converted entirely to numeric values."""
     cols_to_drop = []
     
@@ -208,9 +216,11 @@ def clean_history(history: pd.DataFrame) -> pd.DataFrame:
     return history_clean
 
 
-def smooth_history(history: pd.DataFrame, 
-                   window_length: Optional[int]=5, 
-                   polyorder: Optional[int] = 3) -> pd.DataFrame:
+def smooth_history(
+    history: pd.DataFrame, 
+    window_length: Optional[int]=5, 
+    polyorder: Optional[int] = 3
+) -> pd.DataFrame:
     """Smooth each column in the DataFrame, interpolating for NaNs."""
     nan_mask = history.isna()
     filtered_history = history.interpolate().apply(lambda x: savgol_filter(x, window_length, polyorder, mode='mirror'))
@@ -240,7 +250,7 @@ def get_nested_value(d: dict, keys_str: str):
     return d
 
 
-def get_order_list(exp_names: List) -> List:
+def get_order_list(exp_names: List[str]) -> List[str]:
     """Order of subplots by metric name - used to make grouped plots make sense"""
     const_graph_list = ['T-S Top 1 Fidelity', 'T-S KL', 'T-S Test Difference']
     order_list = exp_names + const_graph_list
@@ -248,9 +258,8 @@ def get_order_list(exp_names: List) -> List:
 
 
 def custom_sort(col: str, type: str, exp_names: List[str]) -> int:
-    order_list = get_order_list(exp_names)
-    
     """Used to sort the order of the subplots in the grouped plots."""
+    order_list = get_order_list(exp_names)
     match type:
         case 'acc':
             metric_name = col.replace(' Mean', '')

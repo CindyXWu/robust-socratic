@@ -168,22 +168,23 @@ def plot_aggregated_data(aggregated_data: Dict[str, np.ndarray], loss_name: str,
     plt.savefig(f"images/aggregated_heatmaps/{loss_name}_{box_pattern}_{type}_variances.png", dpi=300, bbox_inches="tight")
 
 
-## For violin plots ===========================================================================
+## For violin/scatter plots ===========================================================================
 
 
 def violinplot_get_data(project_name: str,
                         loss_name: str,
                         box_pattern: str,
-                        groupby_metrics: List[str],
                         additional_naming: str) -> List[pd.DataFrame]:
+    """Get data from Weights and Biases in format suitable for teacher mechanism agnostic grouping.
+    
+    Valid for violin and scatter plot by logic of grouping.
+    """
     runs = api.runs(project_name)
-
     filtered_runs = []
     filtered_histories = []
     min_step = 1200
 
-    # Filter for loss and correct experiment name, and remove crashed/incomplete runs
-    for run in tqdm(runs):
+    for run in tqdm(runs):  # Filter for loss and correct experiment name, and remove crashed/incomplete runs
         try:
             history = run.history()
         except:
@@ -191,11 +192,9 @@ def violinplot_get_data(project_name: str,
         if ('_step' in history and history['_step'].max() > min_step and 
             run.config.get('distill_loss_type') == loss_name and 
             run.config.get("experiment", {}).get("name") in label_group_names):
-            key = tuple([get_nested_value(run.config, m) for m in groupby_metrics])
             if '_step' in history.columns and history['_step'].max() >= min_step:
                 history = drop_non_numeric_columns(history)  # Remove artifacts
                 history = clean_history(history)  # Remove NaNs
-                #history = smooth_history(history)
                 history['Group Name'] = history.apply(lambda row: {'T': key[0], 'S': key[1]}, axis=1)
                 run.history = history
                 filtered_runs.append(run)
@@ -209,7 +208,7 @@ def violinplot_get_data(project_name: str,
     return filtered_histories
 
 
-def aggregate_conditions_violin(combined_history: List[pd.DataFrame], type: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+def aggregate_conditions(combined_history: List[pd.DataFrame], type: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Take list of history dataframes. Go through every single history and group into a particular condition. 
     Append final value of metric given by type to column named 'value'.
     Append the teacher and student mechanisms to list of teacher-student pairs in condition dictionary. Create a new dataframe from this and return as condition map.
@@ -275,17 +274,15 @@ def plot_aggregated_data_scatter(all_data: dict[str, pd.DataFrame], box_pattern:
     # Define a fixed order for the conditions
     condition_order = ['Similarity', 'Student', 'Teacher', 'Student TP', 'Teacher SP', 'Overlap', 'Neither', 'Other']
 
-    sns.set_style("white")
-    sns.set_context("paper", font_scale=1.2)
+    sns.set(style="white", context="paper", font_scale=1.3)
 
     num_plots = len(all_data)
     fig, axes = plt.subplots(1, num_plots, figsize=(7 * num_plots, 6), sharey=True)
 
-    if num_plots == 1:
+    if num_plots == 1: 
         axes = [axes]
 
     y_axes_names = {"ACC": "Student Test Accuracy", "KL": "KL Divergence", "TOP-1": "Top-1 Fidelity"}
-
     all_handles, all_labels = set(), []  # To store unique handles and labels
 
     for idx, (loss_name, df) in enumerate(all_data.items()):
@@ -306,10 +303,10 @@ def plot_aggregated_data_scatter(all_data: dict[str, pd.DataFrame], box_pattern:
 
         ax.legend_.remove()
 
-    fig.legend(all_handles, all_labels, loc='upper center', ncol=len(all_labels), bbox_to_anchor=(0.5, -0.01), fontsize=15, title="Test Mechanism")
+    fig.legend(all_handles, all_labels, loc='lower center', ncol=len(all_labels), bbox_to_anchor=(0.5, 0), fontsize=17, title="Test Mechanism", title_fontsize=17)
 
     plt.tight_layout()
-    plt.savefig(f"images/aggregated_scatter/{box_pattern}_{type}.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(f"images/aggregated_scatter/{box_pattern}_{type}.png", dpi=500, bbox_inches="tight")
 
 
 
@@ -326,8 +323,8 @@ if __name__ == "__main__":
     additional_naming = '' # For names appended to end of typical project naming convention
     wandb_project_name = f"DISTILL-{model_name}-{dataset_type}-{config_type}-{box_pattern}{additional_naming}"
 
-    # 0 for combined heatmaps, 1 for combined violin plots, 2 for combined scatter plots
-    mode = 2
+    # 0 for combined heatmaps, 1 for scatter plots
+    mode = 1
     groupby_metrics = ["experiment.name", "experiment_s.name"]
     
     if mode == 0:
@@ -350,29 +347,9 @@ if __name__ == "__main__":
             plot_aggregated_data(aggregated_data, loss_name, box_pattern, type=type)
     
     elif mode == 1:
-        box_pattern = "MANDELBROT"
-        for loss_name in loss_names:
-            type = 'ACC'
-            title = f"{type} {loss_name} {box_pattern}{additional_naming}"
-            filename = f"run_data/aggregated violin {loss_name} {box_pattern}{additional_naming}"
-            print(f'calculating aggregated violin mode 1 for {wandb_project_name} {title}')
-
-            try:
-                with open(filename, "rb") as f:
-                    violin_histories = pickle.load(f)
-                save_df_csv(violin_histories[0], 'violin histories after opening saved raw data')
-            except:
-                # IMPORTANT: teacher mechanism must go first in groupby_metrics list
-                violin_histories: List[pd.DataFrame] = violinplot_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, additional_naming=additional_naming)
-
-            violin_df, condition_map = aggregate_conditions_violin(violin_histories, type=type)
-            # Now, directly use violin_df for plotting since it's already in the right format
-            plot_aggregated_data_violin(violin_df, loss_name, box_pattern, type=type, title=title)
-    
-    elif mode == 2:
         box_pattern = "RANDOM"
-        type = 'ACC'
-        data_to_plot = {}
+        type = 'TOP-1'
+        data_to_plot = {}   # Holds data that goes into plotting scatter
 
         for loss_name in loss_names:
             make_legend = True if loss_name == 'CONTRASTIVE' else False
@@ -386,12 +363,9 @@ if __name__ == "__main__":
                     violin_histories = pickle.load(f)
                 save_df_csv(violin_histories[0], 'scatterplot histories after opening saved raw data')
             except: # IMPORTANT: teacher mechanism must go first in groupby_metrics list
-                violin_histories: List[pd.DataFrame] = violinplot_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, groupby_metrics=groupby_metrics, additional_naming=additional_naming)
+                violin_histories: List[pd.DataFrame] = violinplot_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, additional_naming=additional_naming)
 
-            violin_df, condition_map = aggregate_conditions_violin(violin_histories, type=type)
-
+            violin_df, condition_map = aggregate_conditions(violin_histories, type=type)
             data_to_plot[loss_name] = violin_df
-
-            # plot_aggregated_data_scatter(violin_df, loss_name, box_pattern, type=type, make_legend=make_legend)
         
         plot_aggregated_data_scatter(data_to_plot, box_pattern, type=type)

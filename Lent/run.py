@@ -6,14 +6,19 @@ from hydra.core.config_store import ConfigStore
 from hydra.core.hydra_config import HydraConfig
 from hydra.utils import get_original_cwd
 import logging
+import statistics
+from pathlib import Path
 from omegaconf import OmegaConf
 
 from create_sweep import load_config
 from train_utils import train_teacher, get_previous_commit_hash
 from config_setup import MainConfig, ConfigType
 from constructors import model_constructor, optimizer_constructor, create_dataloaders, get_dataset_output_size, change_frac_filename
+from devinterp.optim.sgld import SGLD
+from devinterp.optim.sgnht import SGNHT
+from devinterp.slt import estimate_learning_coeff
 
-# Change directory to one this file is in
+
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Register the defaults from the structured dataclass config schema:
@@ -102,7 +107,7 @@ def main(config: MainConfig) -> None:
             wandb.log_artifact(model_artifact)
     except: # The most lazy way of saying 'this block of code is generating errors sometimes but it doesn't really matter so I'm not going to fix it'
         pass # I'm not sorry
-        
+
     # Needed to make sure each config file in multirun initialises separately
     wandb.finish()
 
