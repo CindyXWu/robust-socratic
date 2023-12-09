@@ -2,9 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 import pickle
-import logging
 import wandb
-
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from labellines import labelLines
@@ -269,6 +267,7 @@ def make_plot(
 
     for ax in axs:
         ax.set_prop_cycle(color=[color_dict[group_name] for group_name in color_dict])
+        
     legend_handles = []
     for i, mean_col in enumerate(cols): # Iterate over subplots
         var_col = mean_col.replace(' Mean', ' Var')

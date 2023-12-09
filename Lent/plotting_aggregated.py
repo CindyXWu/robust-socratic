@@ -262,6 +262,7 @@ def aggregate_conditions(combined_history: List[pd.DataFrame], type: str) -> tup
             condition_map[condition_name].append(f"{teacher} {student} {key}")
 
     df_condition_map = pd.DataFrame(dict([(k, pd.Series(v)) for k, v in condition_map.items()]))
+    print(df_condition_map)
     final_df = pd.DataFrame(all_data)
     save_df_csv(final_df, title=f'final_{type}_df')
     save_df_csv(df_condition_map, title=f'condition_mapping_{type}_df')
@@ -273,9 +274,7 @@ def plot_aggregated_data_scatter(all_data: dict[str, pd.DataFrame], box_pattern:
     """Plot strip scatter plots for all loss functions in a single row."""
     # Define a fixed order for the conditions
     condition_order = ['Similarity', 'Student', 'Teacher', 'Student TP', 'Teacher SP', 'Overlap', 'Neither', 'Other']
-
     sns.set(style="white", context="paper", font_scale=1.3)
-
     num_plots = len(all_data)
     fig, axes = plt.subplots(1, num_plots, figsize=(7 * num_plots, 6), sharey=True)
 
@@ -309,6 +308,33 @@ def plot_aggregated_data_scatter(all_data: dict[str, pd.DataFrame], box_pattern:
     plt.savefig(f"images/aggregated_scatter/{box_pattern}_{type}.png", dpi=500, bbox_inches="tight")
 
 
+def plot_single_loss_data_scatter(loss_data: pd.DataFrame, box_pattern: str, loss_name: str, type: str, make_legend: bool = True) -> None:
+    """Plot strip scatter plot for a single loss function."""
+    # Define a fixed order for the conditions
+    condition_order = ['Similarity', 'Student', 'Teacher', 'Student TP', 'Teacher SP', 'Overlap', 'Neither', 'Other']
+    sns.set(style="white", context="paper", font_scale=1.3)
+    y_axes_names = {"ACC": "Student Test Accuracy", "KL": "KL Divergence", "TOP-1": "Top-1 Fidelity"}
+    fig, ax = plt.subplots(figsize=(7,4.5))
+
+    sns.stripplot(x="Condition", y="Value", hue="Key", data=loss_data, order=condition_order, jitter=False, dodge=True, palette="Paired", marker="o", edgecolor="gray", size=6, ax=ax)
+
+    ax.set_ylabel(y_axes_names[type], fontsize=15, labelpad=15)
+    ax.set_xlabel("Dataset Mechanisms Condition", fontsize=15, labelpad=15)
+
+    if make_legend:
+        handles, labels = ax.get_legend_handles_labels()
+        fig_leg = plt.figure(figsize=(8, 1))
+        ax_leg = fig_leg.add_subplot(111)
+        ax_leg.legend(handles, labels, loc='center', ncols=len(handles), fontsize=12, title_fontsize=12, handlelength=1, title="Test Mechanism")
+        ax_leg.axis('off')
+        fig_leg.tight_layout()
+        fig_leg.savefig(f"images/aggregated_scatter/legend.png", bbox_inches='tight')
+        plt.close(fig_leg)
+        ax.get_legend().remove()
+
+    plt.tight_layout()
+    plt.savefig(f"images/aggregated_scatter/{box_pattern}_{loss_name}_{type}.png", dpi=500, bbox_inches="tight")
+
 
 if __name__ == "__main__":
     # Somewhat immutable things
@@ -323,8 +349,8 @@ if __name__ == "__main__":
     additional_naming = '' # For names appended to end of typical project naming convention
     wandb_project_name = f"DISTILL-{model_name}-{dataset_type}-{config_type}-{box_pattern}{additional_naming}"
 
-    # 0 for combined heatmaps, 1 for scatter plots
-    mode = 1
+    # 0 for combined heatmaps, 1 for scatter plots, 2 for single scatter plots
+    mode = 2
     groupby_metrics = ["experiment.name", "experiment_s.name"]
     
     if mode == 0:
@@ -348,13 +374,12 @@ if __name__ == "__main__":
     
     elif mode == 1:
         box_pattern = "RANDOM"
-        type = 'TOP-1'
+        type = 'KL'
         data_to_plot = {}   # Holds data that goes into plotting scatter
+        wandb_project_name = f"DISTILL-{model_name}-{dataset_type}-{config_type}-{box_pattern}{additional_naming}"
 
         for loss_name in loss_names:
-            make_legend = True if loss_name == 'CONTRASTIVE' else False
             title = f"{type} {loss_name} {box_pattern}{additional_naming}"
-            wandb_project_name = f"DISTILL-{model_name}-{dataset_type}-{config_type}-{box_pattern}{additional_naming}"
             filename = f"run_data/aggregated violin {loss_name} {box_pattern}{additional_naming}"
             print(f'calculating aggregated scatter mode 2 for {wandb_project_name} {title}')
 
@@ -369,3 +394,23 @@ if __name__ == "__main__":
             data_to_plot[loss_name] = violin_df
         
         plot_aggregated_data_scatter(data_to_plot, box_pattern, type=type)
+    
+    elif mode == 2:
+        box_pattern = "RANDOM"
+        type = "ACC"
+        wandb_project_name = f"DISTILL-{model_name}-{dataset_type}-{config_type}-{box_pattern}{additional_naming}"
+
+        for loss_name in loss_names:
+            title = f"{type} {loss_name} {box_pattern}{additional_naming}"
+            filename = f"run_data/aggregated violin {loss_name} {box_pattern}{additional_naming}"
+            print(f'calculating aggregated scatter mode 2 for {wandb_project_name} {title}')
+
+            try:
+                with open(filename, "rb") as f:
+                    violin_histories = pickle.load(f)
+                save_df_csv(violin_histories[0], 'scatterplot histories after opening saved raw data')
+            except: # IMPORTANT: teacher mechanism must go first in groupby_metrics list
+                violin_histories: List[pd.DataFrame] = violinplot_get_data(project_name=wandb_project_name, loss_name=loss_name, box_pattern=box_pattern, additional_naming=additional_naming)
+            
+            violin_df, condition_map = aggregate_conditions(violin_histories, type=type)
+            plot_single_loss_data_scatter(violin_df, box_pattern, loss_name, type=type)
